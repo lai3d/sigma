@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from '@/api/vps';
 import type { CreateVps, UpdateVps, VpsListQuery, ImportResult } from '@/types/api';
 
-export function useVpsList(query?: VpsListQuery) {
+export function useVpsList(query?: VpsListQuery & { page?: number; per_page?: number }) {
   return useQuery({
     queryKey: ['vps', query],
     queryFn: () => api.listVps(query),

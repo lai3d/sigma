@@ -112,6 +112,13 @@ export interface CountStat {
   count: number | null;
 }
 
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  per_page: number;
+}
+
 export interface ImportResult {
   imported: number;
   errors: string[];

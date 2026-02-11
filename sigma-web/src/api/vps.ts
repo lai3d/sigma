@@ -1,7 +1,7 @@
 import { apiClient } from './client';
-import type { Vps, CreateVps, UpdateVps, VpsListQuery, ImportResult } from '@/types/api';
+import type { Vps, CreateVps, UpdateVps, VpsListQuery, ImportResult, PaginatedResponse } from '@/types/api';
 
-export async function listVps(query?: VpsListQuery): Promise<Vps[]> {
+export async function listVps(query?: VpsListQuery & { page?: number; per_page?: number }): Promise<PaginatedResponse<Vps>> {
   const params = new URLSearchParams();
   if (query) {
     for (const [key, value] of Object.entries(query)) {

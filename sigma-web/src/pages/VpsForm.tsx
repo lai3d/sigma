@@ -48,7 +48,8 @@ export default function VpsForm() {
   const navigate = useNavigate();
 
   const { data: existing } = useVps(id || '');
-  const { data: providers } = useProviders();
+  const { data: providersResult } = useProviders({ per_page: 100 });
+  const providers = providersResult?.data;
   const createMutation = useCreateVps();
   const updateMutation = useUpdateVps();
 

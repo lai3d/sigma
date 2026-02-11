@@ -2,8 +2,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from '@/api/providers';
 import type { CreateProvider, UpdateProvider, ImportResult } from '@/types/api';
 
-export function useProviders() {
-  return useQuery({ queryKey: ['providers'], queryFn: api.listProviders });
+export function useProviders(query?: { page?: number; per_page?: number }) {
+  return useQuery({
+    queryKey: ['providers', query],
+    queryFn: () => api.listProviders(query),
+  });
 }
 
 export function useProvider(id: string) {

@@ -183,7 +183,32 @@ pub struct VpsListQuery {
     pub purpose: Option<String>,
     pub tag: Option<String>,
     pub expiring_within_days: Option<i32>,
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_per_page")]
+    pub per_page: i64,
 }
+
+// ─── Pagination ──────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct ProviderListQuery {
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_per_page")]
+    pub per_page: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PaginatedResponse<T: Serialize> {
+    pub data: Vec<T>,
+    pub total: i64,
+    pub page: i64,
+    pub per_page: i64,
+}
+
+fn default_page() -> i64 { 1 }
+fn default_per_page() -> i64 { 25 }
 
 // ─── Prometheus target output ────────────────────────────
 

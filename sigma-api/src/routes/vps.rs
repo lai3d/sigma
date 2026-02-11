@@ -11,8 +11,8 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::models::{
-    CreateVps, ExportQuery, ImportRequest, ImportResult, IpEntry, UpdateVps, Vps, VpsCsvRow,
-    VpsListQuery,
+    CreateVps, ExportQuery, ImportRequest, ImportResult, IpEntry, PaginatedResponse, UpdateVps,
+    Vps, VpsCsvRow, VpsListQuery,
 };
 use crate::routes::AppState;
 
@@ -50,65 +50,84 @@ pub fn router() -> Router<AppState> {
 async fn list(
     State(state): State<AppState>,
     Query(q): Query<VpsListQuery>,
-) -> Result<Json<Vec<Vps>>, AppError> {
-    let mut sql = String::from(
-        "SELECT * FROM vps WHERE 1=1"
-    );
+) -> Result<Json<PaginatedResponse<Vps>>, AppError> {
+    let per_page = q.per_page.clamp(1, 100);
+    let page = q.page.max(1);
+    let offset = (page - 1) * per_page;
+
+    let mut where_clause = String::from(" WHERE 1=1");
     let mut param_idx = 0u32;
 
     if q.status.is_some() {
         param_idx += 1;
-        sql.push_str(&format!(" AND status = ${}", param_idx));
+        where_clause.push_str(&format!(" AND status = ${}", param_idx));
     }
     if q.country.is_some() {
         param_idx += 1;
-        sql.push_str(&format!(" AND country = ${}", param_idx));
+        where_clause.push_str(&format!(" AND country = ${}", param_idx));
     }
     if q.provider_id.is_some() {
         param_idx += 1;
-        sql.push_str(&format!(" AND provider_id = ${}", param_idx));
+        where_clause.push_str(&format!(" AND provider_id = ${}", param_idx));
     }
     if q.purpose.is_some() {
         param_idx += 1;
-        sql.push_str(&format!(" AND purpose = ${}", param_idx));
+        where_clause.push_str(&format!(" AND purpose = ${}", param_idx));
     }
     if q.tag.is_some() {
         param_idx += 1;
-        sql.push_str(&format!(" AND ${} = ANY(tags)", param_idx));
+        where_clause.push_str(&format!(" AND ${} = ANY(tags)", param_idx));
     }
     if q.expiring_within_days.is_some() {
         param_idx += 1;
-        sql.push_str(&format!(
+        where_clause.push_str(&format!(
             " AND expire_date IS NOT NULL AND expire_date <= CURRENT_DATE + (${} || ' days')::INTERVAL",
             param_idx
         ));
     }
 
-    sql.push_str(" ORDER BY status, expire_date ASC NULLS LAST, hostname");
+    // Count query
+    let count_sql = format!("SELECT COUNT(*) FROM vps{}", where_clause);
+    let mut count_query = sqlx::query_as::<_, (i64,)>(&count_sql);
 
-    let mut query = sqlx::query_as::<_, Vps>(&sql);
+    if let Some(ref v) = q.status { count_query = count_query.bind(v); }
+    if let Some(ref v) = q.country { count_query = count_query.bind(v); }
+    if let Some(ref v) = q.provider_id { count_query = count_query.bind(v); }
+    if let Some(ref v) = q.purpose { count_query = count_query.bind(v); }
+    if let Some(ref v) = q.tag { count_query = count_query.bind(v); }
+    if let Some(v) = q.expiring_within_days { count_query = count_query.bind(v); }
 
-    if let Some(ref v) = q.status {
-        query = query.bind(v);
-    }
-    if let Some(ref v) = q.country {
-        query = query.bind(v);
-    }
-    if let Some(ref v) = q.provider_id {
-        query = query.bind(v);
-    }
-    if let Some(ref v) = q.purpose {
-        query = query.bind(v);
-    }
-    if let Some(ref v) = q.tag {
-        query = query.bind(v);
-    }
-    if let Some(v) = q.expiring_within_days {
-        query = query.bind(v);
-    }
+    let total = count_query.fetch_one(&state.db).await?.0;
+
+    // Data query with pagination
+    param_idx += 1;
+    let limit_param = param_idx;
+    param_idx += 1;
+    let offset_param = param_idx;
+
+    let data_sql = format!(
+        "SELECT * FROM vps{} ORDER BY status, expire_date ASC NULLS LAST, hostname LIMIT ${} OFFSET ${}",
+        where_clause, limit_param, offset_param
+    );
+    let mut query = sqlx::query_as::<_, Vps>(&data_sql);
+
+    if let Some(ref v) = q.status { query = query.bind(v); }
+    if let Some(ref v) = q.country { query = query.bind(v); }
+    if let Some(ref v) = q.provider_id { query = query.bind(v); }
+    if let Some(ref v) = q.purpose { query = query.bind(v); }
+    if let Some(ref v) = q.tag { query = query.bind(v); }
+    if let Some(v) = q.expiring_within_days { query = query.bind(v); }
+
+    query = query.bind(per_page).bind(offset);
 
     let rows = query.fetch_all(&state.db).await?;
-    Ok(Json(rows))
+
+    Ok(Json(PaginatedResponse {
+        data: rows,
+        total,
+        page,
+        per_page,
+    }))
 }
 
 async fn get_one(

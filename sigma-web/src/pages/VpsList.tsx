@@ -6,14 +6,16 @@ import { useProviders } from '@/hooks/useProviders';
 import StatusBadge from '@/components/StatusBadge';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import ImportExportButtons from '@/components/ImportExportButtons';
+import Pagination from '@/components/Pagination';
 import { exportVps } from '@/api/vps';
 import { formatDate, daysUntil, ipLabelColor, ipLabelShort } from '@/lib/utils';
 import type { VpsListQuery } from '@/types/api';
 
 export default function VpsList() {
   const [filters, setFilters] = useState<VpsListQuery>({});
-  const { data: vpsList, isLoading } = useVpsList(filters);
-  const { data: providers } = useProviders();
+  const [page, setPage] = useState(1);
+  const { data: result, isLoading } = useVpsList({ ...filters, page, per_page: 25 });
+  const { data: providersResult } = useProviders();
   const deleteMutation = useDeleteVps();
   const retireMutation = useRetireVps();
   const importMutation = useImportVps();
@@ -21,7 +23,14 @@ export default function VpsList() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [confirmRetire, setConfirmRetire] = useState<string | null>(null);
 
+  const vpsList = result?.data;
+  const providers = providersResult?.data;
   const providerMap = new Map(providers?.map((p) => [p.id, p.name]) || []);
+
+  const handleFilterChange = (newFilters: VpsListQuery) => {
+    setFilters(newFilters);
+    setPage(1);
+  };
 
   return (
     <div>
@@ -46,7 +55,7 @@ export default function VpsList() {
       <div className="mt-4 flex flex-wrap gap-3">
         <select
           value={filters.status || ''}
-          onChange={(e) => setFilters({ ...filters, status: e.target.value || undefined })}
+          onChange={(e) => handleFilterChange({ ...filters, status: e.target.value || undefined })}
           className="border rounded-md px-3 py-1.5 text-sm bg-white"
         >
           <option value="">All Statuses</option>
@@ -58,7 +67,7 @@ export default function VpsList() {
 
         <select
           value={filters.purpose || ''}
-          onChange={(e) => setFilters({ ...filters, purpose: e.target.value || undefined })}
+          onChange={(e) => handleFilterChange({ ...filters, purpose: e.target.value || undefined })}
           className="border rounded-md px-3 py-1.5 text-sm bg-white"
         >
           <option value="">All Purposes</option>
@@ -72,7 +81,7 @@ export default function VpsList() {
         <select
           value={filters.provider_id || ''}
           onChange={(e) =>
-            setFilters({ ...filters, provider_id: e.target.value || undefined })
+            handleFilterChange({ ...filters, provider_id: e.target.value || undefined })
           }
           className="border rounded-md px-3 py-1.5 text-sm bg-white"
         >
@@ -89,7 +98,7 @@ export default function VpsList() {
           placeholder="Country (e.g. US)"
           value={filters.country || ''}
           onChange={(e) =>
-            setFilters({ ...filters, country: e.target.value || undefined })
+            handleFilterChange({ ...filters, country: e.target.value || undefined })
           }
           className="border rounded-md px-3 py-1.5 text-sm w-36"
         />
@@ -99,7 +108,7 @@ export default function VpsList() {
           placeholder="Tag"
           value={filters.tag || ''}
           onChange={(e) =>
-            setFilters({ ...filters, tag: e.target.value || undefined })
+            handleFilterChange({ ...filters, tag: e.target.value || undefined })
           }
           className="border rounded-md px-3 py-1.5 text-sm w-32"
         />
@@ -206,6 +215,15 @@ export default function VpsList() {
           </table>
         )}
       </div>
+
+      {result && (
+        <Pagination
+          page={result.page}
+          perPage={result.per_page}
+          total={result.total}
+          onPageChange={setPage}
+        />
+      )}
 
       <ConfirmDialog
         open={!!confirmRetire}

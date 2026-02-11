@@ -3,18 +3,22 @@ import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
 import { useProviders, useDeleteProvider, useImportProviders } from '@/hooks/useProviders';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import ImportExportButtons from '@/components/ImportExportButtons';
+import Pagination from '@/components/Pagination';
 import { exportProviders } from '@/api/providers';
 import { formatDate } from '@/lib/utils';
 import ProviderFormDialog from './ProviderFormDialog';
 
 export default function ProviderList() {
-  const { data: providers, isLoading } = useProviders();
+  const [page, setPage] = useState(1);
+  const { data: result, isLoading } = useProviders({ page, per_page: 25 });
   const deleteMutation = useDeleteProvider();
   const importMutation = useImportProviders();
 
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+
+  const providers = result?.data;
 
   return (
     <div>
@@ -126,6 +130,15 @@ export default function ProviderList() {
           </table>
         )}
       </div>
+
+      {result && (
+        <Pagination
+          page={result.page}
+          perPage={result.per_page}
+          total={result.total}
+          onPageChange={setPage}
+        />
+      )}
 
       {showCreate && (
         <ProviderFormDialog onClose={() => setShowCreate(false)} />

@@ -9,8 +9,8 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::models::{
-    CreateProvider, ExportQuery, ImportRequest, ImportResult, Provider, ProviderCsvRow,
-    UpdateProvider,
+    CreateProvider, ExportQuery, ImportRequest, ImportResult, PaginatedResponse, Provider,
+    ProviderCsvRow, ProviderListQuery, UpdateProvider,
 };
 use crate::routes::AppState;
 
@@ -25,11 +25,32 @@ pub fn router() -> Router<AppState> {
         )
 }
 
-async fn list(State(state): State<AppState>) -> Result<Json<Vec<Provider>>, AppError> {
-    let rows = sqlx::query_as::<_, Provider>("SELECT * FROM providers ORDER BY name")
-        .fetch_all(&state.db)
+async fn list(
+    State(state): State<AppState>,
+    Query(q): Query<ProviderListQuery>,
+) -> Result<Json<PaginatedResponse<Provider>>, AppError> {
+    let per_page = q.per_page.clamp(1, 100);
+    let page = q.page.max(1);
+    let offset = (page - 1) * per_page;
+
+    let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM providers")
+        .fetch_one(&state.db)
         .await?;
-    Ok(Json(rows))
+
+    let rows = sqlx::query_as::<_, Provider>(
+        "SELECT * FROM providers ORDER BY name LIMIT $1 OFFSET $2",
+    )
+    .bind(per_page)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(Json(PaginatedResponse {
+        data: rows,
+        total: total.0,
+        page,
+        per_page,
+    }))
 }
 
 async fn get_one(

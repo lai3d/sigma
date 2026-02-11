@@ -1,8 +1,11 @@
 import { apiClient } from './client';
-import type { Provider, CreateProvider, UpdateProvider, ImportResult } from '@/types/api';
+import type { Provider, CreateProvider, UpdateProvider, ImportResult, PaginatedResponse } from '@/types/api';
 
-export async function listProviders(): Promise<Provider[]> {
-  const { data } = await apiClient.get('/providers');
+export async function listProviders(query?: { page?: number; per_page?: number }): Promise<PaginatedResponse<Provider>> {
+  const params = new URLSearchParams();
+  if (query?.page) params.set('page', String(query.page));
+  if (query?.per_page) params.set('per_page', String(query.per_page));
+  const { data } = await apiClient.get(`/providers?${params.toString()}`);
   return data;
 }
 
