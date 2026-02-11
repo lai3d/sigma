@@ -10,8 +10,10 @@ Sigma is a lightweight VPS fleet management platform for a VPN infrastructure pr
 sigma/
 ├── sigma-api/          # Rust backend (Axum + SQLx + PostgreSQL)
 ├── sigma-web/          # React frontend (Vite + TypeScript + Tailwind CSS)
+├── sigma-cli/          # Rust CLI client (clap + reqwest)
+├── sigma-probe/        # IP reachability probe (deployed on China nodes)
 ├── k8s/                # Kubernetes deployment configs
-├── docker-compose.yml  # Dev/staging orchestration (db + api + web)
+├── docker-compose.yml  # Dev/staging orchestration (db + api + web + probe)
 ├── Makefile            # Common commands
 └── DEPLOYMENT.md       # Deployment guide
 ```
@@ -31,7 +33,7 @@ sigma/
 
 - **Provider** — cloud platform vendor (DMIT, BandwagonHost, RackNerd, etc.)
 - **VPS** — individual server instance with lifecycle: provisioning → active → retiring → retired
-- **ip_checks** — table for tracking IP reachability from China (not yet implemented in API)
+- **ip_checks** — table for tracking IP reachability from China (API done, probe: `sigma-probe/`)
 
 ### VPS fields of note:
 - `ip_addresses` — JSONB array of `{ip, label}` objects. Labels: `china-telecom`, `china-unicom`, `china-mobile`, `china-cernet`, `overseas`, `internal`, `anycast`

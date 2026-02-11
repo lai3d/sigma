@@ -1,4 +1,4 @@
-.PHONY: help dev build up down logs clean deploy-k8s cli
+.PHONY: help dev build up down logs clean deploy-k8s cli probe
 
 # Default registry (override with: make build REGISTRY=your-registry.com)
 REGISTRY ?= your-registry
@@ -24,6 +24,8 @@ build: ## Build Docker images
 	cd sigma-api && docker build -t $(REGISTRY)/sigma-api:$(TAG) .
 	@echo "🔨 Building Web..."
 	cd sigma-web && docker build -t $(REGISTRY)/sigma-web:$(TAG) .
+	@echo "🔨 Building Probe..."
+	cd sigma-probe && docker build -t $(REGISTRY)/sigma-probe:$(TAG) .
 	@echo "✅ Build complete"
 
 push: build ## Build and push images to registry
@@ -101,6 +103,13 @@ cli: ## Build sigma CLI client
 cli-install: cli ## Build and install sigma CLI to ~/.cargo/bin
 	cp sigma-cli/target/release/sigma ~/.cargo/bin/sigma
 	@echo "✅ Installed sigma to ~/.cargo/bin/sigma"
+
+probe: ## Build sigma-probe binary
+	cd sigma-probe && cargo build --release
+	@echo "✅ Probe built: sigma-probe/target/release/sigma-probe"
+
+logs-probe: ## Tail probe logs
+	docker compose logs -f probe
 
 test-api: ## Test API health
 	@echo "🧪 Testing API..."

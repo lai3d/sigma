@@ -40,5 +40,19 @@ services:
       - api
     restart: unless-stopped
 
+  probe:
+    build: ./sigma-probe
+    cap_add:
+      - NET_RAW
+    environment:
+      SIGMA_API_URL: http://api:3000/api
+      SIGMA_API_KEY: ${API_KEY:-change-me-in-production}
+      PROBE_SOURCE: cn-beijing
+      PROBE_INTERVAL: 300
+      PROBE_TYPES: icmp,tcp,http
+    depends_on:
+      - api
+    restart: unless-stopped
+
 volumes:
   pgdata:
