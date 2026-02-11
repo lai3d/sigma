@@ -3,16 +3,17 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useVps, useCreateVps, useUpdateVps } from '@/hooks/useVps';
 import { useProviders } from '@/hooks/useProviders';
+import { ipLabelColor } from '@/lib/utils';
 import type { IpEntry } from '@/types/api';
 
 const IP_LABELS = [
-  { value: '', display: 'No label' },
-  { value: 'china-telecom', display: 'China Telecom / 电信' },
-  { value: 'china-unicom', display: 'China Unicom / 联通' },
-  { value: 'china-mobile', display: 'China Mobile / 移动' },
-  { value: 'china-cernet', display: 'CERNET / 教育网' },
-  { value: 'overseas', display: 'Overseas / 海外' },
-  { value: 'internal', display: 'Internal / 内网' },
+  { value: '', display: '-' },
+  { value: 'china-telecom', display: '电信' },
+  { value: 'china-unicom', display: '联通' },
+  { value: 'china-mobile', display: '移动' },
+  { value: 'china-cernet', display: '教育网' },
+  { value: 'overseas', display: '海外' },
+  { value: 'internal', display: '内网' },
   { value: 'anycast', display: 'Anycast' },
 ] as const;
 
@@ -281,13 +282,15 @@ export default function VpsForm() {
                           addIp();
                         }
                       }}
-                      className="input flex-1"
+                      className="input flex-1 min-w-0"
                       placeholder="103.1.2.3"
                     />
                     <select
                       value={entry.label}
                       onChange={(e) => updateIp(i, 'label', e.target.value)}
-                      className="input w-48"
+                      className={`shrink-0 rounded-md border px-2 py-1.5 text-sm font-medium outline-none cursor-pointer ${
+                        entry.label ? ipLabelColor(entry.label) + ' border-transparent' : 'border-gray-300 text-gray-400'
+                      }`}
                     >
                       {IP_LABELS.map((l) => (
                         <option key={l.value} value={l.value}>
