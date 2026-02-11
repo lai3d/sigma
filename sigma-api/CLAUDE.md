@@ -69,7 +69,7 @@ sigma/
 
 ### Roadmap (not yet implemented):
 - [ ] Telegram/webhook notifications for expiring VPS
-- [ ] CLI client
+- [x] CLI client (`sigma-cli/` — Rust binary using clap + reqwest)
 - [x] Bulk import/export (CSV/JSON)
 - [ ] IP reachability check API (ip_checks table exists but no routes yet)
 - [ ] Ansible dynamic inventory output (`GET /api/ansible/inventory`)

@@ -1,4 +1,4 @@
-.PHONY: help dev build up down logs clean deploy-k8s
+.PHONY: help dev build up down logs clean deploy-k8s cli
 
 # Default registry (override with: make build REGISTRY=your-registry.com)
 REGISTRY ?= your-registry
@@ -93,6 +93,14 @@ k8s-logs-web: ## Tail web logs in Kubernetes
 
 k8s-delete: ## Delete Kubernetes deployment
 	kubectl delete namespace sigma
+
+cli: ## Build sigma CLI client
+	cd sigma-cli && cargo build --release
+	@echo "✅ CLI built: sigma-cli/target/release/sigma"
+
+cli-install: cli ## Build and install sigma CLI to ~/.cargo/bin
+	cp sigma-cli/target/release/sigma ~/.cargo/bin/sigma
+	@echo "✅ Installed sigma to ~/.cargo/bin/sigma"
 
 test-api: ## Test API health
 	@echo "🧪 Testing API..."
