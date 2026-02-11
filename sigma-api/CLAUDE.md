@@ -70,16 +70,18 @@ sigma/
 - [x] Makefile with common commands
 - [x] DEPLOYMENT.md guide
 
-### Roadmap (not yet implemented):
-- [ ] Telegram/webhook notifications for expiring VPS
+### Roadmap:
 - [x] CLI client (`sigma-cli/` — Rust binary using clap + reqwest)
 - [x] Bulk import/export (CSV/JSON)
 - [x] IP reachability check API (`/api/ip-checks` — CRUD, summary, purge)
+- [x] IP reachability probe (`sigma-probe/` — ICMP/TCP/HTTP checks from China nodes)
+- [x] VPS agent auto-registration + heartbeat (`sigma-agent/` + `/api/agent/*` endpoints)
+- [x] Pagination on list endpoints
+- [ ] Telegram/webhook notifications for expiring VPS
 - [ ] Ansible dynamic inventory output (`GET /api/ansible/inventory`)
 - [ ] Cost tracking and reporting per provider/country/month
 - [ ] Auto-deploy node_exporter on new VPS via SSH
 - [ ] OpenAPI/Swagger spec generation
-- [x] Pagination on list endpoints
 - [ ] Rate limiting
 - [ ] Tests
 
