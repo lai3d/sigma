@@ -445,6 +445,114 @@ pub struct AgentHeartbeat {
     pub system_info: serde_json::Value,
 }
 
+// ─── Exchange Rates ──────────────────────────────────────
+
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+pub struct ExchangeRate {
+    pub id: Uuid,
+    pub from_currency: String,
+    pub to_currency: String,
+    #[schema(value_type = String)]
+    pub rate: Decimal,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateExchangeRate {
+    pub from_currency: String,
+    pub to_currency: String,
+    pub rate: f64,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateExchangeRate {
+    pub rate: f64,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct ExchangeRateListQuery {
+    pub from_currency: Option<String>,
+    pub to_currency: Option<String>,
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_per_page")]
+    pub per_page: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct PaginatedExchangeRateResponse {
+    pub data: Vec<ExchangeRate>,
+    pub total: i64,
+    pub page: i64,
+    pub per_page: i64,
+}
+
+// ─── Cost Reporting ──────────────────────────────────────
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct CostSummaryQuery {
+    pub provider_id: Option<Uuid>,
+    pub country: Option<String>,
+    pub status: Option<String>,
+    pub convert_to: Option<String>,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+pub struct CostSummaryRow {
+    pub currency: String,
+    pub vps_count: i64,
+    pub total_cost: Decimal,
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct CurrencyBreakdown {
+    pub currency: String,
+    pub vps_count: i64,
+    #[schema(value_type = String)]
+    pub total_cost: Decimal,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ConvertedTotal {
+    pub currency: String,
+    #[schema(value_type = String)]
+    pub amount: Decimal,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CostSummaryResponse {
+    pub per_currency: Vec<CurrencyBreakdown>,
+    pub converted_total: Option<ConvertedTotal>,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct CostMonthlyQuery {
+    /// Number of months to look back (default 12)
+    pub months: Option<i32>,
+    pub provider_id: Option<Uuid>,
+    pub country: Option<String>,
+    pub convert_to: Option<String>,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+pub struct MonthlyCostRow {
+    pub month: NaiveDate,
+    pub currency: Option<String>,
+    pub total_cost: Decimal,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct MonthlyCostEntry {
+    pub month: NaiveDate,
+    pub per_currency: Vec<CurrencyBreakdown>,
+    pub converted_total: Option<ConvertedTotal>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CostMonthlyResponse {
+    pub months: Vec<MonthlyCostEntry>,
+}
+
 // ─── Defaults ────────────────────────────────────────────
 
 fn default_ssh_port() -> i32 { 22 }

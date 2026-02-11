@@ -1,5 +1,7 @@
 pub mod agent;
 pub mod ansible;
+pub mod costs;
+pub mod exchange_rates;
 pub mod ip_checks;
 pub mod prometheus;
 pub mod providers;

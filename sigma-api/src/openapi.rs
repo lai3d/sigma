@@ -3,10 +3,12 @@ use utoipa::OpenApi;
 use crate::errors::ErrorResponse;
 #[allow(unused_imports)]
 use crate::models::{
-    AgentHeartbeat, AgentRegister, CountStat, CreateIpCheck, CreateProvider, CreateVps,
-    DashboardStats, ImportRequest, ImportResult, IpCheck, IpCheckSummary, IpEntry,
-    PaginatedIpCheckResponse, PaginatedProviderResponse, PaginatedVpsResponse,
-    PrometheusTarget, Provider, UpdateProvider, UpdateVps, Vps,
+    AgentHeartbeat, AgentRegister, ConvertedTotal, CostMonthlyResponse, CostSummaryResponse,
+    CountStat, CreateExchangeRate, CreateIpCheck, CreateProvider, CreateVps, CurrencyBreakdown,
+    DashboardStats, ExchangeRate, ImportRequest, ImportResult, IpCheck, IpCheckSummary, IpEntry,
+    MonthlyCostEntry, PaginatedExchangeRateResponse, PaginatedIpCheckResponse,
+    PaginatedProviderResponse, PaginatedVpsResponse, PrometheusTarget, Provider,
+    UpdateExchangeRate, UpdateProvider, UpdateVps, Vps,
 };
 
 #[derive(OpenApi)]
@@ -50,6 +52,15 @@ use crate::models::{
         crate::routes::agent::heartbeat,
         // Ansible
         crate::routes::ansible::inventory,
+        // Exchange Rates
+        crate::routes::exchange_rates::list,
+        crate::routes::exchange_rates::get_one,
+        crate::routes::exchange_rates::create,
+        crate::routes::exchange_rates::update,
+        crate::routes::exchange_rates::delete,
+        // Costs
+        crate::routes::costs::summary,
+        crate::routes::costs::monthly,
     ),
     components(schemas(
         ErrorResponse,
@@ -62,6 +73,9 @@ use crate::models::{
         ImportRequest, ImportResult,
         IpCheck, CreateIpCheck, IpCheckSummary,
         AgentRegister, AgentHeartbeat,
+        ExchangeRate, CreateExchangeRate, UpdateExchangeRate, PaginatedExchangeRateResponse,
+        CurrencyBreakdown, ConvertedTotal, CostSummaryResponse,
+        MonthlyCostEntry, CostMonthlyResponse,
     )),
     tags(
         (name = "Providers", description = "Cloud provider management"),
@@ -71,6 +85,8 @@ use crate::models::{
         (name = "Prometheus", description = "Prometheus integration"),
         (name = "Agent", description = "VPS agent registration and heartbeat"),
         (name = "Ansible", description = "Ansible dynamic inventory"),
+        (name = "Exchange Rates", description = "Currency exchange rate management"),
+        (name = "Costs", description = "Cost tracking and reporting"),
     )
 )]
 pub struct ApiDoc;

@@ -79,7 +79,7 @@ sigma/
 - [x] Pagination on list endpoints
 - [x] Telegram/webhook notifications for expiring VPS
 - [x] Ansible dynamic inventory output (`GET /api/ansible/inventory`)
-- [ ] Cost tracking and reporting per provider/country/month
+- [x] Cost tracking and reporting per provider/country/month
 - [ ] Auto-deploy node_exporter on new VPS via SSH
 - [x] OpenAPI/Swagger spec generation (`/swagger-ui`, `/api-docs/openapi.json`)
 - [x] Rate limiting (Redis-based sliding window, per-IP)
