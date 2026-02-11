@@ -17,6 +17,7 @@ sigma-cli/src/
     ├── mod.rs
     ├── providers.rs  # list, get, create, update, delete, export, import
     ├── vps.rs        # list, get, create, update, delete, retire, export, import
+    ├── ip_checks.rs  # list, get, create, delete, summary, purge
     └── stats.rs      # Dashboard stats display
 ```
 
@@ -48,6 +49,12 @@ sigma-cli/src/
 | `vps retire <ID>` | POST | `/vps/{id}/retire` |
 | `vps export` | GET | `/vps/export?format=` |
 | `vps import <FILE>` | POST | `/vps/import` |
+| `ip-checks list` | GET | `/ip-checks?vps_id=&ip=&...` |
+| `ip-checks get <ID>` | GET | `/ip-checks/{id}` |
+| `ip-checks create` | POST | `/ip-checks` |
+| `ip-checks delete <ID>` | DELETE | `/ip-checks/{id}` |
+| `ip-checks summary` | GET | `/ip-checks/summary?vps_id=` |
+| `ip-checks purge` | DELETE | `/ip-checks/purge?older_than_days=` |
 | `stats` | GET | `/stats` |
 
 ## Build & Run

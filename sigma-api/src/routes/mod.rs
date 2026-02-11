@@ -1,3 +1,4 @@
+pub mod ip_checks;
 pub mod prometheus;
 pub mod providers;
 pub mod stats;

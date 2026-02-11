@@ -324,6 +324,69 @@ pub struct ExportQuery {
 
 fn default_json_format() -> String { "json".into() }
 
+// ─── IP Checks ───────────────────────────────────────────
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct IpCheck {
+    pub id: Uuid,
+    pub vps_id: Uuid,
+    pub ip: String,
+    pub check_type: String,
+    pub source: String,
+    pub success: bool,
+    pub latency_ms: Option<i32>,
+    pub checked_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateIpCheck {
+    pub vps_id: Uuid,
+    pub ip: String,
+    #[serde(default = "default_icmp")]
+    pub check_type: String,
+    #[serde(default)]
+    pub source: String,
+    pub success: bool,
+    pub latency_ms: Option<i32>,
+}
+
+fn default_icmp() -> String { "icmp".into() }
+
+#[derive(Debug, Deserialize)]
+pub struct IpCheckListQuery {
+    pub vps_id: Option<Uuid>,
+    pub ip: Option<String>,
+    pub source: Option<String>,
+    pub check_type: Option<String>,
+    pub success: Option<bool>,
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_per_page")]
+    pub per_page: i64,
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct IpCheckSummary {
+    pub vps_id: Uuid,
+    pub ip: String,
+    pub total_checks: i64,
+    pub success_count: i64,
+    pub success_rate: f64,
+    pub avg_latency_ms: Option<f64>,
+    pub last_check: DateTime<Utc>,
+    pub last_success: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct IpCheckSummaryQuery {
+    pub vps_id: Option<Uuid>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PurgeQuery {
+    pub older_than_days: i32,
+}
+
 // ─── Defaults ────────────────────────────────────────────
 
 fn default_ssh_port() -> i32 { 22 }

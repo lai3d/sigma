@@ -226,6 +226,50 @@ pub struct CountStat {
     pub count: Option<i64>,
 }
 
+// ─── IP Checks ───────────────────────────────────────────
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct IpCheck {
+    pub id: Uuid,
+    pub vps_id: Uuid,
+    pub ip: String,
+    pub check_type: String,
+    pub source: String,
+    pub success: bool,
+    pub latency_ms: Option<i32>,
+    pub checked_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CreateIpCheck {
+    pub vps_id: Uuid,
+    pub ip: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub check_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub latency_ms: Option<i32>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct IpCheckSummary {
+    pub vps_id: Uuid,
+    pub ip: String,
+    pub total_checks: i64,
+    pub success_count: i64,
+    pub success_rate: f64,
+    pub avg_latency_ms: Option<f64>,
+    pub last_check: DateTime<Utc>,
+    pub last_success: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PurgeResult {
+    pub deleted: u64,
+}
+
 // ─── Import / Export ─────────────────────────────────────
 
 #[derive(Debug, Serialize)]

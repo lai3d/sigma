@@ -71,7 +71,7 @@ sigma/
 - [ ] Telegram/webhook notifications for expiring VPS
 - [x] CLI client (`sigma-cli/` — Rust binary using clap + reqwest)
 - [x] Bulk import/export (CSV/JSON)
-- [ ] IP reachability check API (ip_checks table exists but no routes yet)
+- [x] IP reachability check API (`/api/ip-checks` — CRUD, summary, purge)
 - [ ] Ansible dynamic inventory output (`GET /api/ansible/inventory`)
 - [ ] Cost tracking and reporting per provider/country/month
 - [ ] Auto-deploy node_exporter on new VPS via SSH

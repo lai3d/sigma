@@ -42,6 +42,7 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .merge(routes::providers::router())
         .merge(routes::vps::router())
+        .merge(routes::ip_checks::router())
         .merge(routes::prometheus::router())
         .merge(routes::stats::router())
         .layer(TraceLayer::new_for_http())

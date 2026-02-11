@@ -40,6 +40,12 @@ enum Commands {
         #[command(subcommand)]
         command: VpsCommands,
     },
+    /// Manage IP reachability checks
+    #[command(name = "ip-checks")]
+    IpChecks {
+        #[command(subcommand)]
+        command: IpCheckCommands,
+    },
     /// Show dashboard statistics
     Stats,
     /// Manage CLI configuration
@@ -267,6 +273,59 @@ enum VpsCommands {
         file: String,
         #[arg(long, default_value = "json")]
         format: String,
+    },
+}
+
+// ─── IP Check subcommands ────────────────────────────────
+
+#[derive(Subcommand)]
+enum IpCheckCommands {
+    /// List IP checks with optional filters
+    List {
+        #[arg(long)]
+        vps_id: Option<Uuid>,
+        #[arg(long)]
+        ip: Option<String>,
+        #[arg(long)]
+        source: Option<String>,
+        #[arg(long)]
+        check_type: Option<String>,
+        #[arg(long)]
+        success: Option<bool>,
+        #[arg(long, default_value = "1")]
+        page: i64,
+        #[arg(long, default_value = "25")]
+        per_page: i64,
+    },
+    /// Get a single IP check by ID
+    Get { id: Uuid },
+    /// Record a new IP check result
+    Create {
+        #[arg(long)]
+        vps_id: Uuid,
+        #[arg(long)]
+        ip: String,
+        #[arg(long)]
+        success: bool,
+        #[arg(long)]
+        check_type: Option<String>,
+        #[arg(long)]
+        source: Option<String>,
+        #[arg(long)]
+        latency_ms: Option<i32>,
+    },
+    /// Delete an IP check
+    Delete { id: Uuid },
+    /// Show aggregated summary per VPS/IP
+    Summary {
+        #[arg(long)]
+        vps_id: Option<Uuid>,
+    },
+    /// Purge old check records
+    Purge {
+        /// Delete checks older than N days
+        #[arg(long)]
+        older_than_days: i32,
     },
 }
 
@@ -514,6 +573,55 @@ async fn main() -> Result<()> {
             }
             VpsCommands::Import { file, format } => {
                 commands::vps::import(&client, &file, &format).await
+            }
+        },
+        Commands::IpChecks { command } => match command {
+            IpCheckCommands::List {
+                vps_id,
+                ip,
+                source,
+                check_type,
+                success,
+                page,
+                per_page,
+            } => {
+                commands::ip_checks::list(
+                    &client,
+                    vps_id,
+                    ip.as_deref(),
+                    source.as_deref(),
+                    check_type.as_deref(),
+                    success,
+                    page,
+                    per_page,
+                    json,
+                )
+                .await
+            }
+            IpCheckCommands::Get { id } => {
+                commands::ip_checks::get(&client, id, json).await
+            }
+            IpCheckCommands::Create {
+                vps_id,
+                ip,
+                success,
+                check_type,
+                source,
+                latency_ms,
+            } => {
+                commands::ip_checks::create(
+                    &client, vps_id, ip, success, check_type, source, latency_ms, json,
+                )
+                .await
+            }
+            IpCheckCommands::Delete { id } => {
+                commands::ip_checks::delete(&client, id).await
+            }
+            IpCheckCommands::Summary { vps_id } => {
+                commands::ip_checks::summary(&client, vps_id, json).await
+            }
+            IpCheckCommands::Purge { older_than_days } => {
+                commands::ip_checks::purge(&client, older_than_days).await
             }
         },
         Commands::Stats => commands::stats::stats(&client, json).await,

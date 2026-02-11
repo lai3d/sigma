@@ -81,6 +81,32 @@ sigma vps export --format csv -o vps.csv
 sigma vps import vps.json --format json
 ```
 
+### IP Checks
+
+```bash
+sigma ip-checks list
+sigma ip-checks list --vps-id <UUID> --success true
+sigma ip-checks list --ip 103.1.2.3 --check-type icmp --source cn-beijing
+sigma ip-checks get <UUID>
+
+sigma ip-checks create \
+  --vps-id <UUID> \
+  --ip 103.1.2.3 \
+  --success true \
+  --check-type icmp \
+  --source cn-beijing \
+  --latency-ms 45
+
+sigma ip-checks delete <UUID>
+
+# Aggregated summary per VPS/IP (success rate, avg latency, last status)
+sigma ip-checks summary
+sigma ip-checks summary --vps-id <UUID>
+
+# Purge old checks
+sigma ip-checks purge --older-than-days 30
+```
+
 ### Stats
 
 ```bash

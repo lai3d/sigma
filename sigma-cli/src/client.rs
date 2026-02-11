@@ -134,4 +134,16 @@ impl SigmaClient {
         }
         Err(Self::handle_error(resp).await)
     }
+
+    pub async fn delete_json<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
+        let resp = self
+            .add_auth(self.client.delete(self.url(path)))
+            .send()
+            .await
+            .context("Failed to connect to API")?;
+        if !resp.status().is_success() {
+            return Err(Self::handle_error(resp).await);
+        }
+        resp.json::<T>().await.context("Failed to parse response")
+    }
 }
