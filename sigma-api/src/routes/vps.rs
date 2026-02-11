@@ -1,18 +1,48 @@
 use axum::{
     extract::{Path, Query, State},
+    http::header,
+    response::IntoResponse,
     routing::get,
     Json, Router,
 };
 use rust_decimal::Decimal;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::errors::AppError;
-use crate::models::{CreateVps, IpEntry, UpdateVps, Vps, VpsListQuery};
+use crate::models::{
+    CreateVps, ExportQuery, ImportRequest, ImportResult, IpEntry, UpdateVps, Vps, VpsCsvRow,
+    VpsListQuery,
+};
 use crate::routes::AppState;
+
+const VPS_INSERT_SQL: &str = r#"INSERT INTO vps (
+    hostname, alias, provider_id,
+    ip_addresses, ssh_port,
+    country, city, dc_name,
+    cpu_cores, ram_mb, disk_gb, bandwidth_tb,
+    cost_monthly, currency,
+    status, purchase_date, expire_date,
+    purpose, vpn_protocol, tags,
+    monitoring_enabled, node_exporter_port,
+    extra, notes
+) VALUES (
+    $1, $2, $3,
+    $4, $5,
+    $6, $7, $8,
+    $9, $10, $11, $12,
+    $13, $14,
+    $15, $16, $17,
+    $18, $19, $20,
+    $21, $22,
+    $23, $24
+) RETURNING *"#;
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/vps", get(list).post(create))
+        .route("/api/vps/export", get(export))
+        .route("/api/vps/import", axum::routing::post(import))
         .route("/api/vps/{id}", get(get_one).put(update).delete(delete))
         .route("/api/vps/{id}/retire", axum::routing::post(retire))
 }
@@ -116,29 +146,7 @@ async fn create(
     let ip_json = serde_json::to_value(&input.ip_addresses)
         .map_err(|e| AppError::BadRequest(format!("Invalid ip_addresses: {}", e)))?;
 
-    let row = sqlx::query_as::<_, Vps>(
-        r#"INSERT INTO vps (
-            hostname, alias, provider_id,
-            ip_addresses, ssh_port,
-            country, city, dc_name,
-            cpu_cores, ram_mb, disk_gb, bandwidth_tb,
-            cost_monthly, currency,
-            status, purchase_date, expire_date,
-            purpose, vpn_protocol, tags,
-            monitoring_enabled, node_exporter_port,
-            extra, notes
-        ) VALUES (
-            $1, $2, $3,
-            $4, $5,
-            $6, $7, $8,
-            $9, $10, $11, $12,
-            $13, $14,
-            $15, $16, $17,
-            $18, $19, $20,
-            $21, $22,
-            $23, $24
-        ) RETURNING *"#,
-    )
+    let row = sqlx::query_as::<_, Vps>(VPS_INSERT_SQL)
     .bind(&input.hostname)
     .bind(&input.alias)
     .bind(input.provider_id)
@@ -265,4 +273,302 @@ async fn retire(
     .ok_or(AppError::NotFound)?;
 
     Ok(Json(row))
+}
+
+// ─── Export ──────────────────────────────────────────────
+
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+struct ProviderNameRow {
+    id: Uuid,
+    name: String,
+}
+
+async fn export(
+    State(state): State<AppState>,
+    Query(q): Query<ExportQuery>,
+) -> Result<impl IntoResponse, AppError> {
+    let rows = sqlx::query_as::<_, Vps>(
+        "SELECT * FROM vps ORDER BY status, expire_date ASC NULLS LAST, hostname",
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    let providers = sqlx::query_as::<_, ProviderNameRow>("SELECT id, name FROM providers")
+        .fetch_all(&state.db)
+        .await?;
+    let provider_map: HashMap<Uuid, String> =
+        providers.into_iter().map(|p| (p.id, p.name)).collect();
+
+    match q.format.as_str() {
+        "csv" => {
+            let mut wtr = csv::Writer::from_writer(vec![]);
+            for r in &rows {
+                let provider_name = provider_map
+                    .get(&r.provider_id)
+                    .cloned()
+                    .unwrap_or_default();
+                wtr.serialize(VpsCsvRow {
+                    hostname: r.hostname.clone(),
+                    alias: r.alias.clone(),
+                    provider_name,
+                    ip_addresses: serde_json::to_string(&r.ip_addresses.0).unwrap_or_default(),
+                    ssh_port: r.ssh_port,
+                    country: r.country.clone(),
+                    city: r.city.clone(),
+                    dc_name: r.dc_name.clone(),
+                    cpu_cores: r.cpu_cores,
+                    ram_mb: r.ram_mb,
+                    disk_gb: r.disk_gb,
+                    bandwidth_tb: r.bandwidth_tb.map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)),
+                    cost_monthly: r.cost_monthly.map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)),
+                    currency: r.currency.clone(),
+                    status: r.status.clone(),
+                    purchase_date: r.purchase_date.map(|d| d.to_string()).unwrap_or_default(),
+                    expire_date: r.expire_date.map(|d| d.to_string()).unwrap_or_default(),
+                    purpose: r.purpose.clone(),
+                    vpn_protocol: r.vpn_protocol.clone(),
+                    tags: r.tags.join(";"),
+                    monitoring_enabled: r.monitoring_enabled,
+                    node_exporter_port: r.node_exporter_port,
+                    extra: serde_json::to_string(&r.extra).unwrap_or_default(),
+                    notes: r.notes.clone(),
+                })
+                .map_err(|e| AppError::Internal(format!("CSV write error: {e}")))?;
+            }
+            let data = wtr
+                .into_inner()
+                .map_err(|e| AppError::Internal(format!("CSV flush error: {e}")))?;
+
+            Ok((
+                [
+                    (header::CONTENT_TYPE, "text/csv".to_string()),
+                    (
+                        header::CONTENT_DISPOSITION,
+                        "attachment; filename=\"vps.csv\"".to_string(),
+                    ),
+                ],
+                data,
+            )
+                .into_response())
+        }
+        _ => {
+            let json = serde_json::to_string_pretty(&rows)
+                .map_err(|e| AppError::Internal(format!("JSON error: {e}")))?;
+
+            Ok((
+                [
+                    (header::CONTENT_TYPE, "application/json".to_string()),
+                    (
+                        header::CONTENT_DISPOSITION,
+                        "attachment; filename=\"vps.json\"".to_string(),
+                    ),
+                ],
+                json,
+            )
+                .into_response())
+        }
+    }
+}
+
+// ─── Import ──────────────────────────────────────────────
+
+async fn import(
+    State(state): State<AppState>,
+    Json(input): Json<ImportRequest>,
+) -> Result<Json<ImportResult>, AppError> {
+    // Build provider name → id lookup (case-insensitive)
+    let providers = sqlx::query_as::<_, ProviderNameRow>("SELECT id, name FROM providers")
+        .fetch_all(&state.db)
+        .await?;
+    let provider_lookup: HashMap<String, Uuid> = providers
+        .into_iter()
+        .map(|p| (p.name.to_lowercase(), p.id))
+        .collect();
+
+    let mut imported = 0usize;
+    let mut errors = Vec::new();
+
+    match input.format.as_str() {
+        "csv" => {
+            let mut rdr = csv::Reader::from_reader(input.data.as_bytes());
+            for (i, result) in rdr.deserialize::<VpsCsvRow>().enumerate() {
+                let row_num = i + 1;
+                let row = match result {
+                    Ok(r) => r,
+                    Err(e) => {
+                        errors.push(format!("Row {row_num}: parse error: {e}"));
+                        continue;
+                    }
+                };
+
+                if row.hostname.trim().is_empty() {
+                    errors.push(format!("Row {row_num}: hostname is required"));
+                    continue;
+                }
+
+                let provider_id = match provider_lookup.get(&row.provider_name.to_lowercase()) {
+                    Some(id) => *id,
+                    None => {
+                        errors.push(format!(
+                            "Row {row_num}: unknown provider '{}'",
+                            row.provider_name
+                        ));
+                        continue;
+                    }
+                };
+
+                match import_vps_csv_row(&state, &row, provider_id).await {
+                    Ok(_) => imported += 1,
+                    Err(e) => errors.push(format!("Row {row_num}: {e}")),
+                }
+            }
+        }
+        "json" => {
+            let vps_list: Vec<CreateVps> = serde_json::from_str(&input.data)
+                .map_err(|e| AppError::BadRequest(format!("Invalid JSON: {e}")))?;
+
+            for (i, vps) in vps_list.iter().enumerate() {
+                let row_num = i + 1;
+                if vps.hostname.trim().is_empty() {
+                    errors.push(format!("Row {row_num}: hostname is required"));
+                    continue;
+                }
+
+                if let Err(e) = validate_ips(&vps.ip_addresses) {
+                    errors.push(format!("Row {row_num}: {e}"));
+                    continue;
+                }
+
+                let ip_json = match serde_json::to_value(&vps.ip_addresses) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        errors.push(format!("Row {row_num}: invalid ip_addresses: {e}"));
+                        continue;
+                    }
+                };
+
+                let result = sqlx::query(VPS_INSERT_SQL)
+                    .bind(&vps.hostname)
+                    .bind(&vps.alias)
+                    .bind(vps.provider_id)
+                    .bind(&ip_json)
+                    .bind(vps.ssh_port)
+                    .bind(&vps.country)
+                    .bind(&vps.city)
+                    .bind(&vps.dc_name)
+                    .bind(vps.cpu_cores)
+                    .bind(vps.ram_mb)
+                    .bind(vps.disk_gb)
+                    .bind(vps.bandwidth_tb.and_then(Decimal::from_f64_retain))
+                    .bind(vps.cost_monthly.and_then(Decimal::from_f64_retain))
+                    .bind(&vps.currency)
+                    .bind(&vps.status)
+                    .bind(vps.purchase_date)
+                    .bind(vps.expire_date)
+                    .bind(&vps.purpose)
+                    .bind(&vps.vpn_protocol)
+                    .bind(&vps.tags)
+                    .bind(vps.monitoring_enabled)
+                    .bind(vps.node_exporter_port)
+                    .bind(&vps.extra)
+                    .bind(&vps.notes)
+                    .execute(&state.db)
+                    .await;
+
+                match result {
+                    Ok(_) => imported += 1,
+                    Err(e) => errors.push(format!("Row {row_num}: {e}")),
+                }
+            }
+        }
+        _ => return Err(AppError::BadRequest("format must be 'csv' or 'json'".into())),
+    }
+
+    Ok(Json(ImportResult { imported, errors }))
+}
+
+async fn import_vps_csv_row(
+    state: &AppState,
+    row: &VpsCsvRow,
+    provider_id: Uuid,
+) -> Result<(), AppError> {
+    // Parse ip_addresses from JSON string
+    let ip_entries: Vec<IpEntry> = if row.ip_addresses.trim().is_empty() {
+        vec![]
+    } else {
+        serde_json::from_str(&row.ip_addresses)
+            .map_err(|e| AppError::BadRequest(format!("invalid ip_addresses JSON: {e}")))?
+    };
+    validate_ips(&ip_entries)?;
+
+    let ip_json = serde_json::to_value(&ip_entries)
+        .map_err(|e| AppError::BadRequest(format!("ip_addresses serialize error: {e}")))?;
+
+    // Parse tags from semicolon-separated
+    let tags: Vec<String> = if row.tags.trim().is_empty() {
+        vec![]
+    } else {
+        row.tags.split(';').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect()
+    };
+
+    // Parse extra from JSON string
+    let extra: serde_json::Value = if row.extra.trim().is_empty() {
+        serde_json::Value::Object(serde_json::Map::new())
+    } else {
+        serde_json::from_str(&row.extra)
+            .map_err(|e| AppError::BadRequest(format!("invalid extra JSON: {e}")))?
+    };
+
+    // Parse dates
+    let purchase_date = if row.purchase_date.trim().is_empty() {
+        None
+    } else {
+        Some(
+            row.purchase_date
+                .trim()
+                .parse::<chrono::NaiveDate>()
+                .map_err(|e| AppError::BadRequest(format!("invalid purchase_date: {e}")))?,
+        )
+    };
+
+    let expire_date = if row.expire_date.trim().is_empty() {
+        None
+    } else {
+        Some(
+            row.expire_date
+                .trim()
+                .parse::<chrono::NaiveDate>()
+                .map_err(|e| AppError::BadRequest(format!("invalid expire_date: {e}")))?,
+        )
+    };
+
+    sqlx::query(VPS_INSERT_SQL)
+        .bind(&row.hostname)
+        .bind(&row.alias)
+        .bind(provider_id)
+        .bind(&ip_json)
+        .bind(row.ssh_port)
+        .bind(&row.country)
+        .bind(&row.city)
+        .bind(&row.dc_name)
+        .bind(row.cpu_cores)
+        .bind(row.ram_mb)
+        .bind(row.disk_gb)
+        .bind(row.bandwidth_tb.and_then(Decimal::from_f64_retain))
+        .bind(row.cost_monthly.and_then(Decimal::from_f64_retain))
+        .bind(&row.currency)
+        .bind(&row.status)
+        .bind(purchase_date)
+        .bind(expire_date)
+        .bind(&row.purpose)
+        .bind(&row.vpn_protocol)
+        .bind(&tags)
+        .bind(row.monitoring_enabled)
+        .bind(row.node_exporter_port)
+        .bind(&extra)
+        .bind(&row.notes)
+        .execute(&state.db)
+        .await?;
+
+    Ok(())
 }

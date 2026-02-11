@@ -1,18 +1,28 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
+    http::header,
+    response::IntoResponse,
     routing::get,
     Json, Router,
 };
 use uuid::Uuid;
 
 use crate::errors::AppError;
-use crate::models::{CreateProvider, Provider, UpdateProvider};
+use crate::models::{
+    CreateProvider, ExportQuery, ImportRequest, ImportResult, Provider, ProviderCsvRow,
+    UpdateProvider,
+};
 use crate::routes::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/providers", get(list).post(create))
-        .route("/api/providers/{id}", get(get_one).put(update).delete(delete))
+        .route("/api/providers/export", get(export))
+        .route("/api/providers/import", axum::routing::post(import))
+        .route(
+            "/api/providers/{id}",
+            get(get_one).put(update).delete(delete),
+        )
 }
 
 async fn list(State(state): State<AppState>) -> Result<Json<Vec<Provider>>, AppError> {
@@ -102,4 +112,125 @@ async fn delete(
     }
 
     Ok(Json(serde_json::json!({ "deleted": true })))
+}
+
+// ─── Export ──────────────────────────────────────────────
+
+async fn export(
+    State(state): State<AppState>,
+    Query(q): Query<ExportQuery>,
+) -> Result<impl IntoResponse, AppError> {
+    let rows = sqlx::query_as::<_, Provider>("SELECT * FROM providers ORDER BY name")
+        .fetch_all(&state.db)
+        .await?;
+
+    match q.format.as_str() {
+        "csv" => {
+            let mut wtr = csv::Writer::from_writer(vec![]);
+            for r in &rows {
+                wtr.serialize(ProviderCsvRow {
+                    name: r.name.clone(),
+                    country: r.country.clone(),
+                    website: r.website.clone(),
+                    panel_url: r.panel_url.clone(),
+                    api_supported: r.api_supported,
+                    rating: r.rating,
+                    notes: r.notes.clone(),
+                })
+                .map_err(|e| AppError::Internal(format!("CSV write error: {e}")))?;
+            }
+            let data = wtr
+                .into_inner()
+                .map_err(|e| AppError::Internal(format!("CSV flush error: {e}")))?;
+
+            Ok((
+                [
+                    (header::CONTENT_TYPE, "text/csv".to_string()),
+                    (
+                        header::CONTENT_DISPOSITION,
+                        "attachment; filename=\"providers.csv\"".to_string(),
+                    ),
+                ],
+                data,
+            )
+                .into_response())
+        }
+        _ => {
+            let json = serde_json::to_string_pretty(&rows)
+                .map_err(|e| AppError::Internal(format!("JSON error: {e}")))?;
+
+            Ok((
+                [
+                    (header::CONTENT_TYPE, "application/json".to_string()),
+                    (
+                        header::CONTENT_DISPOSITION,
+                        "attachment; filename=\"providers.json\"".to_string(),
+                    ),
+                ],
+                json,
+            )
+                .into_response())
+        }
+    }
+}
+
+// ─── Import ──────────────────────────────────────────────
+
+async fn import(
+    State(state): State<AppState>,
+    Json(input): Json<ImportRequest>,
+) -> Result<Json<ImportResult>, AppError> {
+    let rows: Vec<ProviderCsvRow> = match input.format.as_str() {
+        "csv" => {
+            let mut rdr = csv::Reader::from_reader(input.data.as_bytes());
+            let mut parsed = Vec::new();
+            for (i, result) in rdr.deserialize().enumerate() {
+                match result {
+                    Ok(row) => parsed.push(row),
+                    Err(e) => {
+                        return Ok(Json(ImportResult {
+                            imported: 0,
+                            errors: vec![format!("Row {}: parse error: {e}", i + 1)],
+                        }));
+                    }
+                }
+            }
+            parsed
+        }
+        "json" => serde_json::from_str::<Vec<ProviderCsvRow>>(&input.data)
+            .map_err(|e| AppError::BadRequest(format!("Invalid JSON: {e}")))?,
+        _ => return Err(AppError::BadRequest("format must be 'csv' or 'json'".into())),
+    };
+
+    let mut imported = 0usize;
+    let mut errors = Vec::new();
+
+    for (i, row) in rows.iter().enumerate() {
+        let row_num = i + 1;
+        if row.name.trim().is_empty() {
+            errors.push(format!("Row {row_num}: name is required"));
+            continue;
+        }
+
+        let result = sqlx::query(
+            r#"INSERT INTO providers (name, country, website, panel_url, api_supported, rating, notes)
+               VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+        )
+        .bind(&row.name)
+        .bind(&row.country)
+        .bind(&row.website)
+        .bind(&row.panel_url)
+        .bind(row.api_supported)
+        .bind(row.rating)
+        .bind(&row.notes)
+        .execute(&state.db)
+        .await;
+
+        match result {
+            Ok(_) => imported += 1,
+            Err(e) => errors.push(format!("Row {row_num}: {e}")),
+        }
+    }
+
+    Ok(Json(ImportResult { imported, errors }))
 }

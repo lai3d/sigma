@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
-import { useProviders, useDeleteProvider } from '@/hooks/useProviders';
+import { useProviders, useDeleteProvider, useImportProviders } from '@/hooks/useProviders';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import ImportExportButtons from '@/components/ImportExportButtons';
+import { exportProviders } from '@/api/providers';
 import { formatDate } from '@/lib/utils';
 import ProviderFormDialog from './ProviderFormDialog';
 
 export default function ProviderList() {
   const { data: providers, isLoading } = useProviders();
   const deleteMutation = useDeleteProvider();
+  const importMutation = useImportProviders();
 
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
@@ -17,12 +20,19 @@ export default function ProviderList() {
     <div>
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">Providers</h2>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-        >
-          <Plus size={16} /> Add Provider
-        </button>
+        <div className="flex items-center gap-2">
+          <ImportExportButtons
+            entityName="providers"
+            onExport={(format) => exportProviders(format)}
+            onImport={(format, data) => importMutation.mutateAsync({ format, data })}
+          />
+          <button
+            onClick={() => setShowCreate(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+          >
+            <Plus size={16} /> Add Provider
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 bg-white rounded-lg border overflow-x-auto">

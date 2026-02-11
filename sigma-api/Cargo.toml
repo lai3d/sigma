@@ -19,3 +19,4 @@ dotenvy = "0.15"
 thiserror = "2"
 rust_decimal = { version = "1", features = ["serde-with-str"] }
 anyhow = "1"
+csv = "1"

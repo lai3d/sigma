@@ -112,6 +112,11 @@ export interface CountStat {
   count: number | null;
 }
 
+export interface ImportResult {
+  imported: number;
+  errors: string[];
+}
+
 export interface DashboardStats {
   total_vps: number;
   active_vps: number;

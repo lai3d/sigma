@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Trash2, Power } from 'lucide-react';
-import { useVpsList, useDeleteVps, useRetireVps } from '@/hooks/useVps';
+import { useVpsList, useDeleteVps, useRetireVps, useImportVps } from '@/hooks/useVps';
 import { useProviders } from '@/hooks/useProviders';
 import StatusBadge from '@/components/StatusBadge';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import ImportExportButtons from '@/components/ImportExportButtons';
+import { exportVps } from '@/api/vps';
 import { formatDate, daysUntil, ipLabelColor, ipLabelShort } from '@/lib/utils';
 import type { VpsListQuery } from '@/types/api';
 
@@ -14,6 +16,7 @@ export default function VpsList() {
   const { data: providers } = useProviders();
   const deleteMutation = useDeleteVps();
   const retireMutation = useRetireVps();
+  const importMutation = useImportVps();
 
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [confirmRetire, setConfirmRetire] = useState<string | null>(null);
@@ -24,12 +27,19 @@ export default function VpsList() {
     <div>
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">VPS Instances</h2>
-        <Link
-          to="/vps/new"
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-        >
-          <Plus size={16} /> Add VPS
-        </Link>
+        <div className="flex items-center gap-2">
+          <ImportExportButtons
+            entityName="vps"
+            onExport={(format) => exportVps(format)}
+            onImport={(format, data) => importMutation.mutateAsync({ format, data })}
+          />
+          <Link
+            to="/vps/new"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+          >
+            <Plus size={16} /> Add VPS
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from '@/api/vps';
-import type { CreateVps, UpdateVps, VpsListQuery } from '@/types/api';
+import type { CreateVps, UpdateVps, VpsListQuery, ImportResult } from '@/types/api';
 
 export function useVpsList(query?: VpsListQuery) {
   return useQuery({
@@ -46,6 +46,15 @@ export function useRetireVps() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.retireVps(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['vps'] }),
+  });
+}
+
+export function useImportVps() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ format, data }: { format: 'csv' | 'json'; data: string }) =>
+      api.importVps(format, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['vps'] }),
   });
 }

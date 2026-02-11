@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from '@/api/providers';
-import type { CreateProvider, UpdateProvider } from '@/types/api';
+import type { CreateProvider, UpdateProvider, ImportResult } from '@/types/api';
 
 export function useProviders() {
   return useQuery({ queryKey: ['providers'], queryFn: api.listProviders });
@@ -35,6 +35,15 @@ export function useDeleteProvider() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.deleteProvider(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['providers'] }),
+  });
+}
+
+export function useImportProviders() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ format, data }: { format: 'csv' | 'json'; data: string }) =>
+      api.importProviders(format, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['providers'] }),
   });
 }

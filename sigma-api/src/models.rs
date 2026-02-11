@@ -212,6 +212,93 @@ pub struct CountStat {
     pub count: Option<i64>,
 }
 
+// ─── Import / Export ─────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct ImportRequest {
+    pub format: String,
+    pub data: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ImportResult {
+    pub imported: usize,
+    pub errors: Vec<String>,
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct ProviderCsvRow {
+    pub name: String,
+    #[serde(default)]
+    pub country: String,
+    #[serde(default)]
+    pub website: String,
+    #[serde(default)]
+    pub panel_url: String,
+    #[serde(default)]
+    pub api_supported: bool,
+    pub rating: Option<i16>,
+    #[serde(default)]
+    pub notes: String,
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct VpsCsvRow {
+    pub hostname: String,
+    #[serde(default)]
+    pub alias: String,
+    #[serde(default)]
+    pub provider_name: String,
+    #[serde(default)]
+    pub ip_addresses: String,
+    #[serde(default = "default_ssh_port_csv")]
+    pub ssh_port: i32,
+    #[serde(default)]
+    pub country: String,
+    #[serde(default)]
+    pub city: String,
+    #[serde(default)]
+    pub dc_name: String,
+    pub cpu_cores: Option<i16>,
+    pub ram_mb: Option<i32>,
+    pub disk_gb: Option<i32>,
+    pub bandwidth_tb: Option<f64>,
+    pub cost_monthly: Option<f64>,
+    #[serde(default = "default_currency")]
+    pub currency: String,
+    #[serde(default = "default_status")]
+    pub status: String,
+    #[serde(default)]
+    pub purchase_date: String,
+    #[serde(default)]
+    pub expire_date: String,
+    #[serde(default)]
+    pub purpose: String,
+    #[serde(default)]
+    pub vpn_protocol: String,
+    #[serde(default)]
+    pub tags: String,
+    #[serde(default = "default_true")]
+    pub monitoring_enabled: bool,
+    #[serde(default = "default_node_exporter_port_csv")]
+    pub node_exporter_port: i32,
+    #[serde(default)]
+    pub extra: String,
+    #[serde(default)]
+    pub notes: String,
+}
+
+fn default_ssh_port_csv() -> i32 { 22 }
+fn default_node_exporter_port_csv() -> i32 { 9100 }
+
+#[derive(Debug, Deserialize)]
+pub struct ExportQuery {
+    #[serde(default = "default_json_format")]
+    pub format: String,
+}
+
+fn default_json_format() -> String { "json".into() }
+
 // ─── Defaults ────────────────────────────────────────────
 
 fn default_ssh_port() -> i32 { 22 }
