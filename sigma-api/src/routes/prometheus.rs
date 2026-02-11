@@ -17,9 +17,9 @@ async fn targets(State(state): State<AppState>) -> Result<Json<Vec<PrometheusTar
             v.hostname, v.alias, v.ip_addresses, v.node_exporter_port,
             v.country, v.city, v.dc_name, v.status, v.purpose, v.vpn_protocol,
             v.tags, v.expire_date,
-            p.name as provider_name
+            COALESCE(p.name, '') as provider_name
            FROM vps v
-           JOIN providers p ON p.id = v.provider_id
+           LEFT JOIN providers p ON p.id = v.provider_id
            WHERE v.monitoring_enabled = true
              AND v.status IN ('active', 'provisioning')
            ORDER BY v.hostname"#,

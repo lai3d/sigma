@@ -234,7 +234,7 @@ async fn update(
     .bind(id)
     .bind(input.hostname.unwrap_or(existing.hostname))
     .bind(input.alias.unwrap_or(existing.alias))
-    .bind(input.provider_id.unwrap_or(existing.provider_id))
+    .bind(input.provider_id.or(existing.provider_id))
     .bind(&ip_json)
     .bind(input.ssh_port.unwrap_or(existing.ssh_port))
     .bind(input.country.unwrap_or(existing.country))
@@ -322,8 +322,8 @@ async fn export(
         "csv" => {
             let mut wtr = csv::Writer::from_writer(vec![]);
             for r in &rows {
-                let provider_name = provider_map
-                    .get(&r.provider_id)
+                let provider_name = r.provider_id
+                    .and_then(|pid| provider_map.get(&pid))
                     .cloned()
                     .unwrap_or_default();
                 wtr.serialize(VpsCsvRow {

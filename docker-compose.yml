@@ -54,5 +54,15 @@ services:
       - api
     restart: unless-stopped
 
+  agent:
+    build: ./sigma-agent
+    environment:
+      SIGMA_API_URL: http://api:3000/api
+      SIGMA_API_KEY: ${API_KEY:-change-me-in-production}
+      AGENT_INTERVAL: 60
+    depends_on:
+      - api
+    restart: unless-stopped
+
 volumes:
   pgdata:

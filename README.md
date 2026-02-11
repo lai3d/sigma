@@ -47,6 +47,9 @@ docker compose ps
 sigma/
 ├── sigma-api/          # Rust backend (Axum + SQLx + PostgreSQL)
 ├── sigma-web/          # React frontend (Vite + TypeScript + Tailwind CSS)
+├── sigma-cli/          # Rust CLI client (clap + reqwest)
+├── sigma-probe/        # IP reachability probe (deployed on China nodes)
+├── sigma-agent/        # VPS system agent (auto-register + heartbeat)
 ├── k8s/                # Kubernetes manifests (ArgoCD-managed)
 ├── .github/workflows/  # CI: build & push images to GHCR
 ├── docker-compose.yml  # Local dev orchestration
@@ -83,6 +86,8 @@ Set `API_KEY` env var to enable. Pass via `X-Api-Key` header. If unset, auth is 
 | GET/PUT/DELETE | `/api/vps/{id}` | Get / Update / Delete VPS |
 | POST | `/api/vps/{id}/retire` | Quick retire |
 | GET | `/api/prometheus/targets` | Prometheus file_sd JSON |
+| POST | `/api/agent/register` | Agent self-registration |
+| POST | `/api/agent/heartbeat` | Agent heartbeat with system info |
 
 ### VPS Filters (query params)
 

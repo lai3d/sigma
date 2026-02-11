@@ -12,8 +12,9 @@ sigma/
 ├── sigma-web/          # React frontend (Vite + TypeScript + Tailwind CSS)
 ├── sigma-cli/          # Rust CLI client (clap + reqwest)
 ├── sigma-probe/        # IP reachability probe (deployed on China nodes)
+├── sigma-agent/        # VPS system agent (auto-register + heartbeat)
 ├── k8s/                # Kubernetes deployment configs
-├── docker-compose.yml  # Dev/staging orchestration (db + api + web + probe)
+├── docker-compose.yml  # Dev/staging orchestration (db + api + web + probe + agent)
 ├── Makefile            # Common commands
 └── DEPLOYMENT.md       # Deployment guide
 ```

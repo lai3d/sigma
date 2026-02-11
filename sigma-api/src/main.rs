@@ -45,6 +45,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(routes::ip_checks::router())
         .merge(routes::prometheus::router())
         .merge(routes::stats::router())
+        .merge(routes::agent::router())
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
         .with_state(app_state);

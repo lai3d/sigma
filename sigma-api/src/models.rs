@@ -62,7 +62,7 @@ pub struct Vps {
     pub id: Uuid,
     pub hostname: String,
     pub alias: String,
-    pub provider_id: Uuid,
+    pub provider_id: Option<Uuid>,
 
     pub ip_addresses: sqlx::types::Json<Vec<IpEntry>>,
     pub ssh_port: i32,
@@ -101,7 +101,8 @@ pub struct CreateVps {
     pub hostname: String,
     #[serde(default)]
     pub alias: String,
-    pub provider_id: Uuid,
+    #[serde(default)]
+    pub provider_id: Option<Uuid>,
 
     #[serde(default)]
     pub ip_addresses: Vec<IpEntry>,
@@ -385,6 +386,26 @@ pub struct IpCheckSummaryQuery {
 #[derive(Debug, Deserialize)]
 pub struct PurgeQuery {
     pub older_than_days: i32,
+}
+
+// ─── Agent ───────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct AgentRegister {
+    pub hostname: String,
+    #[serde(default)]
+    pub ip_addresses: Vec<IpEntry>,
+    #[serde(default = "default_ssh_port")]
+    pub ssh_port: i32,
+    #[serde(default)]
+    pub system_info: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AgentHeartbeat {
+    pub hostname: String,
+    #[serde(default)]
+    pub system_info: serde_json::Value,
 }
 
 // ─── Defaults ────────────────────────────────────────────

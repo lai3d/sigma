@@ -29,10 +29,10 @@ async fn dashboard(State(state): State<AppState>) -> Result<Json<DashboardStats>
     .await?;
 
     let by_provider = sqlx::query_as::<_, CountStat>(
-        r#"SELECT p.name as label, COUNT(*) as count
-           FROM vps v JOIN providers p ON p.id = v.provider_id
+        r#"SELECT COALESCE(p.name, '(unassigned)') as label, COUNT(*) as count
+           FROM vps v LEFT JOIN providers p ON p.id = v.provider_id
            WHERE v.status != 'retired'
-           GROUP BY p.name ORDER BY count DESC"#,
+           GROUP BY COALESCE(p.name, '(unassigned)') ORDER BY count DESC"#,
     )
     .fetch_all(&state.db)
     .await?;
