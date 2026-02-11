@@ -24,7 +24,7 @@ Edit `ingress.yaml` and replace:
 
 ```bash
 # Build API
-cd ../sigma
+cd ../sigma-api
 docker build -t your-registry/sigma-api:latest .
 docker push your-registry/sigma-api:latest
 

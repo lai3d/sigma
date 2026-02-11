@@ -18,7 +18,7 @@
 ### Setup
 
 ```bash
-cd sigma
+cd sigma-api
 
 # 1. Configure environment
 cp .env.example .env
@@ -102,7 +102,7 @@ vi secret.yaml  # Change DATABASE_URL and API_KEY
 vi ingress.yaml  # Change sigma.yourdomain.com
 
 # 3. Build and push images
-docker build -t your-registry/sigma-api:v1.0.0 ../sigma
+docker build -t your-registry/sigma-api:v1.0.0 ../sigma-api
 docker push your-registry/sigma-api:v1.0.0
 
 docker build -t your-registry/sigma-web:v1.0.0 ../sigma-web
@@ -130,7 +130,7 @@ kubectl logs -f deployment/sigma-api -n sigma
 ### API (Rust)
 
 ```bash
-cd sigma
+cd sigma-api
 docker build -t sigma-api:latest .
 
 # Multi-arch (for ARM/AMD)
@@ -226,7 +226,7 @@ jobs:
 
       - name: Build API
         run: |
-          cd sigma
+          cd sigma-api
           docker build -t ${{ secrets.REGISTRY }}/sigma-api:${{ github.sha }} .
           docker push ${{ secrets.REGISTRY }}/sigma-api:${{ github.sha }}
 

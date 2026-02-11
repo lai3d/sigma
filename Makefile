@@ -21,7 +21,7 @@ dev: ## Start development environment with Docker Compose
 
 build: ## Build Docker images
 	@echo "🔨 Building API..."
-	cd sigma && docker build -t $(REGISTRY)/sigma-api:$(TAG) .
+	cd sigma-api && docker build -t $(REGISTRY)/sigma-api:$(TAG) .
 	@echo "🔨 Building Web..."
 	cd sigma-web && docker build -t $(REGISTRY)/sigma-web:$(TAG) .
 	@echo "✅ Build complete"
