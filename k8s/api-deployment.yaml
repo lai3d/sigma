@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: api
-        image: your-registry/sigma-api:latest  # Replace with your image
+        image: ghcr.io/lai3d/sigma/api:latest  # Managed by ArgoCD Image Updater
         ports:
         - containerPort: 3000
         env:

@@ -1,8 +1,8 @@
-name: Build and Deploy
+name: Build Images
 
 on:
   push:
-    branches: [main, staging]
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -26,6 +26,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -38,11 +39,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/api
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push API image
         uses: docker/build-push-action@v5
@@ -69,6 +67,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -81,11 +80,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/web
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Web image
         uses: docker/build-push-action@v5
@@ -96,74 +92,3 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-  deploy-staging:
-    name: Deploy to Staging
-    needs: [build-api, build-web]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/staging' && github.event_name == 'push'
-    environment:
-      name: staging
-      url: https://staging.sigma.example.com
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configure kubectl
-        uses: azure/k8s-set-context@v3
-        with:
-          method: kubeconfig
-          kubeconfig: ${{ secrets.KUBE_CONFIG_STAGING }}
-
-      - name: Deploy to staging
-        run: |
-          kubectl set image deployment/sigma-api \
-            api=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/api:staging \
-            -n sigma-staging
-          kubectl set image deployment/sigma-web \
-            web=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/web:staging \
-            -n sigma-staging
-
-      - name: Wait for rollout
-        run: |
-          kubectl rollout status deployment/sigma-api -n sigma-staging
-          kubectl rollout status deployment/sigma-web -n sigma-staging
-
-  deploy-production:
-    name: Deploy to Production
-    needs: [build-api, build-web]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment:
-      name: production
-      url: https://sigma.example.com
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configure kubectl
-        uses: azure/k8s-set-context@v3
-        with:
-          method: kubeconfig
-          kubeconfig: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
-
-      - name: Deploy to production
-        run: |
-          kubectl set image deployment/sigma-api \
-            api=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/api:main \
-            -n sigma
-          kubectl set image deployment/sigma-web \
-            web=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/web:main \
-            -n sigma
-
-      - name: Wait for rollout
-        run: |
-          kubectl rollout status deployment/sigma-api -n sigma
-          kubectl rollout status deployment/sigma-web -n sigma
-
-      - name: Verify deployment
-        run: |
-          kubectl get pods -n sigma
-          kubectl get ingress -n sigma
