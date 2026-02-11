@@ -1,4 +1,5 @@
 pub mod agent;
+pub mod ansible;
 pub mod ip_checks;
 pub mod prometheus;
 pub mod providers;

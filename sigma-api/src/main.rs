@@ -54,6 +54,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(routes::prometheus::router())
         .merge(routes::stats::router())
         .merge(routes::agent::router())
+        .merge(routes::ansible::router())
         .layer(axum::middleware::from_fn_with_state(
             app_state.clone(),
             routes::rate_limit::rate_limit,
