@@ -18,13 +18,11 @@
 ### Setup
 
 ```bash
-cd sigma-api
-
 # 1. Configure environment
 cp .env.example .env
 # Edit .env and set your API_KEY
 
-# 2. Start all services
+# 2. Start all services (from project root)
 docker compose up -d
 
 # 3. Check status
