@@ -70,13 +70,13 @@ sigma/
 ### Roadmap (not yet implemented):
 - [ ] Telegram/webhook notifications for expiring VPS
 - [ ] CLI client
-- [ ] Bulk import/export (CSV/JSON)
+- [x] Bulk import/export (CSV/JSON)
 - [ ] IP reachability check API (ip_checks table exists but no routes yet)
 - [ ] Ansible dynamic inventory output (`GET /api/ansible/inventory`)
 - [ ] Cost tracking and reporting per provider/country/month
 - [ ] Auto-deploy node_exporter on new VPS via SSH
 - [ ] OpenAPI/Swagger spec generation
-- [ ] Pagination on list endpoints
+- [x] Pagination on list endpoints
 - [ ] Rate limiting
 - [ ] Tests
 
