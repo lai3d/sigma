@@ -13,17 +13,12 @@ Lightweight VPS fleet management API with Prometheus/Thanos/Grafana integration.
 ## Quick Start
 
 ```bash
-# 1. Start PostgreSQL
-docker compose up -d db
+# Full stack via Docker Compose (from project root)
+docker compose up -d
 
-# 2. Configure
-cp .env.example .env
-# Edit .env as needed
-
-# 3. Build and run
-cargo run
-
-# Migrations run automatically on startup
+# Or run the API standalone:
+cp .env.example .env   # Set DATABASE_URL, API_KEY
+cargo run              # Migrations run automatically on startup
 ```
 
 ## API Endpoints
@@ -98,7 +93,10 @@ curl -X POST http://localhost:3000/api/vps \
     "hostname": "hk-exit-01",
     "alias": "Hong Kong Exit Node 1",
     "provider_id": "<uuid-from-above>",
-    "ip_addresses": ["103.x.x.x"],
+    "ip_addresses": [
+      {"ip": "103.1.2.3", "label": "china-telecom"},
+      {"ip": "10.0.0.1", "label": "internal"}
+    ],
     "country": "HK",
     "city": "Hong Kong",
     "cpu_cores": 2,
@@ -126,19 +124,24 @@ curl http://localhost:3000/api/prometheus/targets
 
 ## Prometheus Integration
 
-1. Set up the target sync script:
+`GET /api/prometheus/targets` returns file_sd-compatible JSON. Set up a cron job or sidecar to periodically fetch and write to a file:
 
 ```bash
-cp scripts/sync-targets.sh /usr/local/bin/
-chmod +x /usr/local/bin/sync-targets.sh
-
-# Cron every minute
-echo "* * * * * root CMDB_URL=http://sigma:3000 OUTPUT_FILE=/etc/prometheus/targets/sigma.json /usr/local/bin/sync-targets.sh" >> /etc/crontab
+# Sync targets every minute
+* * * * * curl -s http://sigma:3000/api/prometheus/targets > /etc/prometheus/targets/sigma.json
 ```
 
-2. Add to your `prometheus.yml` (see `scripts/prometheus-snippet.yml`).
+Add to `prometheus.yml`:
 
-3. Labels available in Grafana: `instance_name`, `provider`, `country`, `city`, `dc`, `purpose`, `vpn_protocol`, `tags`, `expire_date`, `status`.
+```yaml
+scrape_configs:
+  - job_name: 'sigma-nodes'
+    file_sd_configs:
+      - files: ['/etc/prometheus/targets/sigma.json']
+        refresh_interval: 1m
+```
+
+Labels available in Grafana: `instance_name`, `provider`, `country`, `city`, `dc`, `purpose`, `vpn_protocol`, `tags`, `expire_date`, `status`.
 
 ## Building for Production
 

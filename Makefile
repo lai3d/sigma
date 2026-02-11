@@ -79,8 +79,8 @@ db-restore: ## Restore PostgreSQL database (usage: make db-restore FILE=backup.s
 db-shell: ## Open PostgreSQL shell
 	docker compose exec db psql -U sigma
 
-deploy-k8s: ## Deploy to Kubernetes
-	cd k8s && ./deploy.sh
+deploy-k8s: ## Apply Kubernetes manifests
+	kubectl apply -f k8s/
 
 k8s-status: ## Check Kubernetes deployment status
 	kubectl get all -n sigma
