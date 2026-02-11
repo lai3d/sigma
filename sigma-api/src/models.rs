@@ -1,8 +1,16 @@
 use chrono::{DateTime, NaiveDate, Utc};
-use ipnetwork::IpNetwork;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+// ─── IP Entry with label ────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct IpEntry {
+    pub ip: String,
+    #[serde(default)]
+    pub label: String,
+}
 
 // ─── Provider ────────────────────────────────────────────
 
@@ -56,7 +64,7 @@ pub struct Vps {
     pub alias: String,
     pub provider_id: Uuid,
 
-    pub ip_addresses: Vec<IpNetwork>,
+    pub ip_addresses: sqlx::types::Json<Vec<IpEntry>>,
     pub ssh_port: i32,
 
     pub country: String,
@@ -96,7 +104,7 @@ pub struct CreateVps {
     pub provider_id: Uuid,
 
     #[serde(default)]
-    pub ip_addresses: Vec<String>, // accept as strings, parse to IpNetwork
+    pub ip_addresses: Vec<IpEntry>,
     #[serde(default = "default_ssh_port")]
     pub ssh_port: i32,
 
@@ -144,7 +152,7 @@ pub struct UpdateVps {
     pub hostname: Option<String>,
     pub alias: Option<String>,
     pub provider_id: Option<Uuid>,
-    pub ip_addresses: Option<Vec<String>>,
+    pub ip_addresses: Option<Vec<IpEntry>>,
     pub ssh_port: Option<i32>,
     pub country: Option<String>,
     pub city: Option<String>,

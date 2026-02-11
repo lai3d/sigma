@@ -2,7 +2,7 @@ use axum::{extract::State, routing::get, Json, Router};
 use std::collections::HashMap;
 
 use crate::errors::AppError;
-use crate::models::PrometheusTarget;
+use crate::models::{IpEntry, PrometheusTarget};
 use crate::routes::AppState;
 
 pub fn router() -> Router<AppState> {
@@ -31,8 +31,9 @@ async fn targets(State(state): State<AppState>) -> Result<Json<Vec<PrometheusTar
         .into_iter()
         .filter_map(|row| {
             // Use the first IP address as the scrape target
-            let ip = row.ip_addresses.first()?;
-            let target = format!("{}:{}", ip.ip(), row.node_exporter_port);
+            let entries = row.ip_addresses.0;
+            let first_ip = entries.first()?;
+            let target = format!("{}:{}", first_ip.ip, row.node_exporter_port);
 
             let mut labels = HashMap::new();
             labels.insert("instance_name".into(), row.hostname.clone());
@@ -77,7 +78,7 @@ async fn targets(State(state): State<AppState>) -> Result<Json<Vec<PrometheusTar
 struct VpsTargetRow {
     hostname: String,
     alias: String,
-    ip_addresses: Vec<ipnetwork::IpNetwork>,
+    ip_addresses: sqlx::types::Json<Vec<IpEntry>>,
     node_exporter_port: i32,
     country: String,
     city: String,

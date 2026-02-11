@@ -1,14 +1,25 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useVps, useCreateVps, useUpdateVps } from '@/hooks/useVps';
 import { useProviders } from '@/hooks/useProviders';
+import type { IpEntry } from '@/types/api';
+
+const IP_LABELS = [
+  { value: '', display: 'No label' },
+  { value: 'china-telecom', display: 'China Telecom / 电信' },
+  { value: 'china-unicom', display: 'China Unicom / 联通' },
+  { value: 'china-mobile', display: 'China Mobile / 移动' },
+  { value: 'china-cernet', display: 'CERNET / 教育网' },
+  { value: 'overseas', display: 'Overseas / 海外' },
+  { value: 'internal', display: 'Internal / 内网' },
+  { value: 'anycast', display: 'Anycast' },
+] as const;
 
 interface FormData {
   hostname: string;
   alias: string;
   provider_id: string;
-  ip_addresses_raw: string;
   ssh_port: number;
   country: string;
   city: string;
@@ -40,6 +51,10 @@ export default function VpsForm() {
   const createMutation = useCreateVps();
   const updateMutation = useUpdateVps();
 
+  // Dynamic IP list with labels
+  const [ipList, setIpList] = useState<IpEntry[]>([{ ip: '', label: '' }]);
+  const [ipError, setIpError] = useState('');
+
   const {
     register,
     handleSubmit,
@@ -50,7 +65,6 @@ export default function VpsForm() {
       hostname: '',
       alias: '',
       provider_id: '',
-      ip_addresses_raw: '',
       ssh_port: 22,
       country: '',
       city: '',
@@ -75,11 +89,15 @@ export default function VpsForm() {
 
   useEffect(() => {
     if (existing) {
+      const ips =
+        existing.ip_addresses.length > 0
+          ? existing.ip_addresses
+          : [{ ip: '', label: '' }];
+      setIpList(ips.map((e) => ({ ...e })));
       reset({
         hostname: existing.hostname,
         alias: existing.alias,
         provider_id: existing.provider_id,
-        ip_addresses_raw: existing.ip_addresses.map((ip) => ip.replace(/\/(32|128)$/, '')).join(', '),
         ssh_port: existing.ssh_port,
         country: existing.country,
         city: existing.city,
@@ -109,13 +127,57 @@ export default function VpsForm() {
     return isNaN(n) ? null : n;
   }
 
+  function updateIp(index: number, field: keyof IpEntry, value: string) {
+    setIpList((prev) =>
+      prev.map((entry, i) => (i === index ? { ...entry, [field]: value } : entry)),
+    );
+    setIpError('');
+  }
+
+  function addIp() {
+    setIpList((prev) => [...prev, { ip: '', label: '' }]);
+  }
+
+  function removeIp(index: number) {
+    setIpList((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      return next.length === 0 ? [{ ip: '', label: '' }] : next;
+    });
+  }
+
+  function pasteIps(e: React.ClipboardEvent<HTMLInputElement>, index: number) {
+    const text = e.clipboardData.getData('text');
+    const parts = text
+      .split(/[,\n\r]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parts.length > 1) {
+      e.preventDefault();
+      setIpList((prev) => {
+        const next = [...prev];
+        const newEntries: IpEntry[] = parts.map((ip) => ({ ip, label: '' }));
+        next.splice(index, 1, ...newEntries);
+        return next;
+      });
+    }
+  }
+
   async function onSubmit(data: FormData) {
     if (!data.hostname.trim()) return;
     if (!data.provider_id) return;
 
-    const ip_addresses = data.ip_addresses_raw
-      ? data.ip_addresses_raw.split(/[,\s]+/).filter(Boolean)
-      : [];
+    const ip_addresses = ipList
+      .filter((e) => e.ip.trim())
+      .map((e) => ({ ip: e.ip.trim(), label: e.label }));
+
+    // Validate IP format
+    const ipRegex = /^[\d.:a-fA-F]+$/;
+    const badEntry = ip_addresses.find((e) => !ipRegex.test(e.ip));
+    if (badEntry) {
+      setIpError(`Invalid IP address: ${badEntry.ip}`);
+      return;
+    }
+
     const tags = data.tags_raw
       ? data.tags_raw.split(/[,\s]+/).filter(Boolean)
       : [];
@@ -125,7 +187,7 @@ export default function VpsForm() {
       alias: data.alias || '',
       provider_id: data.provider_id,
       ip_addresses,
-      ssh_port: data.ssh_port || 22,
+      ssh_port: Number(data.ssh_port) || 22,
       country: data.country || '',
       city: data.city || '',
       dc_name: data.dc_name || '',
@@ -142,16 +204,21 @@ export default function VpsForm() {
       vpn_protocol: data.vpn_protocol || '',
       tags,
       monitoring_enabled: data.monitoring_enabled ?? true,
-      node_exporter_port: data.node_exporter_port || 9100,
+      node_exporter_port: Number(data.node_exporter_port) || 9100,
       notes: data.notes || '',
     };
 
-    if (isEdit && id) {
-      await updateMutation.mutateAsync({ id, data: payload });
-    } else {
-      await createMutation.mutateAsync(payload);
+    try {
+      if (isEdit && id) {
+        await updateMutation.mutateAsync({ id, data: payload });
+      } else {
+        await createMutation.mutateAsync(payload);
+      }
+      navigate('/vps');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to save VPS';
+      alert(msg);
     }
-    navigate('/vps');
   }
 
   return (
@@ -195,19 +262,69 @@ export default function VpsForm() {
         {/* Network */}
         <fieldset className="bg-white rounded-lg border p-5 space-y-4">
           <legend className="text-sm font-semibold text-gray-700 px-2">Network</legend>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <Field label="IP Addresses" hint="Comma-separated">
-                <input
-                  {...register('ip_addresses_raw')}
-                  className="input"
-                  placeholder="103.1.2.3, 2001:db8::1"
-                />
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                IP Addresses
+                <span className="text-gray-400 font-normal ml-1">(paste multiple to auto-split)</span>
+              </label>
+              <div className="space-y-2">
+                {ipList.map((entry, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <input
+                      value={entry.ip}
+                      onChange={(e) => updateIp(i, 'ip', e.target.value)}
+                      onPaste={(e) => pasteIps(e, i)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addIp();
+                        }
+                      }}
+                      className="input flex-1"
+                      placeholder="103.1.2.3"
+                    />
+                    <select
+                      value={entry.label}
+                      onChange={(e) => updateIp(i, 'label', e.target.value)}
+                      className="input w-48"
+                    >
+                      {IP_LABELS.map((l) => (
+                        <option key={l.value} value={l.value}>
+                          {l.display}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => removeIp(i)}
+                      className="p-1.5 text-gray-400 hover:text-red-500 shrink-0"
+                      title="Remove"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {ipError && <p className="mt-1 text-xs text-red-600">{ipError}</p>}
+              <button
+                type="button"
+                onClick={addIp}
+                className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add IP
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Field label="SSH Port">
+                <input {...register('ssh_port')} type="number" className="input" />
               </Field>
             </div>
-            <Field label="SSH Port">
-              <input {...register('ssh_port')} type="number" className="input" />
-            </Field>
           </div>
         </fieldset>
 

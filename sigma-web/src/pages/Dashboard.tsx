@@ -1,5 +1,5 @@
 import { useStats } from '@/hooks/useStats';
-import { formatDate, daysUntil, formatIp } from '@/lib/utils';
+import { formatDate, daysUntil } from '@/lib/utils';
 import { Server, Activity, Building2, AlertTriangle } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
 import {
@@ -159,7 +159,7 @@ export default function Dashboard() {
                     <tr key={vps.id} className="border-b last:border-0">
                       <td className="py-2 font-mono">{vps.hostname}</td>
                       <td className="py-2 font-mono text-xs">
-                        {vps.ip_addresses.map(formatIp).join(', ')}
+                        {vps.ip_addresses.map((e) => e.ip).join(', ')}
                       </td>
                       <td className="py-2">{vps.country}</td>
                       <td className="py-2">

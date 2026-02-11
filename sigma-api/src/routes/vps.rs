@@ -3,12 +3,11 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use ipnetwork::IpNetwork;
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
 use crate::errors::AppError;
-use crate::models::{CreateVps, UpdateVps, Vps, VpsListQuery};
+use crate::models::{CreateVps, IpEntry, UpdateVps, Vps, VpsListQuery};
 use crate::routes::AppState;
 
 pub fn router() -> Router<AppState> {
@@ -22,18 +21,10 @@ async fn list(
     State(state): State<AppState>,
     Query(q): Query<VpsListQuery>,
 ) -> Result<Json<Vec<Vps>>, AppError> {
-    // Build dynamic query with filters
     let mut sql = String::from(
         "SELECT * FROM vps WHERE 1=1"
     );
     let mut param_idx = 0u32;
-
-    // We'll use a simpler approach: fetch all and filter in code for the MVP.
-    // For production, you'd want proper query building.
-    // But let's do it properly with raw SQL + conditional binds.
-
-    // Actually, let's use a practical approach with sqlx::query_as and conditional SQL.
-    // We'll build SQL string dynamically.
 
     if q.status.is_some() {
         param_idx += 1;
@@ -65,7 +56,6 @@ async fn list(
 
     sql.push_str(" ORDER BY status, expire_date ASC NULLS LAST, hostname");
 
-    // Build the query dynamically
     let mut query = sqlx::query_as::<_, Vps>(&sql);
 
     if let Some(ref v) = q.status {
@@ -103,28 +93,28 @@ async fn get_one(
     Ok(Json(row))
 }
 
-fn parse_ips(ips: &[String]) -> Result<Vec<IpNetwork>, AppError> {
-    ips.iter()
-        .map(|s| {
-            // If no prefix length given, assume /32 for IPv4, /128 for IPv6
-            let s = if s.contains('/') {
-                s.clone()
-            } else if s.contains(':') {
-                format!("{}/128", s)
-            } else {
-                format!("{}/32", s)
-            };
-            s.parse::<IpNetwork>()
-                .map_err(|e| AppError::BadRequest(format!("Invalid IP '{}': {}", s, e)))
-        })
-        .collect()
+fn validate_ips(entries: &[IpEntry]) -> Result<(), AppError> {
+    for e in entries {
+        let ip_str = e.ip.trim();
+        if ip_str.is_empty() {
+            continue;
+        }
+        // Validate it's a parseable IP (v4 or v6)
+        if ip_str.parse::<std::net::IpAddr>().is_err() {
+            return Err(AppError::BadRequest(format!("Invalid IP address: '{}'", ip_str)));
+        }
+    }
+    Ok(())
 }
 
 async fn create(
     State(state): State<AppState>,
     Json(input): Json<CreateVps>,
 ) -> Result<Json<Vps>, AppError> {
-    let ips = parse_ips(&input.ip_addresses)?;
+    validate_ips(&input.ip_addresses)?;
+
+    let ip_json = serde_json::to_value(&input.ip_addresses)
+        .map_err(|e| AppError::BadRequest(format!("Invalid ip_addresses: {}", e)))?;
 
     let row = sqlx::query_as::<_, Vps>(
         r#"INSERT INTO vps (
@@ -152,7 +142,7 @@ async fn create(
     .bind(&input.hostname)
     .bind(&input.alias)
     .bind(input.provider_id)
-    .bind(&ips)
+    .bind(&ip_json)
     .bind(input.ssh_port)
     .bind(&input.country)
     .bind(&input.city)
@@ -190,9 +180,14 @@ async fn update(
         .await?
         .ok_or(AppError::NotFound)?;
 
-    let ips = match input.ip_addresses {
-        Some(ref addrs) => parse_ips(addrs)?,
-        None => existing.ip_addresses.clone(),
+    let ip_json = match input.ip_addresses {
+        Some(ref addrs) => {
+            validate_ips(addrs)?;
+            serde_json::to_value(addrs)
+                .map_err(|e| AppError::BadRequest(format!("Invalid ip_addresses: {}", e)))?
+        }
+        None => serde_json::to_value(&existing.ip_addresses.0)
+            .unwrap_or_default(),
     };
 
     let row = sqlx::query_as::<_, Vps>(
@@ -213,7 +208,7 @@ async fn update(
     .bind(input.hostname.unwrap_or(existing.hostname))
     .bind(input.alias.unwrap_or(existing.alias))
     .bind(input.provider_id.unwrap_or(existing.provider_id))
-    .bind(&ips)
+    .bind(&ip_json)
     .bind(input.ssh_port.unwrap_or(existing.ssh_port))
     .bind(input.country.unwrap_or(existing.country))
     .bind(input.city.unwrap_or(existing.city))

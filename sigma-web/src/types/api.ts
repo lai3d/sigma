@@ -34,12 +34,17 @@ export interface UpdateProvider {
   notes?: string;
 }
 
+export interface IpEntry {
+  ip: string;
+  label: string;
+}
+
 export interface Vps {
   id: string;
   hostname: string;
   alias: string;
   provider_id: string;
-  ip_addresses: string[];
+  ip_addresses: IpEntry[];
   ssh_port: number;
   country: string;
   city: string;
@@ -68,7 +73,7 @@ export interface CreateVps {
   hostname: string;
   alias?: string;
   provider_id: string;
-  ip_addresses?: string[];
+  ip_addresses?: IpEntry[];
   ssh_port?: number;
   country?: string;
   city?: string;

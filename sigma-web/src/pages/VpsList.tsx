@@ -5,7 +5,7 @@ import { useVpsList, useDeleteVps, useRetireVps } from '@/hooks/useVps';
 import { useProviders } from '@/hooks/useProviders';
 import StatusBadge from '@/components/StatusBadge';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import { formatDate, daysUntil, formatIp } from '@/lib/utils';
+import { formatDate, daysUntil, ipLabelColor, ipLabelShort } from '@/lib/utils';
 import type { VpsListQuery } from '@/types/api';
 
 export default function VpsList() {
@@ -132,8 +132,19 @@ export default function VpsList() {
                         <span className="ml-2 text-xs text-gray-400">{vps.alias}</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs">
-                      {vps.ip_addresses.map(formatIp).join(', ')}
+                    <td className="px-4 py-3">
+                      <div className="space-y-0.5">
+                        {vps.ip_addresses.map((entry, i) => (
+                          <div key={i} className="flex items-center gap-1">
+                            <span className="font-mono text-xs">{entry.ip}</span>
+                            {entry.label && (
+                              <span className={`px-1 py-0.5 text-[10px] rounded ${ipLabelColor(entry.label)}`}>
+                                {ipLabelShort(entry.label)}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-4 py-3">{providerMap.get(vps.provider_id) || '-'}</td>
                     <td className="px-4 py-3">{vps.country}</td>
