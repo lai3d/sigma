@@ -82,7 +82,7 @@ sigma/
 - [ ] Cost tracking and reporting per provider/country/month
 - [ ] Auto-deploy node_exporter on new VPS via SSH
 - [ ] OpenAPI/Swagger spec generation
-- [ ] Rate limiting
+- [x] Rate limiting (Redis-based sliding window, per-IP)
 - [ ] Tests
 
 ## Tech Stack

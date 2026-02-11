@@ -2,6 +2,7 @@ pub mod agent;
 pub mod ip_checks;
 pub mod prometheus;
 pub mod providers;
+pub mod rate_limit;
 pub mod stats;
 pub mod vps;
 
@@ -18,6 +19,9 @@ use crate::db::Db;
 pub struct AppState {
     pub db: Db,
     pub api_key: Option<String>,
+    pub redis: redis::aio::ConnectionManager,
+    pub rate_limit_requests: u32,
+    pub rate_limit_window: u64,
 }
 
 /// Simple API key auth middleware.

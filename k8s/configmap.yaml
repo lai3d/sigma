@@ -7,3 +7,6 @@ data:
   LISTEN_HOST: "0.0.0.0"
   LISTEN_PORT: "3000"
   RUST_LOG: "info"
+  REDIS_URL: "redis://redis-service:6379"
+  RATE_LIMIT_REQUESTS: "100"
+  RATE_LIMIT_WINDOW: "60"

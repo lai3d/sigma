@@ -34,9 +34,17 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     tracing::info!("Migrations applied");
 
+    // Connect to Redis
+    let redis_client = redis::Client::open(cfg.redis_url.as_str())?;
+    let redis_conn = redis::aio::ConnectionManager::new(redis_client).await?;
+    tracing::info!("Connected to Redis");
+
     let app_state = routes::AppState {
         db: pool,
         api_key: cfg.api_key.clone(),
+        redis: redis_conn,
+        rate_limit_requests: cfg.rate_limit_requests,
+        rate_limit_window: cfg.rate_limit_window,
     };
 
     let app = Router::new()
@@ -46,6 +54,14 @@ async fn main() -> anyhow::Result<()> {
         .merge(routes::prometheus::router())
         .merge(routes::stats::router())
         .merge(routes::agent::router())
+        .layer(axum::middleware::from_fn_with_state(
+            app_state.clone(),
+            routes::rate_limit::rate_limit,
+        ))
+        .layer(axum::middleware::from_fn_with_state(
+            app_state.clone(),
+            routes::auth,
+        ))
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
         .with_state(app_state);
@@ -54,7 +70,8 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Listening on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>())
+        .await?;
 
     Ok(())
 }
