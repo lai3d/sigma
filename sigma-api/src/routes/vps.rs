@@ -3,12 +3,13 @@ use axum::{
     http::header,
     response::IntoResponse,
     routing::get,
-    Json, Router,
+    Extension, Json, Router,
 };
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 use uuid::Uuid;
 
+use crate::auth::{require_role, CurrentUser};
 use crate::errors::{AppError, ErrorResponse};
 #[allow(unused_imports)]
 use crate::models::PaginatedVpsResponse;
@@ -187,8 +188,10 @@ fn validate_ips(entries: &[IpEntry]) -> Result<(), AppError> {
 )]
 pub async fn create(
     State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
     Json(input): Json<CreateVps>,
 ) -> Result<Json<Vps>, AppError> {
+    require_role(&user, &["admin", "operator"])?;
     validate_ips(&input.ip_addresses)?;
 
     let ip_json = serde_json::to_value(&input.ip_addresses)
@@ -237,9 +240,11 @@ pub async fn create(
 )]
 pub async fn update(
     State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
     Path(id): Path<Uuid>,
     Json(input): Json<UpdateVps>,
 ) -> Result<Json<Vps>, AppError> {
+    require_role(&user, &["admin", "operator"])?;
     let existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE id = $1")
         .bind(id)
         .fetch_optional(&state.db)
@@ -312,8 +317,11 @@ pub async fn update(
 )]
 pub async fn delete(
     State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    require_role(&user, &["admin", "operator"])?;
+
     let result = sqlx::query("DELETE FROM vps WHERE id = $1")
         .bind(id)
         .execute(&state.db)
@@ -338,8 +346,10 @@ pub async fn delete(
 )]
 pub async fn retire(
     State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Vps>, AppError> {
+    require_role(&user, &["admin", "operator"])?;
     let row = sqlx::query_as::<_, Vps>(
         "UPDATE vps SET status = 'retired', monitoring_enabled = false WHERE id = $1 RETURNING *",
     )
@@ -467,8 +477,10 @@ pub async fn export(
 )]
 pub async fn import(
     State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
     Json(input): Json<ImportRequest>,
 ) -> Result<Json<ImportResult>, AppError> {
+    require_role(&user, &["admin", "operator"])?;
     // Build provider name → id lookup (case-insensitive)
     let providers = sqlx::query_as::<_, ProviderNameRow>("SELECT id, name FROM providers")
         .fetch_all(&state.db)

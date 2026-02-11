@@ -26,7 +26,7 @@ sigma/
 - **PostgreSQL** — leverages JSONB, TEXT[], GIN indexes for IP and tag queries
 - **No ORM magic** — raw SQL via sqlx::query_as for full control and transparency
 - **Runtime migrations** — using `sqlx::migrate::Migrator::new()` instead of compile-time `migrate!()` macro
-- **Simple API key auth** — via `X-Api-Key` header, optional (disabled if API_KEY env not set)
+- **JWT + API key dual auth** — email/password login with JWT (Bearer token), plus legacy API key (`X-Api-Key`) for CLI/agent. Three roles: admin, operator, readonly
 - **Prometheus file_sd integration** — core integration point with Thanos/Prometheus/Grafana stack
 - **Docker Compose (dev)** → **Kubernetes (production)**
 
@@ -80,6 +80,7 @@ sigma/
 - [x] Telegram/webhook notifications for expiring VPS
 - [x] Ansible dynamic inventory output (`GET /api/ansible/inventory`)
 - [x] Cost tracking and reporting per provider/country/month
+- [x] User authentication & RBAC (email+password, JWT, admin/operator/readonly roles)
 - [ ] Auto-deploy node_exporter on new VPS via SSH
 - [x] OpenAPI/Swagger spec generation (`/swagger-ui`, `/api-docs/openapi.json`)
 - [x] Rate limiting (Redis-based sliding window, per-IP)
@@ -106,6 +107,8 @@ sigma/
 - IP addresses stored as JSONB `[{ip, label}]`, validated server-side via `std::net::IpAddr`
 - Partial updates: PUT endpoints fetch existing record, merge with provided fields
 - Frontend: React Query hooks in `src/hooks/`, API layer in `src/api/`, types in `src/types/api.ts`
+- Auth: JWT in localStorage (`sigma_token`), AuthContext provides `useAuth()` hook, ProtectedRoute component for route guarding
+- RBAC: mutating handlers require `admin` or `operator` role; user management requires `admin`; read endpoints open to all authenticated users
 
 ## Build & Run
 

@@ -3,10 +3,11 @@ use axum::{
     http::header,
     response::IntoResponse,
     routing::get,
-    Json, Router,
+    Extension, Json, Router,
 };
 use uuid::Uuid;
 
+use crate::auth::{require_role, CurrentUser};
 use crate::errors::{AppError, ErrorResponse};
 #[allow(unused_imports)]
 use crate::models::PaginatedProviderResponse;
@@ -96,8 +97,10 @@ pub async fn get_one(
 )]
 pub async fn create(
     State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
     Json(input): Json<CreateProvider>,
 ) -> Result<Json<Provider>, AppError> {
+    require_role(&user, &["admin", "operator"])?;
     let row = sqlx::query_as::<_, Provider>(
         r#"INSERT INTO providers (name, country, website, panel_url, api_supported, rating, notes)
            VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -128,9 +131,11 @@ pub async fn create(
 )]
 pub async fn update(
     State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
     Path(id): Path<Uuid>,
     Json(input): Json<UpdateProvider>,
 ) -> Result<Json<Provider>, AppError> {
+    require_role(&user, &["admin", "operator"])?;
     let existing = sqlx::query_as::<_, Provider>("SELECT * FROM providers WHERE id = $1")
         .bind(id)
         .fetch_optional(&state.db)
@@ -169,8 +174,10 @@ pub async fn update(
 )]
 pub async fn delete(
     State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    require_role(&user, &["admin", "operator"])?;
     let result = sqlx::query("DELETE FROM providers WHERE id = $1")
         .bind(id)
         .execute(&state.db)
@@ -264,8 +271,10 @@ pub async fn export(
 )]
 pub async fn import(
     State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
     Json(input): Json<ImportRequest>,
 ) -> Result<Json<ImportResult>, AppError> {
+    require_role(&user, &["admin", "operator"])?;
     let rows: Vec<ProviderCsvRow> = match input.format.as_str() {
         "csv" => {
             let mut rdr = csv::Reader::from_reader(input.data.as_bytes());

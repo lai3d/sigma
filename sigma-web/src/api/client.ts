@@ -5,9 +5,28 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
-  const apiKey = localStorage.getItem('sigma_api_key');
-  if (apiKey) {
-    config.headers['X-Api-Key'] = apiKey;
+  const token = localStorage.getItem('sigma_token');
+  if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`;
+  } else {
+    const apiKey = localStorage.getItem('sigma_api_key');
+    if (apiKey) {
+      config.headers['X-Api-Key'] = apiKey;
+    }
   }
   return config;
 });
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('sigma_token');
+      localStorage.removeItem('sigma_user');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);

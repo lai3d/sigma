@@ -1,3 +1,4 @@
+mod auth;
 mod config;
 mod db;
 mod errors;
@@ -38,6 +39,27 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     tracing::info!("Migrations applied");
 
+    // Seed admin user if users table is empty
+    let user_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users")
+        .fetch_one(&pool)
+        .await?;
+
+    if user_count.0 == 0 {
+        let password_hash = auth::hash_password("changeme")
+            .expect("Failed to hash default admin password");
+        sqlx::query(
+            "INSERT INTO users (email, password_hash, name, role, force_password_change) VALUES ($1, $2, $3, $4, $5)",
+        )
+        .bind("admin@sigma.local")
+        .bind(&password_hash)
+        .bind("Admin")
+        .bind("admin")
+        .bind(true)
+        .execute(&pool)
+        .await?;
+        tracing::info!("Seeded default admin user: admin@sigma.local (password: changeme)");
+    }
+
     // Connect to Redis
     let redis_client = redis::Client::open(cfg.redis_url.as_str())?;
     let redis_conn = redis::aio::ConnectionManager::new(redis_client).await?;
@@ -53,6 +75,8 @@ async fn main() -> anyhow::Result<()> {
         rate_limit_requests: cfg.rate_limit_requests,
         rate_limit_window: cfg.rate_limit_window,
         http_client: http_client.clone(),
+        jwt_secret: cfg.jwt_secret.clone(),
+        jwt_expiry_hours: cfg.jwt_expiry_hours,
     };
 
     // Spawn notification worker if any channel is configured
@@ -64,6 +88,10 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("Notification worker disabled (no TELEGRAM_BOT_TOKEN or WEBHOOK_URL set)");
     }
 
+    // Public routes (no auth required)
+    let public_routes = routes::auth_routes::router();
+
+    // Protected API routes (auth required)
     let api_routes = Router::new()
         .merge(routes::providers::router())
         .merge(routes::vps::router())
@@ -74,6 +102,8 @@ async fn main() -> anyhow::Result<()> {
         .merge(routes::ansible::router())
         .merge(routes::exchange_rates::router())
         .merge(routes::costs::router())
+        .merge(routes::auth_routes::protected_router())
+        .merge(routes::users::router())
         .layer(axum::middleware::from_fn_with_state(
             app_state.clone(),
             routes::rate_limit::rate_limit,
@@ -84,6 +114,7 @@ async fn main() -> anyhow::Result<()> {
         ));
 
     let app = Router::new()
+        .merge(public_routes)
         .merge(api_routes)
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi::ApiDoc::openapi()))
         .layer(TraceLayer::new_for_http())

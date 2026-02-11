@@ -553,6 +553,102 @@ pub struct CostMonthlyResponse {
     pub months: Vec<MonthlyCostEntry>,
 }
 
+// ─── Users & Auth ────────────────────────────────────────
+
+#[derive(Debug, sqlx::FromRow, Serialize)]
+pub struct User {
+    pub id: Uuid,
+    pub email: String,
+    #[serde(skip_serializing)]
+    pub password_hash: String,
+    pub name: String,
+    pub role: String,
+    pub force_password_change: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct UserResponse {
+    pub id: Uuid,
+    pub email: String,
+    pub name: String,
+    pub role: String,
+    pub force_password_change: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<User> for UserResponse {
+    fn from(u: User) -> Self {
+        Self {
+            id: u.id,
+            email: u.email,
+            name: u.name,
+            role: u.role,
+            force_password_change: u.force_password_change,
+            created_at: u.created_at,
+            updated_at: u.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateUser {
+    pub email: String,
+    pub password: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default = "default_role")]
+    pub role: String,
+}
+
+fn default_role() -> String { "readonly".into() }
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateUser {
+    pub email: Option<String>,
+    pub name: Option<String>,
+    pub role: Option<String>,
+    pub password: Option<String>,
+    pub force_password_change: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct LoginRequest {
+    pub email: String,
+    pub password: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct LoginResponse {
+    pub token: String,
+    pub user: UserResponse,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct ChangePasswordRequest {
+    pub current_password: String,
+    pub new_password: String,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct UserListQuery {
+    pub role: Option<String>,
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_per_page")]
+    pub per_page: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct PaginatedUserResponse {
+    pub data: Vec<UserResponse>,
+    pub total: i64,
+    pub page: i64,
+    pub per_page: i64,
+}
+
 // ─── Defaults ────────────────────────────────────────────
 
 fn default_ssh_port() -> i32 { 22 }

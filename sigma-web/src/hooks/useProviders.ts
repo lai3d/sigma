@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from '@/api/providers';
-import type { CreateProvider, UpdateProvider, ImportResult } from '@/types/api';
+import type { CreateProvider, UpdateProvider } from '@/types/api';
 
 export function useProviders(query?: { page?: number; per_page?: number }) {
   return useQuery({

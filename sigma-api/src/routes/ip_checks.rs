@@ -1,10 +1,11 @@
 use axum::{
     extract::{Path, Query, State},
     routing::get,
-    Json, Router,
+    Extension, Json, Router,
 };
 use uuid::Uuid;
 
+use crate::auth::{require_role, CurrentUser};
 use crate::errors::{AppError, ErrorResponse};
 #[allow(unused_imports)]
 use crate::models::PaginatedIpCheckResponse;
@@ -141,8 +142,10 @@ pub async fn get_one(
 )]
 pub async fn create(
     State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
     Json(input): Json<CreateIpCheck>,
 ) -> Result<Json<IpCheck>, AppError> {
+    require_role(&user, &["admin", "operator"])?;
     // Validate check_type
     match input.check_type.as_str() {
         "icmp" | "tcp" | "http" => {}
@@ -202,8 +205,11 @@ pub async fn create(
 )]
 pub async fn delete(
     State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    require_role(&user, &["admin", "operator"])?;
+
     let result = sqlx::query("DELETE FROM ip_checks WHERE id = $1")
         .bind(id)
         .execute(&state.db)
@@ -287,8 +293,10 @@ pub async fn summary(
 )]
 pub async fn purge(
     State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
     Query(q): Query<PurgeQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    require_role(&user, &["admin", "operator"])?;
     let result = sqlx::query(
         "DELETE FROM ip_checks WHERE checked_at < NOW() - ($1 || ' days')::INTERVAL",
     )

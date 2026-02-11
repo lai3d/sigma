@@ -1,10 +1,11 @@
 use axum::{
     extract::{Path, Query, State},
     routing::get,
-    Json, Router,
+    Extension, Json, Router,
 };
 use uuid::Uuid;
 
+use crate::auth::{require_role, CurrentUser};
 use crate::errors::{AppError, ErrorResponse};
 #[allow(unused_imports)]
 use crate::models::PaginatedExchangeRateResponse;
@@ -122,8 +123,10 @@ pub async fn get_one(
 )]
 pub async fn create(
     State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
     Json(body): Json<CreateExchangeRate>,
 ) -> Result<Json<ExchangeRate>, AppError> {
+    require_role(&user, &["admin", "operator"])?;
     let row = sqlx::query_as::<_, ExchangeRate>(
         "INSERT INTO exchange_rates (from_currency, to_currency, rate)
          VALUES ($1, $2, $3)
@@ -152,9 +155,11 @@ pub async fn create(
 )]
 pub async fn update(
     State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
     Path(id): Path<Uuid>,
     Json(body): Json<UpdateExchangeRate>,
 ) -> Result<Json<ExchangeRate>, AppError> {
+    require_role(&user, &["admin", "operator"])?;
     let row = sqlx::query_as::<_, ExchangeRate>(
         "UPDATE exchange_rates SET rate = $1, updated_at = NOW() WHERE id = $2 RETURNING *",
     )
@@ -178,8 +183,11 @@ pub async fn update(
 )]
 pub async fn delete(
     State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    require_role(&user, &["admin", "operator"])?;
+
     let result = sqlx::query("DELETE FROM exchange_rates WHERE id = $1")
         .bind(id)
         .execute(&state.db)

@@ -12,6 +12,8 @@ pub struct Config {
     pub webhook_url: Option<String>,
     pub notify_before_days: Vec<i32>,
     pub notify_interval_secs: u64,
+    pub jwt_secret: String,
+    pub jwt_expiry_hours: u64,
 }
 
 impl Config {
@@ -57,6 +59,12 @@ impl Config {
                 .ok()
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(3600),
+            jwt_secret: std::env::var("JWT_SECRET")
+                .unwrap_or_else(|_| "sigma-default-jwt-secret-change-me".into()),
+            jwt_expiry_hours: std::env::var("JWT_EXPIRY_HOURS")
+                .ok()
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(24),
         }
     }
 }

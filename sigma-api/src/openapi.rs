@@ -3,12 +3,13 @@ use utoipa::OpenApi;
 use crate::errors::ErrorResponse;
 #[allow(unused_imports)]
 use crate::models::{
-    AgentHeartbeat, AgentRegister, ConvertedTotal, CostMonthlyResponse, CostSummaryResponse,
-    CountStat, CreateExchangeRate, CreateIpCheck, CreateProvider, CreateVps, CurrencyBreakdown,
-    DashboardStats, ExchangeRate, ImportRequest, ImportResult, IpCheck, IpCheckSummary, IpEntry,
-    MonthlyCostEntry, PaginatedExchangeRateResponse, PaginatedIpCheckResponse,
-    PaginatedProviderResponse, PaginatedVpsResponse, PrometheusTarget, Provider,
-    UpdateExchangeRate, UpdateProvider, UpdateVps, Vps,
+    AgentHeartbeat, AgentRegister, ChangePasswordRequest, ConvertedTotal, CostMonthlyResponse,
+    CostSummaryResponse, CountStat, CreateExchangeRate, CreateIpCheck, CreateProvider, CreateUser,
+    CreateVps, CurrencyBreakdown, DashboardStats, ExchangeRate, ImportRequest, ImportResult,
+    IpCheck, IpCheckSummary, IpEntry, LoginRequest, LoginResponse, MonthlyCostEntry,
+    PaginatedExchangeRateResponse, PaginatedIpCheckResponse, PaginatedProviderResponse,
+    PaginatedUserResponse, PaginatedVpsResponse, PrometheusTarget, Provider, UpdateExchangeRate,
+    UpdateProvider, UpdateUser, UpdateVps, UserResponse, Vps,
 };
 
 #[derive(OpenApi)]
@@ -19,6 +20,17 @@ use crate::models::{
         description = "VPS fleet management API for Sigma platform"
     ),
     paths(
+        // Auth
+        crate::routes::auth_routes::login,
+        crate::routes::auth_routes::me,
+        crate::routes::auth_routes::refresh,
+        crate::routes::auth_routes::change_password,
+        // Users
+        crate::routes::users::list,
+        crate::routes::users::get_one,
+        crate::routes::users::create,
+        crate::routes::users::update,
+        crate::routes::users::delete,
         // Providers
         crate::routes::providers::list,
         crate::routes::providers::get_one,
@@ -76,8 +88,12 @@ use crate::models::{
         ExchangeRate, CreateExchangeRate, UpdateExchangeRate, PaginatedExchangeRateResponse,
         CurrencyBreakdown, ConvertedTotal, CostSummaryResponse,
         MonthlyCostEntry, CostMonthlyResponse,
+        UserResponse, CreateUser, UpdateUser, PaginatedUserResponse,
+        LoginRequest, LoginResponse, ChangePasswordRequest,
     )),
     tags(
+        (name = "Auth", description = "Authentication and session management"),
+        (name = "Users", description = "User management (admin only)"),
         (name = "Providers", description = "Cloud provider management"),
         (name = "VPS", description = "VPS instance management"),
         (name = "IP Checks", description = "IP reachability tracking"),

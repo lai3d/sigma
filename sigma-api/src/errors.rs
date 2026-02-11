@@ -21,6 +21,9 @@ pub enum AppError {
     #[error("Unauthorized")]
     Unauthorized,
 
+    #[error("Forbidden: {0}")]
+    Forbidden(String),
+
     #[error("Database error: {0}")]
     Sqlx(#[from] sqlx::Error),
 
@@ -34,6 +37,7 @@ impl IntoResponse for AppError {
             AppError::NotFound => (StatusCode::NOT_FOUND, self.to_string()),
             AppError::BadRequest(_) => (StatusCode::BAD_REQUEST, self.to_string()),
             AppError::Unauthorized => (StatusCode::UNAUTHORIZED, self.to_string()),
+            AppError::Forbidden(_) => (StatusCode::FORBIDDEN, self.to_string()),
             AppError::Sqlx(e) => {
                 tracing::error!("Database error: {:?}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Database error".into())
