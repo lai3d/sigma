@@ -5,7 +5,9 @@ use axum::{
 };
 use uuid::Uuid;
 
-use crate::errors::AppError;
+use crate::errors::{AppError, ErrorResponse};
+#[allow(unused_imports)]
+use crate::models::PaginatedIpCheckResponse;
 use crate::models::{
     CreateIpCheck, IpCheck, IpCheckListQuery, IpCheckSummary, IpCheckSummaryQuery,
     PaginatedResponse, PurgeQuery,
@@ -20,7 +22,16 @@ pub fn router() -> Router<AppState> {
         .route("/api/ip-checks/{id}", get(get_one).delete(delete))
 }
 
-async fn list(
+#[utoipa::path(
+    get, path = "/api/ip-checks",
+    tag = "IP Checks",
+    params(IpCheckListQuery),
+    responses(
+        (status = 200, body = PaginatedIpCheckResponse),
+        (status = 500, body = ErrorResponse),
+    )
+)]
+pub async fn list(
     State(state): State<AppState>,
     Query(q): Query<IpCheckListQuery>,
 ) -> Result<Json<PaginatedResponse<IpCheck>>, AppError> {
@@ -95,7 +106,16 @@ async fn list(
     }))
 }
 
-async fn get_one(
+#[utoipa::path(
+    get, path = "/api/ip-checks/{id}",
+    tag = "IP Checks",
+    params(("id" = Uuid, Path, description = "IP check ID")),
+    responses(
+        (status = 200, body = IpCheck),
+        (status = 404, body = ErrorResponse),
+    )
+)]
+pub async fn get_one(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<IpCheck>, AppError> {
@@ -110,7 +130,16 @@ async fn get_one(
     Ok(Json(row))
 }
 
-async fn create(
+#[utoipa::path(
+    post, path = "/api/ip-checks",
+    tag = "IP Checks",
+    request_body = CreateIpCheck,
+    responses(
+        (status = 200, body = IpCheck),
+        (status = 400, body = ErrorResponse),
+    )
+)]
+pub async fn create(
     State(state): State<AppState>,
     Json(input): Json<CreateIpCheck>,
 ) -> Result<Json<IpCheck>, AppError> {
@@ -162,7 +191,16 @@ async fn create(
     Ok(Json(row))
 }
 
-async fn delete(
+#[utoipa::path(
+    delete, path = "/api/ip-checks/{id}",
+    tag = "IP Checks",
+    params(("id" = Uuid, Path, description = "IP check ID")),
+    responses(
+        (status = 200, description = "IP check deleted"),
+        (status = 404, body = ErrorResponse),
+    )
+)]
+pub async fn delete(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, AppError> {
@@ -178,7 +216,15 @@ async fn delete(
     Ok(Json(serde_json::json!({ "deleted": true })))
 }
 
-async fn summary(
+#[utoipa::path(
+    get, path = "/api/ip-checks/summary",
+    tag = "IP Checks",
+    params(IpCheckSummaryQuery),
+    responses(
+        (status = 200, body = Vec<IpCheckSummary>),
+    )
+)]
+pub async fn summary(
     State(state): State<AppState>,
     Query(q): Query<IpCheckSummaryQuery>,
 ) -> Result<Json<Vec<IpCheckSummary>>, AppError> {
@@ -231,7 +277,15 @@ async fn summary(
     Ok(Json(rows))
 }
 
-async fn purge(
+#[utoipa::path(
+    delete, path = "/api/ip-checks/purge",
+    tag = "IP Checks",
+    params(PurgeQuery),
+    responses(
+        (status = 200, description = "Number of deleted records"),
+    )
+)]
+pub async fn purge(
     State(state): State<AppState>,
     Query(q): Query<PurgeQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {

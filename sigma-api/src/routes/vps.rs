@@ -9,7 +9,9 @@ use rust_decimal::Decimal;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::errors::AppError;
+use crate::errors::{AppError, ErrorResponse};
+#[allow(unused_imports)]
+use crate::models::PaginatedVpsResponse;
 use crate::models::{
     CreateVps, ExportQuery, ImportRequest, ImportResult, IpEntry, PaginatedResponse, UpdateVps,
     Vps, VpsCsvRow, VpsListQuery,
@@ -47,7 +49,16 @@ pub fn router() -> Router<AppState> {
         .route("/api/vps/{id}/retire", axum::routing::post(retire))
 }
 
-async fn list(
+#[utoipa::path(
+    get, path = "/api/vps",
+    tag = "VPS",
+    params(VpsListQuery),
+    responses(
+        (status = 200, body = PaginatedVpsResponse),
+        (status = 500, body = ErrorResponse),
+    )
+)]
+pub async fn list(
     State(state): State<AppState>,
     Query(q): Query<VpsListQuery>,
 ) -> Result<Json<PaginatedResponse<Vps>>, AppError> {
@@ -130,7 +141,16 @@ async fn list(
     }))
 }
 
-async fn get_one(
+#[utoipa::path(
+    get, path = "/api/vps/{id}",
+    tag = "VPS",
+    params(("id" = Uuid, Path, description = "VPS ID")),
+    responses(
+        (status = 200, body = Vps),
+        (status = 404, body = ErrorResponse),
+    )
+)]
+pub async fn get_one(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Vps>, AppError> {
@@ -156,7 +176,16 @@ fn validate_ips(entries: &[IpEntry]) -> Result<(), AppError> {
     Ok(())
 }
 
-async fn create(
+#[utoipa::path(
+    post, path = "/api/vps",
+    tag = "VPS",
+    request_body = CreateVps,
+    responses(
+        (status = 200, body = Vps),
+        (status = 400, body = ErrorResponse),
+    )
+)]
+pub async fn create(
     State(state): State<AppState>,
     Json(input): Json<CreateVps>,
 ) -> Result<Json<Vps>, AppError> {
@@ -196,7 +225,17 @@ async fn create(
     Ok(Json(row))
 }
 
-async fn update(
+#[utoipa::path(
+    put, path = "/api/vps/{id}",
+    tag = "VPS",
+    params(("id" = Uuid, Path, description = "VPS ID")),
+    request_body = UpdateVps,
+    responses(
+        (status = 200, body = Vps),
+        (status = 404, body = ErrorResponse),
+    )
+)]
+pub async fn update(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     Json(input): Json<UpdateVps>,
@@ -262,7 +301,16 @@ async fn update(
     Ok(Json(row))
 }
 
-async fn delete(
+#[utoipa::path(
+    delete, path = "/api/vps/{id}",
+    tag = "VPS",
+    params(("id" = Uuid, Path, description = "VPS ID")),
+    responses(
+        (status = 200, description = "VPS deleted"),
+        (status = 404, body = ErrorResponse),
+    )
+)]
+pub async fn delete(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, AppError> {
@@ -279,7 +327,16 @@ async fn delete(
 }
 
 /// Quick action: mark a VPS as retired
-async fn retire(
+#[utoipa::path(
+    post, path = "/api/vps/{id}/retire",
+    tag = "VPS",
+    params(("id" = Uuid, Path, description = "VPS ID")),
+    responses(
+        (status = 200, body = Vps, description = "VPS marked as retired"),
+        (status = 404, body = ErrorResponse),
+    )
+)]
+pub async fn retire(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Vps>, AppError> {
@@ -302,7 +359,15 @@ struct ProviderNameRow {
     name: String,
 }
 
-async fn export(
+#[utoipa::path(
+    get, path = "/api/vps/export",
+    tag = "VPS",
+    params(ExportQuery),
+    responses(
+        (status = 200, description = "Export data as CSV or JSON"),
+    )
+)]
+pub async fn export(
     State(state): State<AppState>,
     Query(q): Query<ExportQuery>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -391,7 +456,16 @@ async fn export(
 
 // ─── Import ──────────────────────────────────────────────
 
-async fn import(
+#[utoipa::path(
+    post, path = "/api/vps/import",
+    tag = "VPS",
+    request_body = ImportRequest,
+    responses(
+        (status = 200, body = ImportResult),
+        (status = 400, body = ErrorResponse),
+    )
+)]
+pub async fn import(
     State(state): State<AppState>,
     Json(input): Json<ImportRequest>,
 ) -> Result<Json<ImportResult>, AppError> {

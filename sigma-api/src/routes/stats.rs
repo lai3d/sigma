@@ -8,7 +8,14 @@ pub fn router() -> Router<AppState> {
     Router::new().route("/api/stats", get(dashboard))
 }
 
-async fn dashboard(State(state): State<AppState>) -> Result<Json<DashboardStats>, AppError> {
+#[utoipa::path(
+    get, path = "/api/stats",
+    tag = "Stats",
+    responses(
+        (status = 200, body = DashboardStats),
+    )
+)]
+pub async fn dashboard(State(state): State<AppState>) -> Result<Json<DashboardStats>, AppError> {
     let total_vps: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM vps")
         .fetch_one(&state.db)
         .await?;

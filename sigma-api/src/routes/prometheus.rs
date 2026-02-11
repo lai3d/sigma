@@ -11,7 +11,14 @@ pub fn router() -> Router<AppState> {
 
 /// Output Prometheus file_sd compatible JSON.
 /// Only includes VPS with monitoring_enabled = true and status in (active, provisioning).
-async fn targets(State(state): State<AppState>) -> Result<Json<Vec<PrometheusTarget>>, AppError> {
+#[utoipa::path(
+    get, path = "/api/prometheus/targets",
+    tag = "Prometheus",
+    responses(
+        (status = 200, body = Vec<PrometheusTarget>),
+    )
+)]
+pub async fn targets(State(state): State<AppState>) -> Result<Json<Vec<PrometheusTarget>>, AppError> {
     let rows = sqlx::query_as::<_, VpsTargetRow>(
         r#"SELECT
             v.hostname, v.alias, v.ip_addresses, v.node_exporter_port,

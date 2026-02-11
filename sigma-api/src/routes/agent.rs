@@ -1,6 +1,6 @@
 use axum::{extract::State, routing::post, Json, Router};
 
-use crate::errors::AppError;
+use crate::errors::{AppError, ErrorResponse};
 use crate::models::{AgentHeartbeat, AgentRegister, IpEntry, Vps};
 use crate::routes::AppState;
 
@@ -10,7 +10,16 @@ pub fn router() -> Router<AppState> {
         .route("/api/agent/heartbeat", post(heartbeat))
 }
 
-async fn register(
+#[utoipa::path(
+    post, path = "/api/agent/register",
+    tag = "Agent",
+    request_body = AgentRegister,
+    responses(
+        (status = 200, body = Vps, description = "Registered or updated VPS"),
+        (status = 400, body = ErrorResponse),
+    )
+)]
+pub async fn register(
     State(state): State<AppState>,
     Json(input): Json<AgentRegister>,
 ) -> Result<Json<Vps>, AppError> {
@@ -95,7 +104,17 @@ async fn register(
     Ok(Json(row))
 }
 
-async fn heartbeat(
+#[utoipa::path(
+    post, path = "/api/agent/heartbeat",
+    tag = "Agent",
+    request_body = AgentHeartbeat,
+    responses(
+        (status = 200, body = Vps, description = "Updated VPS"),
+        (status = 400, body = ErrorResponse),
+        (status = 404, body = ErrorResponse),
+    )
+)]
+pub async fn heartbeat(
     State(state): State<AppState>,
     Json(input): Json<AgentHeartbeat>,
 ) -> Result<Json<Vps>, AppError> {

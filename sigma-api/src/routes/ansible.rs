@@ -13,7 +13,14 @@ pub fn router() -> Router<AppState> {
 /// Ansible dynamic inventory JSON output.
 /// Groups hosts by: status, country, purpose, provider, and each tag.
 /// Only includes VPS with status in (active, provisioning).
-async fn inventory(State(state): State<AppState>) -> Result<Json<AnsibleInventory>, AppError> {
+#[utoipa::path(
+    get, path = "/api/ansible/inventory",
+    tag = "Ansible",
+    responses(
+        (status = 200, description = "Ansible dynamic inventory JSON"),
+    )
+)]
+pub async fn inventory(State(state): State<AppState>) -> Result<Json<AnsibleInventory>, AppError> {
     let rows = sqlx::query_as::<_, VpsInventoryRow>(
         r#"SELECT
             v.hostname, v.alias, v.ip_addresses, v.ssh_port,
@@ -151,7 +158,7 @@ async fn inventory(State(state): State<AppState>) -> Result<Json<AnsibleInventor
 /// Ansible dynamic inventory JSON structure.
 /// Groups are flattened into the top level; `_meta.hostvars` holds per-host variables.
 #[derive(Debug, Serialize)]
-struct AnsibleInventory {
+pub struct AnsibleInventory {
     #[serde(flatten)]
     groups: HashMap<String, AnsibleGroup>,
     #[serde(rename = "_meta")]

@@ -1,11 +1,12 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 // ─── IP Entry with label ────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct IpEntry {
     pub ip: String,
     #[serde(default)]
@@ -14,7 +15,7 @@ pub struct IpEntry {
 
 // ─── Provider ────────────────────────────────────────────
 
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
 pub struct Provider {
     pub id: Uuid,
     pub name: String,
@@ -28,7 +29,7 @@ pub struct Provider {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateProvider {
     pub name: String,
     #[serde(default)]
@@ -44,7 +45,7 @@ pub struct CreateProvider {
     pub notes: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateProvider {
     pub name: Option<String>,
     pub country: Option<String>,
@@ -57,13 +58,14 @@ pub struct UpdateProvider {
 
 // ─── VPS ─────────────────────────────────────────────────
 
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
 pub struct Vps {
     pub id: Uuid,
     pub hostname: String,
     pub alias: String,
     pub provider_id: Option<Uuid>,
 
+    #[schema(value_type = Vec<IpEntry>)]
     pub ip_addresses: sqlx::types::Json<Vec<IpEntry>>,
     pub ssh_port: i32,
 
@@ -74,8 +76,10 @@ pub struct Vps {
     pub cpu_cores: Option<i16>,
     pub ram_mb: Option<i32>,
     pub disk_gb: Option<i32>,
+    #[schema(value_type = Option<String>)]
     pub bandwidth_tb: Option<Decimal>,
 
+    #[schema(value_type = Option<String>)]
     pub cost_monthly: Option<Decimal>,
     pub currency: String,
 
@@ -90,13 +94,14 @@ pub struct Vps {
     pub monitoring_enabled: bool,
     pub node_exporter_port: i32,
 
+    #[schema(value_type = Object)]
     pub extra: serde_json::Value,
     pub notes: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateVps {
     pub hostname: String,
     #[serde(default)]
@@ -143,12 +148,13 @@ pub struct CreateVps {
     pub node_exporter_port: i32,
 
     #[serde(default)]
+    #[schema(value_type = Object)]
     pub extra: serde_json::Value,
     #[serde(default)]
     pub notes: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateVps {
     pub hostname: Option<String>,
     pub alias: Option<String>,
@@ -172,11 +178,12 @@ pub struct UpdateVps {
     pub tags: Option<Vec<String>>,
     pub monitoring_enabled: Option<bool>,
     pub node_exporter_port: Option<i32>,
+    #[schema(value_type = Option<Object>)]
     pub extra: Option<serde_json::Value>,
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, IntoParams)]
 pub struct VpsListQuery {
     pub status: Option<String>,
     pub country: Option<String>,
@@ -192,7 +199,7 @@ pub struct VpsListQuery {
 
 // ─── Pagination ──────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, IntoParams)]
 pub struct ProviderListQuery {
     #[serde(default = "default_page")]
     pub page: i64,
@@ -208,12 +215,37 @@ pub struct PaginatedResponse<T: Serialize> {
     pub per_page: i64,
 }
 
+// Concrete paginated response types for OpenAPI schema generation
+#[derive(Serialize, ToSchema)]
+pub struct PaginatedProviderResponse {
+    pub data: Vec<Provider>,
+    pub total: i64,
+    pub page: i64,
+    pub per_page: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct PaginatedVpsResponse {
+    pub data: Vec<Vps>,
+    pub total: i64,
+    pub page: i64,
+    pub per_page: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct PaginatedIpCheckResponse {
+    pub data: Vec<IpCheck>,
+    pub total: i64,
+    pub page: i64,
+    pub per_page: i64,
+}
+
 fn default_page() -> i64 { 1 }
 fn default_per_page() -> i64 { 25 }
 
 // ─── Prometheus target output ────────────────────────────
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct PrometheusTarget {
     pub targets: Vec<String>,
     pub labels: std::collections::HashMap<String, String>,
@@ -221,7 +253,7 @@ pub struct PrometheusTarget {
 
 // ─── Stats ───────────────────────────────────────────────
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct DashboardStats {
     pub total_vps: i64,
     pub active_vps: i64,
@@ -232,7 +264,7 @@ pub struct DashboardStats {
     pub expiring_soon: Vec<Vps>,
 }
 
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
 pub struct CountStat {
     pub label: Option<String>,
     pub count: Option<i64>,
@@ -240,13 +272,15 @@ pub struct CountStat {
 
 // ─── Import / Export ─────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ImportRequest {
+    /// Format: "csv" or "json"
     pub format: String,
+    /// Raw CSV or JSON data as a string
     pub data: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ImportResult {
     pub imported: usize,
     pub errors: Vec<String>,
@@ -317,8 +351,9 @@ pub struct VpsCsvRow {
 fn default_ssh_port_csv() -> i32 { 22 }
 fn default_node_exporter_port_csv() -> i32 { 9100 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, IntoParams)]
 pub struct ExportQuery {
+    /// Format: "csv" or "json" (default: "json")
     #[serde(default = "default_json_format")]
     pub format: String,
 }
@@ -327,7 +362,7 @@ fn default_json_format() -> String { "json".into() }
 
 // ─── IP Checks ───────────────────────────────────────────
 
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
 pub struct IpCheck {
     pub id: Uuid,
     pub vps_id: Uuid,
@@ -339,7 +374,7 @@ pub struct IpCheck {
     pub checked_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateIpCheck {
     pub vps_id: Uuid,
     pub ip: String,
@@ -353,7 +388,7 @@ pub struct CreateIpCheck {
 
 fn default_icmp() -> String { "icmp".into() }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, IntoParams)]
 pub struct IpCheckListQuery {
     pub vps_id: Option<Uuid>,
     pub ip: Option<String>,
@@ -366,7 +401,7 @@ pub struct IpCheckListQuery {
     pub per_page: i64,
 }
 
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
 pub struct IpCheckSummary {
     pub vps_id: Uuid,
     pub ip: String,
@@ -378,19 +413,19 @@ pub struct IpCheckSummary {
     pub last_success: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, IntoParams)]
 pub struct IpCheckSummaryQuery {
     pub vps_id: Option<Uuid>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, IntoParams)]
 pub struct PurgeQuery {
     pub older_than_days: i32,
 }
 
 // ─── Agent ───────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct AgentRegister {
     pub hostname: String,
     #[serde(default)]
@@ -398,13 +433,15 @@ pub struct AgentRegister {
     #[serde(default = "default_ssh_port")]
     pub ssh_port: i32,
     #[serde(default)]
+    #[schema(value_type = Object)]
     pub system_info: serde_json::Value,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct AgentHeartbeat {
     pub hostname: String,
     #[serde(default)]
+    #[schema(value_type = Object)]
     pub system_info: serde_json::Value,
 }
 

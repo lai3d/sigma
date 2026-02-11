@@ -7,7 +7,9 @@ use axum::{
 };
 use uuid::Uuid;
 
-use crate::errors::AppError;
+use crate::errors::{AppError, ErrorResponse};
+#[allow(unused_imports)]
+use crate::models::PaginatedProviderResponse;
 use crate::models::{
     CreateProvider, ExportQuery, ImportRequest, ImportResult, PaginatedResponse, Provider,
     ProviderCsvRow, ProviderListQuery, UpdateProvider,
@@ -25,7 +27,16 @@ pub fn router() -> Router<AppState> {
         )
 }
 
-async fn list(
+#[utoipa::path(
+    get, path = "/api/providers",
+    tag = "Providers",
+    params(ProviderListQuery),
+    responses(
+        (status = 200, body = PaginatedProviderResponse),
+        (status = 500, body = ErrorResponse),
+    )
+)]
+pub async fn list(
     State(state): State<AppState>,
     Query(q): Query<ProviderListQuery>,
 ) -> Result<Json<PaginatedResponse<Provider>>, AppError> {
@@ -53,7 +64,16 @@ async fn list(
     }))
 }
 
-async fn get_one(
+#[utoipa::path(
+    get, path = "/api/providers/{id}",
+    tag = "Providers",
+    params(("id" = Uuid, Path, description = "Provider ID")),
+    responses(
+        (status = 200, body = Provider),
+        (status = 404, body = ErrorResponse),
+    )
+)]
+pub async fn get_one(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Provider>, AppError> {
@@ -65,7 +85,16 @@ async fn get_one(
     Ok(Json(row))
 }
 
-async fn create(
+#[utoipa::path(
+    post, path = "/api/providers",
+    tag = "Providers",
+    request_body = CreateProvider,
+    responses(
+        (status = 200, body = Provider),
+        (status = 400, body = ErrorResponse),
+    )
+)]
+pub async fn create(
     State(state): State<AppState>,
     Json(input): Json<CreateProvider>,
 ) -> Result<Json<Provider>, AppError> {
@@ -87,7 +116,17 @@ async fn create(
     Ok(Json(row))
 }
 
-async fn update(
+#[utoipa::path(
+    put, path = "/api/providers/{id}",
+    tag = "Providers",
+    params(("id" = Uuid, Path, description = "Provider ID")),
+    request_body = UpdateProvider,
+    responses(
+        (status = 200, body = Provider),
+        (status = 404, body = ErrorResponse),
+    )
+)]
+pub async fn update(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     Json(input): Json<UpdateProvider>,
@@ -119,7 +158,16 @@ async fn update(
     Ok(Json(row))
 }
 
-async fn delete(
+#[utoipa::path(
+    delete, path = "/api/providers/{id}",
+    tag = "Providers",
+    params(("id" = Uuid, Path, description = "Provider ID")),
+    responses(
+        (status = 200, description = "Provider deleted"),
+        (status = 404, body = ErrorResponse),
+    )
+)]
+pub async fn delete(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, AppError> {
@@ -137,7 +185,15 @@ async fn delete(
 
 // ─── Export ──────────────────────────────────────────────
 
-async fn export(
+#[utoipa::path(
+    get, path = "/api/providers/export",
+    tag = "Providers",
+    params(ExportQuery),
+    responses(
+        (status = 200, description = "Export data as CSV or JSON"),
+    )
+)]
+pub async fn export(
     State(state): State<AppState>,
     Query(q): Query<ExportQuery>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -197,7 +253,16 @@ async fn export(
 
 // ─── Import ──────────────────────────────────────────────
 
-async fn import(
+#[utoipa::path(
+    post, path = "/api/providers/import",
+    tag = "Providers",
+    request_body = ImportRequest,
+    responses(
+        (status = 200, body = ImportResult),
+        (status = 400, body = ErrorResponse),
+    )
+)]
+pub async fn import(
     State(state): State<AppState>,
     Json(input): Json<ImportRequest>,
 ) -> Result<Json<ImportResult>, AppError> {

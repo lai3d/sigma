@@ -3,6 +3,7 @@ mod db;
 mod errors;
 mod models;
 mod notifications;
+mod openapi;
 mod routes;
 
 use axum::Router;
@@ -10,6 +11,8 @@ use sqlx::postgres::PgPoolOptions;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -61,7 +64,7 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("Notification worker disabled (no TELEGRAM_BOT_TOKEN or WEBHOOK_URL set)");
     }
 
-    let app = Router::new()
+    let api_routes = Router::new()
         .merge(routes::providers::router())
         .merge(routes::vps::router())
         .merge(routes::ip_checks::router())
@@ -76,7 +79,11 @@ async fn main() -> anyhow::Result<()> {
         .layer(axum::middleware::from_fn_with_state(
             app_state.clone(),
             routes::auth,
-        ))
+        ));
+
+    let app = Router::new()
+        .merge(api_routes)
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi::ApiDoc::openapi()))
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
         .with_state(app_state);

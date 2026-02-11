@@ -81,7 +81,7 @@ sigma/
 - [x] Ansible dynamic inventory output (`GET /api/ansible/inventory`)
 - [ ] Cost tracking and reporting per provider/country/month
 - [ ] Auto-deploy node_exporter on new VPS via SSH
-- [ ] OpenAPI/Swagger spec generation
+- [x] OpenAPI/Swagger spec generation (`/swagger-ui`, `/api-docs/openapi.json`)
 - [x] Rate limiting (Redis-based sliding window, per-IP)
 - [ ] Tests
 
