@@ -1,0 +1,36 @@
+# Rust
+target/
+*.swp
+*.swo
+
+# Node.js
+node_modules/
+dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database backups
+backup_*.sql
+*.dump
+
+# Docker
+.docker/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Claude Code
+.claude/

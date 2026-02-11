@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sigma-config
+  namespace: sigma
+data:
+  LISTEN_HOST: "0.0.0.0"
+  LISTEN_PORT: "3000"
+  RUST_LOG: "info"

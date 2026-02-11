@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sigma
+      POSTGRES_PASSWORD: sigma
+      POSTGRES_DB: sigma
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sigma"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://sigma:sigma@db:5432/sigma
+      LISTEN_HOST: 0.0.0.0
+      LISTEN_PORT: 3000
+      API_KEY: ${API_KEY:-change-me-in-production}
+      RUST_LOG: ${RUST_LOG:-info}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../sigma-web
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    environment:
+      API_URL: http://api:3000
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  pgdata:
