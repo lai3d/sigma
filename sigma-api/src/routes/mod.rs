@@ -23,6 +23,7 @@ pub struct AppState {
     pub redis: redis::aio::ConnectionManager,
     pub rate_limit_requests: u32,
     pub rate_limit_window: u64,
+    pub http_client: reqwest::Client,
 }
 
 /// Simple API key auth middleware.

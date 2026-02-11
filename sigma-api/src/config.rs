@@ -7,6 +7,11 @@ pub struct Config {
     pub redis_url: String,
     pub rate_limit_requests: u32,
     pub rate_limit_window: u64,
+    pub telegram_bot_token: Option<String>,
+    pub telegram_chat_id: Option<String>,
+    pub webhook_url: Option<String>,
+    pub notify_before_days: Vec<i32>,
+    pub notify_interval_secs: u64,
 }
 
 impl Config {
@@ -34,6 +39,24 @@ impl Config {
                 .ok()
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(60),
+            telegram_bot_token: std::env::var("TELEGRAM_BOT_TOKEN")
+                .ok()
+                .filter(|s| !s.is_empty()),
+            telegram_chat_id: std::env::var("TELEGRAM_CHAT_ID")
+                .ok()
+                .filter(|s| !s.is_empty()),
+            webhook_url: std::env::var("WEBHOOK_URL")
+                .ok()
+                .filter(|s| !s.is_empty()),
+            notify_before_days: std::env::var("NOTIFY_BEFORE_DAYS")
+                .unwrap_or_else(|_| "7,3,1".into())
+                .split(',')
+                .filter_map(|s| s.trim().parse().ok())
+                .collect(),
+            notify_interval_secs: std::env::var("NOTIFY_INTERVAL_SECS")
+                .ok()
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(3600),
         }
     }
 }

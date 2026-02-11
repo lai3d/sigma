@@ -77,7 +77,7 @@ sigma/
 - [x] IP reachability probe (`sigma-probe/` — ICMP/TCP/HTTP checks from China nodes)
 - [x] VPS agent auto-registration + heartbeat (`sigma-agent/` + `/api/agent/*` endpoints)
 - [x] Pagination on list endpoints
-- [ ] Telegram/webhook notifications for expiring VPS
+- [x] Telegram/webhook notifications for expiring VPS
 - [x] Ansible dynamic inventory output (`GET /api/ansible/inventory`)
 - [ ] Cost tracking and reporting per provider/country/month
 - [ ] Auto-deploy node_exporter on new VPS via SSH

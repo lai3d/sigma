@@ -32,6 +32,11 @@ services:
       LISTEN_PORT: 3000
       API_KEY: ${API_KEY:-change-me-in-production}
       RUST_LOG: ${RUST_LOG:-info}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      WEBHOOK_URL: ${WEBHOOK_URL:-}
+      NOTIFY_BEFORE_DAYS: ${NOTIFY_BEFORE_DAYS:-7,3,1}
+      NOTIFY_INTERVAL_SECS: ${NOTIFY_INTERVAL_SECS:-3600}
     depends_on:
       db:
         condition: service_healthy
