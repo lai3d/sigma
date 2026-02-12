@@ -84,7 +84,7 @@ sigma/
 - [ ] Auto-deploy node_exporter on new VPS via SSH
 - [x] OpenAPI/Swagger spec generation (`/swagger-ui`, `/api-docs/openapi.json`)
 - [x] Rate limiting (Redis-based sliding window, per-IP)
-- [ ] Tests
+- [x] Tests
 
 ## Tech Stack
 
