@@ -1,0 +1,83 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sigma
+      POSTGRES_PASSWORD: sigma
+      POSTGRES_DB: sigma
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sigma"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  api:
+    image: ghcr.io/lai3d/sigma/api:latest
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://sigma:sigma@db:5432/sigma
+      REDIS_URL: redis://redis:6379
+      LISTEN_HOST: 0.0.0.0
+      LISTEN_PORT: 3000
+      API_KEY: ${API_KEY:-change-me-in-production}
+      JWT_SECRET: ${JWT_SECRET:-sigma-dev-secret}
+      RUST_LOG: ${RUST_LOG:-info}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      WEBHOOK_URL: ${WEBHOOK_URL:-}
+      NOTIFY_BEFORE_DAYS: ${NOTIFY_BEFORE_DAYS:-7,3,1}
+      NOTIFY_INTERVAL_SECS: ${NOTIFY_INTERVAL_SECS:-3600}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  web:
+    image: ghcr.io/lai3d/sigma/web:latest
+    ports:
+      - "80:80"
+    environment:
+      API_URL: http://api:3000
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  probe:
+    image: ghcr.io/lai3d/sigma/probe:latest
+    cap_add:
+      - NET_RAW
+    environment:
+      SIGMA_API_URL: http://api:3000/api
+      SIGMA_API_KEY: ${API_KEY:-change-me-in-production}
+      PROBE_SOURCE: cn-beijing
+      PROBE_INTERVAL: 300
+      PROBE_TYPES: icmp,tcp,http
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  agent:
+    image: ghcr.io/lai3d/sigma/agent:latest
+    environment:
+      SIGMA_API_URL: http://api:3000/api
+      SIGMA_API_KEY: ${API_KEY:-change-me-in-production}
+      AGENT_INTERVAL: 60
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  pgdata:
