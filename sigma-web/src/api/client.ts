@@ -5,6 +5,12 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
+  // Don't attach auth headers to public login endpoints
+  const url = config.url || '';
+  if (url.startsWith('/auth/login')) {
+    return config;
+  }
+
   const token = localStorage.getItem('sigma_token');
   if (token) {
     config.headers['Authorization'] = `Bearer ${token}`;
