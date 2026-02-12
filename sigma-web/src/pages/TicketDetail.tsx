@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Pencil, Trash2 } from 'lucide-react';
 import { useTicket, useUpdateTicket, useDeleteTicket, useTicketComments, useAddComment } from '@/hooks/useTickets';
+import { useVps } from '@/hooks/useVps';
+import { useProvider } from '@/hooks/useProviders';
 import { useAuth } from '@/contexts/AuthContext';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { formatDate, timeAgo } from '@/lib/utils';
@@ -30,6 +32,8 @@ export default function TicketDetail() {
 
   const { data: ticket, isLoading } = useTicket(id || '');
   const { data: comments } = useTicketComments(id || '');
+  const { data: linkedVps } = useVps(ticket?.vps_id || '');
+  const { data: linkedProvider } = useProvider(ticket?.provider_id || '');
   const updateMutation = useUpdateTicket();
   const deleteMutation = useDeleteTicket();
   const addCommentMutation = useAddComment();
@@ -105,7 +109,7 @@ export default function TicketDetail() {
                 <dt className="text-gray-500">VPS</dt>
                 <dd>
                   <Link to={`/vps/${ticket.vps_id}`} className="text-blue-600 hover:underline">
-                    {ticket.vps_id.slice(0, 8)}...
+                    {linkedVps?.hostname || ticket.vps_id.slice(0, 8) + '...'}
                   </Link>
                 </dd>
               </div>
@@ -113,7 +117,9 @@ export default function TicketDetail() {
             {ticket.provider_id && (
               <div className="flex justify-between">
                 <dt className="text-gray-500">Provider</dt>
-                <dd className="text-gray-700">{ticket.provider_id.slice(0, 8)}...</dd>
+                <dd className="text-gray-700">
+                  {linkedProvider?.name || ticket.provider_id.slice(0, 8) + '...'}
+                </dd>
               </div>
             )}
             <div className="flex justify-between">

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useTicket, useCreateTicket, useUpdateTicket } from '@/hooks/useTickets';
 import { useProviders } from '@/hooks/useProviders';
+import { useVpsList } from '@/hooks/useVps';
 import { useUsers } from '@/hooks/useUsers';
 
 interface FormData {
@@ -22,8 +23,10 @@ export default function TicketForm() {
 
   const { data: existing } = useTicket(id || '');
   const { data: providersResult } = useProviders({ per_page: 100 });
+  const { data: vpsResult } = useVpsList({ per_page: 100 });
   const { data: usersResult } = useUsers({ per_page: 100 });
   const providers = providersResult?.data;
+  const vpsList = vpsResult?.data;
   const users = usersResult?.data;
   const createMutation = useCreateTicket();
   const updateMutation = useUpdateTicket();
@@ -135,6 +138,20 @@ export default function TicketForm() {
             </select>
           </div>
         )}
+
+        {/* VPS */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">VPS (optional)</label>
+          <select
+            {...register('vps_id')}
+            className="border rounded-md px-3 py-2 text-sm bg-white w-full"
+          >
+            <option value="">None</option>
+            {vpsList?.map((v) => (
+              <option key={v.id} value={v.id}>{v.hostname}{v.alias ? ` (${v.alias})` : ''}</option>
+            ))}
+          </select>
+        </div>
 
         {/* Provider */}
         <div>
