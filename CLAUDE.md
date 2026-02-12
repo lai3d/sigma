@@ -66,7 +66,7 @@ sigma/
 ### Deployment — Done:
 - [x] Root-level docker-compose.yml (db + api + web)
 - [x] Kubernetes configs (k8s/ directory)
-- [x] GitHub Actions CI/CD workflow
+- [x] GitHub Actions CI/CD workflows (per-package: api, web, agent, probe)
 - [x] Makefile with common commands
 - [x] DEPLOYMENT.md guide
 
