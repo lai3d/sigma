@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
+import { BarChart3 } from 'lucide-react';
 import { useVps, useCreateVps, useUpdateVps } from '@/hooks/useVps';
 import { useProviders } from '@/hooks/useProviders';
 import { ipLabelColor, timeAgo, formatUptime } from '@/lib/utils';
@@ -222,11 +223,29 @@ export default function VpsForm() {
     }
   }
 
+  const grafanaBaseUrl = localStorage.getItem('sigma_grafana_url') || '';
+  const firstIp = existing?.ip_addresses?.[0]?.ip;
+  const grafanaLink = grafanaBaseUrl && firstIp
+    ? `${grafanaBaseUrl}${grafanaBaseUrl.includes('?') ? '&' : '?'}var-target=${encodeURIComponent(firstIp)}`
+    : '';
+
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900">
-        {isEdit ? 'Edit VPS' : 'Add VPS'}
-      </h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">
+          {isEdit ? 'Edit VPS' : 'Add VPS'}
+        </h2>
+        {isEdit && grafanaLink && (
+          <a
+            href={grafanaLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-md hover:bg-orange-100"
+          >
+            <BarChart3 size={14} /> Grafana
+          </a>
+        )}
+      </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="mt-6 max-w-3xl space-y-8">
         {/* Agent Info (read-only, edit mode only) */}

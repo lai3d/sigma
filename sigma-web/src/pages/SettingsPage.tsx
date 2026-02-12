@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Key, User, Shield } from 'lucide-react';
+import { Key, User, Shield, BarChart3 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import * as authApi from '@/api/auth';
@@ -9,6 +9,10 @@ export default function SettingsPage() {
   const { user, updateUser } = useAuth();
   const [apiKey, setApiKey] = useState('');
   const [saved, setSaved] = useState(false);
+
+  // Grafana
+  const [grafanaUrl, setGrafanaUrl] = useState('');
+  const [grafanaSaved, setGrafanaSaved] = useState(false);
 
   // TOTP state
   const [totpSetup, setTotpSetup] = useState<TotpSetupResponse | null>(null);
@@ -20,6 +24,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setApiKey(localStorage.getItem('sigma_api_key') || '');
+    setGrafanaUrl(localStorage.getItem('sigma_grafana_url') || '');
   }, []);
 
   function handleSave() {
@@ -233,6 +238,42 @@ export default function SettingsPage() {
           )}
         </div>
       )}
+
+      {/* Grafana Card */}
+      <div className="mt-4 max-w-lg bg-white rounded-lg border p-5 space-y-4">
+        <div className="flex items-center gap-2 text-gray-700">
+          <BarChart3 size={18} />
+          <h3 className="text-sm font-semibold">Grafana Dashboard</h3>
+        </div>
+        <p className="text-sm text-gray-500">
+          Base URL for the Grafana dashboard. A "Grafana" button will appear on VPS pages linking to the dashboard filtered by IP.
+          Example: <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">https://grafana.example.com/d/abc123</code>
+        </p>
+        <input
+          type="url"
+          value={grafanaUrl}
+          onChange={(e) => setGrafanaUrl(e.target.value)}
+          className="input w-full"
+          placeholder="https://grafana.example.com/d/..."
+        />
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              if (grafanaUrl.trim()) {
+                localStorage.setItem('sigma_grafana_url', grafanaUrl.trim());
+              } else {
+                localStorage.removeItem('sigma_grafana_url');
+              }
+              setGrafanaSaved(true);
+              setTimeout(() => setGrafanaSaved(false), 2000);
+            }}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+          >
+            Save
+          </button>
+          {grafanaSaved && <span className="text-sm text-green-600">Saved!</span>}
+        </div>
+      </div>
 
       {/* API Key Card */}
       <div className="mt-4 max-w-lg bg-white rounded-lg border p-5 space-y-4">
