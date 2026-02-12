@@ -1,6 +1,8 @@
 use std::net::IpAddr;
+use std::time::Duration;
 
 use serde_json::json;
+use tracing::{debug, warn};
 
 use crate::models::IpEntry;
 
@@ -22,8 +24,9 @@ pub fn get_hostname() -> String {
         .unwrap_or_else(|_| gethostname_fallback())
 }
 
-/// Discover non-loopback IP addresses from /proc/net/fib_trie.
-pub fn discover_ips() -> Vec<IpEntry> {
+/// Discover non-loopback IP addresses from /proc/net/fib_trie,
+/// then fetch public IP from external service if no public IP was found locally.
+pub async fn discover_ips() -> Vec<IpEntry> {
     let mut ips = Vec::new();
 
     if let Ok(content) = std::fs::read_to_string("/proc/net/fib_trie") {
@@ -52,10 +55,72 @@ pub fn discover_ips() -> Vec<IpEntry> {
         }
     }
 
+    // If no public IP found locally, try external lookup
+    let has_public = ips.iter().any(|e| {
+        e.ip.parse::<IpAddr>()
+            .map(|ip| !ip_is_private(&ip))
+            .unwrap_or(false)
+    });
+
+    if !has_public {
+        match fetch_public_ip().await {
+            Ok(entry) => {
+                debug!(ip = %entry.ip, "Discovered public IP via external service");
+                ips.push(entry);
+            }
+            Err(e) => {
+                warn!("Failed to discover public IP: {:#}", e);
+            }
+        }
+    }
+
     // Deduplicate
     ips.sort_by(|a, b| a.ip.cmp(&b.ip));
     ips.dedup_by(|a, b| a.ip == b.ip);
     ips
+}
+
+/// Fetch public IP from external services (tries multiple with short timeout).
+async fn fetch_public_ip() -> anyhow::Result<IpEntry> {
+    let services = [
+        "https://icanhazip.com",
+        "https://ifconfig.me/ip",
+        "https://api.ipify.org",
+    ];
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()?;
+
+    for url in &services {
+        match client.get(*url).send().await {
+            Ok(resp) if resp.status().is_success() => {
+                let text = resp.text().await.unwrap_or_default();
+                let ip_str = text.trim();
+                if let Ok(ip) = ip_str.parse::<IpAddr>() {
+                    return Ok(IpEntry {
+                        ip: ip.to_string(),
+                        label: String::new(),
+                    });
+                }
+            }
+            Ok(resp) => {
+                debug!(url, status = %resp.status(), "Public IP service returned error");
+            }
+            Err(e) => {
+                debug!(url, error = %e, "Public IP service request failed");
+            }
+        }
+    }
+
+    anyhow::bail!("All public IP services failed")
+}
+
+fn ip_is_private(ip: &IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => v4.is_private() || v4.is_link_local(),
+        IpAddr::V6(_) => false,
+    }
 }
 
 fn is_docker_ip(ip: &IpAddr) -> bool {

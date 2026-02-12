@@ -56,7 +56,7 @@ async fn main() -> Result<()> {
 
 async fn register(client: &SigmaClient, hostname: &str, config: &Config) -> Result<VpsResponse> {
     let system_info = system::collect_system_info();
-    let ip_addresses = system::discover_ips();
+    let ip_addresses = system::discover_ips().await;
 
     info!(
         ips = ?ip_addresses.iter().map(|e| &e.ip).collect::<Vec<_>>(),
