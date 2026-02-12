@@ -32,6 +32,14 @@ docker compose logs -f api
 docker compose logs -f web
 ```
 
+### Using Pre-built Images
+
+If you don't want to build from source, use `docker-compose.prebuilt.yml` which pulls pre-built images from GHCR:
+
+```bash
+docker compose -f docker-compose.prebuilt.yml up -d
+```
+
 ### Services
 
 | Service | Port | URL |
@@ -70,10 +78,12 @@ docker compose up -d --build web
 
 ### CI: GitHub Actions
 
-Push to `main` triggers image builds and pushes to GHCR:
+Push to `main` triggers per-package image builds (only when that package changes) and pushes to GHCR:
 
 - `ghcr.io/lai3d/sigma/api:latest` + `ghcr.io/lai3d/sigma/api:sha-<commit>`
 - `ghcr.io/lai3d/sigma/web:latest` + `ghcr.io/lai3d/sigma/web:sha-<commit>`
+- `ghcr.io/lai3d/sigma/agent:latest` + `ghcr.io/lai3d/sigma/agent:sha-<commit>`
+- `ghcr.io/lai3d/sigma/probe:latest` + `ghcr.io/lai3d/sigma/probe:sha-<commit>`
 
 PR builds are validated but not pushed.
 
