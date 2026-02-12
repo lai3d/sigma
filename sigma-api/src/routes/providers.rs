@@ -145,6 +145,7 @@ pub async fn update(
         .fetch_optional(&state.db)
         .await?
         .ok_or(AppError::NotFound)?;
+    let old = serde_json::to_value(&existing).unwrap_or_default();
 
     let row = sqlx::query_as::<_, Provider>(
         r#"UPDATE providers SET
@@ -164,8 +165,22 @@ pub async fn update(
     .fetch_one(&state.db)
     .await?;
 
+    let new = serde_json::to_value(&row).unwrap_or_default();
+    let mut changes = serde_json::Map::new();
+    let skip = ["id", "created_at", "updated_at"];
+    if let (serde_json::Value::Object(old_map), serde_json::Value::Object(new_map)) = (&old, &new) {
+        for (key, new_val) in new_map {
+            if skip.contains(&key.as_str()) { continue; }
+            if let Some(old_val) = old_map.get(key) {
+                if old_val != new_val {
+                    changes.insert(key.clone(), serde_json::json!({"from": old_val, "to": new_val}));
+                }
+            }
+        }
+    }
+
     log_audit(&state.db, &user, "update", "provider", Some(&id.to_string()),
-        serde_json::json!({"name": row.name})).await;
+        serde_json::json!({"name": row.name, "changes": changes})).await;
 
     Ok(Json(row))
 }

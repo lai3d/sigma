@@ -255,6 +255,8 @@ pub async fn update(
         .await?
         .ok_or(AppError::NotFound)?;
 
+    let old = serde_json::to_value(&existing).unwrap_or_default();
+
     let ip_json = match input.ip_addresses {
         Some(ref addrs) => {
             validate_ips(addrs)?;
@@ -307,8 +309,23 @@ pub async fn update(
     .fetch_one(&state.db)
     .await?;
 
+    // Build a diff of changed fields for the audit log
+    let new = serde_json::to_value(&row).unwrap_or_default();
+    let mut changes = serde_json::Map::new();
+    let skip = ["id", "created_at", "updated_at", "agent_version", "last_heartbeat_at"];
+    if let (serde_json::Value::Object(old_map), serde_json::Value::Object(new_map)) = (&old, &new) {
+        for (key, new_val) in new_map {
+            if skip.contains(&key.as_str()) { continue; }
+            if let Some(old_val) = old_map.get(key) {
+                if old_val != new_val {
+                    changes.insert(key.clone(), serde_json::json!({"from": old_val, "to": new_val}));
+                }
+            }
+        }
+    }
+
     log_audit(&state.db, &user, "update", "vps", Some(&id.to_string()),
-        serde_json::json!({"hostname": row.hostname})).await;
+        serde_json::json!({"hostname": row.hostname, "changes": changes})).await;
 
     Ok(Json(row))
 }
