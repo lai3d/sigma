@@ -216,7 +216,7 @@ export default function VpsForm() {
       } else {
         await createMutation.mutateAsync(payload);
       }
-      navigate('/vps');
+      navigate(isEdit && id ? `/vps/${id}` : '/vps');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to save VPS';
       alert(msg);
@@ -517,7 +517,7 @@ export default function VpsForm() {
           </button>
           <button
             type="button"
-            onClick={() => navigate('/vps')}
+            onClick={() => navigate(isEdit && id ? `/vps/${id}` : '/vps')}
             className="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
           >
             Cancel

@@ -6,6 +6,7 @@ import Layout from '@/components/Layout';
 import Dashboard from '@/pages/Dashboard';
 import VpsList from '@/pages/VpsList';
 import VpsForm from '@/pages/VpsForm';
+import VpsDetail from '@/pages/VpsDetail';
 import ProviderList from '@/pages/ProviderList';
 import SettingsPage from '@/pages/SettingsPage';
 import LoginPage from '@/pages/LoginPage';
@@ -41,7 +42,8 @@ export default function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/vps" element={<VpsList />} />
               <Route path="/vps/new" element={<VpsForm />} />
-              <Route path="/vps/:id" element={<VpsForm />} />
+              <Route path="/vps/:id" element={<VpsDetail />} />
+              <Route path="/vps/:id/edit" element={<VpsForm />} />
               <Route path="/providers" element={<ProviderList />} />
               <Route path="/tickets" element={<TicketList />} />
               <Route path="/tickets/new" element={<TicketForm />} />

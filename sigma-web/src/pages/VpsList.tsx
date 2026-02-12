@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Trash2, Power } from 'lucide-react';
+import { Plus, Pencil, Trash2, Power } from 'lucide-react';
 import { useVpsList, useDeleteVps, useRetireVps, useImportVps } from '@/hooks/useVps';
 import { useProviders } from '@/hooks/useProviders';
 import StatusBadge from '@/components/StatusBadge';
@@ -204,6 +204,13 @@ export default function VpsList() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
+                        <Link
+                          to={`/vps/${vps.id}/edit`}
+                          title="Edit"
+                          className="p-1 text-blue-500 hover:bg-blue-50 rounded"
+                        >
+                          <Pencil size={15} />
+                        </Link>
                         {vps.status !== 'retired' && (
                           <button
                             title="Retire"
