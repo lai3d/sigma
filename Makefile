@@ -1,4 +1,4 @@
-.PHONY: help dev build up down logs clean deploy-k8s cli probe agent
+.PHONY: help dev build up down logs clean deploy-k8s cli probe agent test-db test-api test-web test
 
 # Default registry (override with: make build REGISTRY=your-registry.com)
 REGISTRY ?= your-registry
@@ -120,10 +120,25 @@ agent: ## Build sigma-agent binary
 logs-agent: ## Tail agent logs
 	docker compose logs -f agent
 
-test-api: ## Test API health
+test-db: ## Start test database
+	docker compose up -d test-db
+	@echo "⏳ Waiting for test database..."
+	@sleep 2
+
+test-api: test-db ## Run backend tests
+	DATABASE_URL=postgres://sigma_test:sigma_test@localhost:5433/sigma_test \
+	REDIS_URL=redis://localhost:6379 \
+	cargo test --manifest-path sigma-api/Cargo.toml -- --test-threads=1
+
+test-web: ## Run frontend tests
+	cd sigma-web && npx vitest run
+
+test: test-api test-web ## Run all tests
+
+check-api: ## Test API health (curl)
 	@echo "🧪 Testing API..."
 	@curl -s -H "X-Api-Key: ${API_KEY:-change-me}" http://localhost:3000/api/stats | jq . || echo "❌ API not responding"
 
-test-web: ## Test web frontend
+check-web: ## Test web frontend (curl)
 	@echo "🧪 Testing Web..."
 	@curl -s http://localhost/ > /dev/null && echo "✅ Web is up" || echo "❌ Web not responding"

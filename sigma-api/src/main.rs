@@ -1,11 +1,8 @@
-mod auth;
-mod config;
-mod db;
-mod errors;
-mod models;
-mod notifications;
-mod openapi;
-mod routes;
+use sigma_api::auth;
+use sigma_api::config;
+use sigma_api::notifications;
+use sigma_api::openapi;
+use sigma_api::routes;
 
 use axum::Router;
 use sqlx::postgres::PgPoolOptions;
