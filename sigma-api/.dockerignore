@@ -1,0 +1,10 @@
+target
+.git
+.gitignore
+.env
+.env.*
+Dockerfile
+.dockerignore
+tests
+*.md
+.DS_Store
