@@ -166,7 +166,6 @@ export default function VpsForm() {
 
   async function onSubmit(data: FormData) {
     if (!data.hostname.trim()) return;
-    if (!data.provider_id) return;
 
     const ip_addresses = ipList
       .filter((e) => e.ip.trim())
@@ -187,7 +186,7 @@ export default function VpsForm() {
     const payload = {
       hostname: data.hostname.trim(),
       alias: data.alias || '',
-      provider_id: data.provider_id,
+      provider_id: data.provider_id || undefined,
       ip_addresses,
       ssh_port: Number(data.ssh_port) || 22,
       country: data.country || '',
@@ -291,7 +290,7 @@ export default function VpsForm() {
             <Field label="Alias">
               <input {...register('alias')} className="input" placeholder="Hong Kong Exit 1" />
             </Field>
-            <Field label="Provider *" error={errors.provider_id?.message}>
+            <Field label="Provider" error={errors.provider_id?.message}>
               <select {...register('provider_id')} className="input">
                 <option value="">Select provider...</option>
                 {providers?.map((p) => (

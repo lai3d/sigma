@@ -150,7 +150,7 @@ export interface Vps {
 export interface CreateVps {
   hostname: string;
   alias?: string;
-  provider_id: string;
+  provider_id?: string;
   ip_addresses?: IpEntry[];
   ssh_port?: number;
   country?: string;
