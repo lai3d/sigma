@@ -33,6 +33,13 @@ sigma-agent/
 | `AGENT_HOSTNAME` | `--hostname` | (auto-detect) | Override hostname |
 | `AGENT_SSH_PORT` | `--ssh-port` | `22` | SSH port to report |
 
+## IP Discovery
+
+1. Reads local IPs from `/proc/net/fib_trie` (filters out loopback and Docker bridge IPs)
+2. If no public IP is found locally (common on NAT'd VPS), falls back to external lookup:
+   - Tries `icanhazip.com` → `ifconfig.me` → `api.ipify.org` in sequence (5s timeout each)
+   - First successful response is added to the IP list
+
 ## System Info Collected
 
 - cpu_cores: from /proc/cpuinfo
