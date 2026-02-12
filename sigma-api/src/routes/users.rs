@@ -199,9 +199,17 @@ pub async fn update(
         None => existing.password_hash,
     };
 
+    // Admin force-disable TOTP: if totp_enabled is explicitly set to false, clear secret
+    let (totp_enabled, totp_secret) = if input.totp_enabled == Some(false) {
+        (false, None)
+    } else {
+        (existing.totp_enabled, existing.totp_secret)
+    };
+
     let row = sqlx::query_as::<_, User>(
         r#"UPDATE users SET
-            email = $2, name = $3, role = $4, password_hash = $5, force_password_change = $6
+            email = $2, name = $3, role = $4, password_hash = $5, force_password_change = $6,
+            totp_enabled = $7, totp_secret = $8
            WHERE id = $1
            RETURNING *"#,
     )
@@ -211,6 +219,8 @@ pub async fn update(
     .bind(&role)
     .bind(&password_hash)
     .bind(input.force_password_change.unwrap_or(existing.force_password_change))
+    .bind(totp_enabled)
+    .bind(totp_secret)
     .fetch_one(&state.db)
     .await
     .map_err(|e| match e {

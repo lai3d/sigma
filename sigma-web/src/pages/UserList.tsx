@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
-import { useUsers, useDeleteUser } from '@/hooks/useUsers';
+import { Plus, Pencil, Trash2, ShieldOff } from 'lucide-react';
+import { useUsers, useDeleteUser, useUpdateUser } from '@/hooks/useUsers';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import Pagination from '@/components/Pagination';
 import { formatDate } from '@/lib/utils';
@@ -16,8 +16,10 @@ export default function UserList() {
   const [page, setPage] = useState(1);
   const { data: result, isLoading } = useUsers({ page, per_page: 25 });
   const deleteMutation = useDeleteUser();
+  const updateMutation = useUpdateUser();
 
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [confirmDisableTotp, setConfirmDisableTotp] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
@@ -47,8 +49,9 @@ export default function UserList() {
                 <th className="px-4 py-3 font-medium">Email</th>
                 <th className="px-4 py-3 font-medium">Name</th>
                 <th className="px-4 py-3 font-medium">Role</th>
+                <th className="px-4 py-3 font-medium">2FA</th>
                 <th className="px-4 py-3 font-medium">Created</th>
-                <th className="px-4 py-3 font-medium w-24">Actions</th>
+                <th className="px-4 py-3 font-medium w-28">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -61,6 +64,13 @@ export default function UserList() {
                       {u.role}
                     </span>
                   </td>
+                  <td className="px-4 py-3">
+                    {u.totp_enabled ? (
+                      <span className="inline-block w-2 h-2 bg-green-500 rounded-full" title="TOTP enabled"></span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-gray-500">{formatDate(u.created_at)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
@@ -71,6 +81,15 @@ export default function UserList() {
                       >
                         <Pencil size={15} />
                       </button>
+                      {u.totp_enabled && (
+                        <button
+                          title="Disable TOTP"
+                          onClick={() => setConfirmDisableTotp(u.id)}
+                          className="p-1 text-orange-500 hover:bg-orange-50 rounded"
+                        >
+                          <ShieldOff size={15} />
+                        </button>
+                      )}
                       <button
                         title="Delete"
                         onClick={() => setConfirmDelete(u.id)}
@@ -115,6 +134,19 @@ export default function UserList() {
           setConfirmDelete(null);
         }}
         onCancel={() => setConfirmDelete(null)}
+      />
+
+      <ConfirmDialog
+        open={!!confirmDisableTotp}
+        title="Disable TOTP"
+        message="This will force-disable two-factor authentication for this user. They will be able to log in without a TOTP code."
+        confirmLabel="Disable TOTP"
+        variant="danger"
+        onConfirm={() => {
+          if (confirmDisableTotp) updateMutation.mutate({ id: confirmDisableTotp, data: { totp_enabled: false } });
+          setConfirmDisableTotp(null);
+        }}
+        onCancel={() => setConfirmDisableTotp(null)}
       />
     </div>
   );

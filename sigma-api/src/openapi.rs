@@ -8,8 +8,9 @@ use crate::models::{
     CreateVps, CurrencyBreakdown, DashboardStats, ExchangeRate, ImportRequest, ImportResult,
     IpCheck, IpCheckSummary, IpEntry, LoginRequest, LoginResponse, MonthlyCostEntry,
     PaginatedExchangeRateResponse, PaginatedIpCheckResponse, PaginatedProviderResponse,
-    PaginatedUserResponse, PaginatedVpsResponse, PrometheusTarget, Provider, UpdateExchangeRate,
-    UpdateProvider, UpdateUser, UpdateVps, UserResponse, Vps,
+    PaginatedUserResponse, PaginatedVpsResponse, PrometheusTarget, Provider,
+    TotpChallengeResponse, TotpDisableRequest, TotpLoginRequest, TotpSetupResponse,
+    TotpVerifyRequest, UpdateExchangeRate, UpdateProvider, UpdateUser, UpdateVps, UserResponse, Vps,
 };
 
 #[derive(OpenApi)]
@@ -22,9 +23,13 @@ use crate::models::{
     paths(
         // Auth
         crate::routes::auth_routes::login,
+        crate::routes::auth_routes::login_totp,
         crate::routes::auth_routes::me,
         crate::routes::auth_routes::refresh,
         crate::routes::auth_routes::change_password,
+        crate::routes::auth_routes::totp_setup,
+        crate::routes::auth_routes::totp_verify,
+        crate::routes::auth_routes::totp_disable,
         // Users
         crate::routes::users::list,
         crate::routes::users::get_one,
@@ -90,6 +95,8 @@ use crate::models::{
         MonthlyCostEntry, CostMonthlyResponse,
         UserResponse, CreateUser, UpdateUser, PaginatedUserResponse,
         LoginRequest, LoginResponse, ChangePasswordRequest,
+        TotpSetupResponse, TotpVerifyRequest, TotpDisableRequest,
+        TotpLoginRequest, TotpChallengeResponse,
     )),
     tags(
         (name = "Auth", description = "Authentication and session management"),

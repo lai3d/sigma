@@ -5,6 +5,7 @@ use argon2::{
 use chrono::Utc;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
+use totp_rs::{Algorithm, Secret, TOTP};
 use uuid::Uuid;
 
 use crate::errors::AppError;
@@ -86,6 +87,86 @@ pub fn require_role(user: &CurrentUser, allowed: &[&str]) -> Result<(), AppError
             allowed.join(", ")
         )))
     }
+}
+
+// ─── TOTP helpers ─────────────────────────────────────────
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TotpChallengeClaims {
+    pub sub: String,
+    pub purpose: String,
+    pub exp: i64,
+    pub iat: i64,
+}
+
+pub fn create_totp_challenge_token(user_id: Uuid, secret: &str) -> Result<String, AppError> {
+    let now = Utc::now().timestamp();
+    let claims = TotpChallengeClaims {
+        sub: user_id.to_string(),
+        purpose: "totp_challenge".to_string(),
+        iat: now,
+        exp: now + 300, // 5 minutes
+    };
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(secret.as_bytes()),
+    )
+    .map_err(|e| AppError::Internal(format!("TOTP challenge token creation failed: {e}")))
+}
+
+pub fn verify_totp_challenge_token(token: &str, secret: &str) -> Result<Uuid, AppError> {
+    let data = decode::<TotpChallengeClaims>(
+        token,
+        &DecodingKey::from_secret(secret.as_bytes()),
+        &Validation::default(),
+    )
+    .map_err(|_| AppError::Unauthorized)?;
+
+    if data.claims.purpose != "totp_challenge" {
+        return Err(AppError::Unauthorized);
+    }
+
+    data.claims
+        .sub
+        .parse::<Uuid>()
+        .map_err(|_| AppError::Unauthorized)
+}
+
+pub fn generate_totp_secret(email: &str) -> Result<(String, TOTP), AppError> {
+    let secret = Secret::generate_secret();
+    let secret_base32 = secret.to_encoded().to_string();
+    let totp = TOTP::new(
+        Algorithm::SHA1,
+        6,
+        1,
+        30,
+        secret.to_bytes().map_err(|e| AppError::Internal(format!("TOTP secret error: {e}")))?,
+        Some("Sigma".to_string()),
+        email.to_string(),
+    )
+    .map_err(|e| AppError::Internal(format!("TOTP creation failed: {e}")))?;
+
+    Ok((secret_base32, totp))
+}
+
+pub fn totp_from_secret(secret_base32: &str, email: &str) -> Result<TOTP, AppError> {
+    let secret = Secret::Encoded(secret_base32.to_string());
+    TOTP::new(
+        Algorithm::SHA1,
+        6,
+        1,
+        30,
+        secret.to_bytes().map_err(|e| AppError::Internal(format!("TOTP secret error: {e}")))?,
+        Some("Sigma".to_string()),
+        email.to_string(),
+    )
+    .map_err(|e| AppError::Internal(format!("TOTP creation failed: {e}")))
+}
+
+pub fn verify_totp_code(secret_base32: &str, email: &str, code: &str) -> Result<bool, AppError> {
+    let totp = totp_from_secret(secret_base32, email)?;
+    Ok(totp.check_current(code).unwrap_or(false))
 }
 
 #[cfg(test)]
@@ -197,5 +278,48 @@ mod tests {
         let expected_duration = 48 * 3600;
         let actual_duration = claims.exp - claims.iat;
         assert_eq!(actual_duration, expected_duration);
+    }
+
+    // ─── TOTP tests ──────────────────────────────────────
+
+    #[test]
+    fn test_totp_challenge_token_roundtrip() {
+        let user_id = Uuid::new_v4();
+        let secret = "totp-challenge-secret";
+        let token = create_totp_challenge_token(user_id, secret).unwrap();
+        let result_id = verify_totp_challenge_token(&token, secret).unwrap();
+        assert_eq!(result_id, user_id);
+    }
+
+    #[test]
+    fn test_totp_challenge_token_wrong_secret() {
+        let user_id = Uuid::new_v4();
+        let token = create_totp_challenge_token(user_id, "secret1").unwrap();
+        let result = verify_totp_challenge_token(&token, "secret2");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_full_jwt_rejected_as_challenge_token() {
+        let user_id = Uuid::new_v4();
+        let secret = "shared-secret";
+        let jwt = create_token(user_id, "test@example.com", "admin", secret, 24).unwrap();
+        // A full JWT has email/role fields but no "purpose" field, so it should fail
+        // when decoded as TotpChallengeClaims (purpose won't be "totp_challenge")
+        let result = verify_totp_challenge_token(&jwt, secret);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_generate_and_verify_totp_code() {
+        let (secret_base32, totp) = generate_totp_secret("test@example.com").unwrap();
+        let code = totp.generate_current().unwrap();
+        assert!(verify_totp_code(&secret_base32, "test@example.com", &code).unwrap());
+    }
+
+    #[test]
+    fn test_totp_wrong_code_rejected() {
+        let (secret_base32, _) = generate_totp_secret("test@example.com").unwrap();
+        assert!(!verify_totp_code(&secret_base32, "test@example.com", "000000").unwrap());
     }
 }

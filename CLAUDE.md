@@ -85,6 +85,7 @@ sigma/
 - [x] OpenAPI/Swagger spec generation (`/swagger-ui`, `/api-docs/openapi.json`)
 - [x] Rate limiting (Redis-based sliding window, per-IP)
 - [x] Tests
+- [x] TOTP MFA (two-factor authentication with Google Authenticator / Authy)
 
 ## Tech Stack
 

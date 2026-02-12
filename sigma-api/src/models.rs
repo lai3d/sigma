@@ -564,6 +564,9 @@ pub struct User {
     pub name: String,
     pub role: String,
     pub force_password_change: bool,
+    #[serde(skip_serializing)]
+    pub totp_secret: Option<String>,
+    pub totp_enabled: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -575,6 +578,7 @@ pub struct UserResponse {
     pub name: String,
     pub role: String,
     pub force_password_change: bool,
+    pub totp_enabled: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -587,6 +591,7 @@ impl From<User> for UserResponse {
             name: u.name,
             role: u.role,
             force_password_change: u.force_password_change,
+            totp_enabled: u.totp_enabled,
             created_at: u.created_at,
             updated_at: u.updated_at,
         }
@@ -612,6 +617,7 @@ pub struct UpdateUser {
     pub role: Option<String>,
     pub password: Option<String>,
     pub force_password_change: Option<bool>,
+    pub totp_enabled: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -630,6 +636,35 @@ pub struct LoginResponse {
 pub struct ChangePasswordRequest {
     pub current_password: String,
     pub new_password: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TotpSetupResponse {
+    pub secret: String,
+    pub otpauth_url: String,
+    pub qr_code: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct TotpVerifyRequest {
+    pub code: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct TotpDisableRequest {
+    pub code: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct TotpLoginRequest {
+    pub totp_token: String,
+    pub code: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TotpChallengeResponse {
+    pub requires_totp: bool,
+    pub totp_token: String,
 }
 
 #[derive(Debug, Deserialize, IntoParams)]

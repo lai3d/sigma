@@ -1,12 +1,14 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import type { User, LoginRequest } from '@/types/api';
+import type { User, LoginRequest, LoginResult, TotpLoginRequest } from '@/types/api';
+import { isTotpChallenge } from '@/types/api';
 import * as authApi from '@/api/auth';
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (input: LoginRequest) => Promise<User>;
+  login: (input: LoginRequest) => Promise<LoginResult>;
+  loginTotp: (input: TotpLoginRequest) => Promise<User>;
   logout: () => void;
   updateUser: (user: User) => void;
 }
@@ -40,8 +42,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setIsLoading(false));
   }, []);
 
-  const login = useCallback(async (input: LoginRequest) => {
+  const login = useCallback(async (input: LoginRequest): Promise<LoginResult> => {
     const res = await authApi.login(input);
+    if (!isTotpChallenge(res)) {
+      localStorage.setItem('sigma_token', res.token);
+      localStorage.setItem('sigma_user', JSON.stringify(res.user));
+      setUser(res.user);
+    }
+    return res;
+  }, []);
+
+  const loginTotp = useCallback(async (input: TotpLoginRequest): Promise<User> => {
+    const res = await authApi.loginTotp(input);
     localStorage.setItem('sigma_token', res.token);
     localStorage.setItem('sigma_user', JSON.stringify(res.user));
     setUser(res.user);
@@ -60,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, loginTotp, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

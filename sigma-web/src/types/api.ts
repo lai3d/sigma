@@ -11,6 +11,7 @@ export interface User {
   name: string;
   role: UserRole;
   force_password_change: boolean;
+  totp_enabled: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -43,6 +44,39 @@ export interface UpdateUser {
   role?: UserRole;
   password?: string;
   force_password_change?: boolean;
+  totp_enabled?: boolean;
+}
+
+// ─── TOTP Types ────────────────────────────────────────────
+
+export interface TotpChallengeResponse {
+  requires_totp: boolean;
+  totp_token: string;
+}
+
+export interface TotpSetupResponse {
+  secret: string;
+  otpauth_url: string;
+  qr_code: string;
+}
+
+export interface TotpLoginRequest {
+  totp_token: string;
+  code: string;
+}
+
+export interface TotpVerifyRequest {
+  code: string;
+}
+
+export interface TotpDisableRequest {
+  code: string;
+}
+
+export type LoginResult = LoginResponse | TotpChallengeResponse;
+
+export function isTotpChallenge(res: LoginResult): res is TotpChallengeResponse {
+  return 'requires_totp' in res && (res as TotpChallengeResponse).requires_totp === true;
 }
 
 export interface Provider {

@@ -26,6 +26,7 @@ utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
 jsonwebtoken = "9"
 argon2 = "0.5"
+totp-rs = { version = "5", features = ["qr", "otpauth", "gen_secret"] }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
