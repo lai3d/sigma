@@ -1,5 +1,6 @@
 pub mod agent;
 pub mod ansible;
+pub mod audit_logs;
 pub mod auth_routes;
 pub mod costs;
 pub mod exchange_rates;

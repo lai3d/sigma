@@ -61,6 +61,7 @@ sigma/
 - [x] Provider list + create/edit dialog
 - [x] Settings page (API key config in localStorage)
 - [x] Layout with sidebar navigation
+- [x] Audit log page: filterable table (resource/action), expandable JSON details, admin-only
 - [x] Dockerfile (Node 20 → nginx:alpine, API reverse proxy)
 
 ### Deployment — Done:
@@ -86,6 +87,7 @@ sigma/
 - [x] Rate limiting (Redis-based sliding window, per-IP)
 - [x] Tests
 - [x] TOTP MFA (two-factor authentication with Google Authenticator / Authy)
+- [x] Audit log (who changed what — tracks all mutations with user, action, resource, details)
 
 ## Tech Stack
 

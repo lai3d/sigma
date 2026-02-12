@@ -15,6 +15,7 @@ use crate::models::{
     CreateProvider, ExportQuery, ImportRequest, ImportResult, PaginatedResponse, Provider,
     ProviderCsvRow, ProviderListQuery, UpdateProvider,
 };
+use crate::routes::audit_logs::log_audit;
 use crate::routes::AppState;
 
 pub fn router() -> Router<AppState> {
@@ -116,6 +117,9 @@ pub async fn create(
     .fetch_one(&state.db)
     .await?;
 
+    log_audit(&state.db, &user, "create", "provider", Some(&row.id.to_string()),
+        serde_json::json!({"name": row.name})).await;
+
     Ok(Json(row))
 }
 
@@ -160,6 +164,9 @@ pub async fn update(
     .fetch_one(&state.db)
     .await?;
 
+    log_audit(&state.db, &user, "update", "provider", Some(&id.to_string()),
+        serde_json::json!({"name": row.name})).await;
+
     Ok(Json(row))
 }
 
@@ -186,6 +193,9 @@ pub async fn delete(
     if result.rows_affected() == 0 {
         return Err(AppError::NotFound);
     }
+
+    log_audit(&state.db, &user, "delete", "provider", Some(&id.to_string()),
+        serde_json::json!({})).await;
 
     Ok(Json(serde_json::json!({ "deleted": true })))
 }

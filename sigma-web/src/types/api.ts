@@ -202,6 +202,30 @@ export interface ImportResult {
   errors: string[];
 }
 
+// ─── Audit Logs ────────────────────────────────────────────
+
+export interface AuditLog {
+  id: string;
+  user_id: string | null;
+  user_email: string;
+  action: string;
+  resource: string;
+  resource_id: string | null;
+  details: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface AuditLogQuery {
+  resource?: string;
+  resource_id?: string;
+  user_id?: string;
+  action?: string;
+  since?: string;
+  until?: string;
+  page?: number;
+  per_page?: number;
+}
+
 export interface DashboardStats {
   total_vps: number;
   active_vps: number;

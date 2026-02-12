@@ -17,6 +17,7 @@ use crate::models::{
     CreateVps, ExportQuery, ImportRequest, ImportResult, IpEntry, PaginatedResponse, UpdateVps,
     Vps, VpsCsvRow, VpsListQuery,
 };
+use crate::routes::audit_logs::log_audit;
 use crate::routes::AppState;
 
 const VPS_INSERT_SQL: &str = r#"INSERT INTO vps (
@@ -225,6 +226,9 @@ pub async fn create(
     .fetch_one(&state.db)
     .await?;
 
+    log_audit(&state.db, &user, "create", "vps", Some(&row.id.to_string()),
+        serde_json::json!({"hostname": row.hostname, "country": row.country})).await;
+
     Ok(Json(row))
 }
 
@@ -303,6 +307,9 @@ pub async fn update(
     .fetch_one(&state.db)
     .await?;
 
+    log_audit(&state.db, &user, "update", "vps", Some(&id.to_string()),
+        serde_json::json!({"hostname": row.hostname})).await;
+
     Ok(Json(row))
 }
 
@@ -331,6 +338,9 @@ pub async fn delete(
         return Err(AppError::NotFound);
     }
 
+    log_audit(&state.db, &user, "delete", "vps", Some(&id.to_string()),
+        serde_json::json!({})).await;
+
     Ok(Json(serde_json::json!({ "deleted": true })))
 }
 
@@ -357,6 +367,9 @@ pub async fn retire(
     .fetch_optional(&state.db)
     .await?
     .ok_or(AppError::NotFound)?;
+
+    log_audit(&state.db, &user, "retire", "vps", Some(&id.to_string()),
+        serde_json::json!({"hostname": row.hostname})).await;
 
     Ok(Json(row))
 }
@@ -587,6 +600,11 @@ pub async fn import(
             }
         }
         _ => return Err(AppError::BadRequest("format must be 'csv' or 'json'".into())),
+    }
+
+    if imported > 0 {
+        log_audit(&state.db, &user, "import", "vps", None,
+            serde_json::json!({"imported": imported, "errors": errors.len()})).await;
     }
 
     Ok(Json(ImportResult { imported, errors }))

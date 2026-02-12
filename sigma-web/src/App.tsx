@@ -11,6 +11,7 @@ import SettingsPage from '@/pages/SettingsPage';
 import LoginPage from '@/pages/LoginPage';
 import ChangePasswordPage from '@/pages/ChangePasswordPage';
 import UserList from '@/pages/UserList';
+import AuditLogList from '@/pages/AuditLogList';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,6 +42,9 @@ export default function App() {
               <Route path="/providers" element={<ProviderList />} />
               <Route path="/users" element={
                 <ProtectedRoute requiredRole="admin"><UserList /></ProtectedRoute>
+              } />
+              <Route path="/audit-log" element={
+                <ProtectedRoute requiredRole="admin"><AuditLogList /></ProtectedRoute>
               } />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>

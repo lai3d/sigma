@@ -10,6 +10,7 @@ use crate::errors::{AppError, ErrorResponse};
 #[allow(unused_imports)]
 use crate::models::PaginatedUserResponse;
 use crate::models::{CreateUser, PaginatedResponse, UpdateUser, User, UserListQuery, UserResponse};
+use crate::routes::audit_logs::log_audit;
 use crate::routes::AppState;
 
 pub fn router() -> Router<AppState> {
@@ -152,6 +153,9 @@ pub async fn create(
         _ => AppError::from(e),
     })?;
 
+    log_audit(&state.db, &current, "create", "user", Some(&row.id.to_string()),
+        serde_json::json!({"email": row.email, "role": row.role})).await;
+
     Ok(Json(row.into()))
 }
 
@@ -230,6 +234,9 @@ pub async fn update(
         _ => AppError::from(e),
     })?;
 
+    log_audit(&state.db, &current, "update", "user", Some(&id.to_string()),
+        serde_json::json!({"email": row.email, "role": row.role})).await;
+
     Ok(Json(row.into()))
 }
 
@@ -263,6 +270,9 @@ pub async fn delete(
     if result.rows_affected() == 0 {
         return Err(AppError::NotFound);
     }
+
+    log_audit(&state.db, &current, "delete", "user", Some(&id.to_string()),
+        serde_json::json!({})).await;
 
     Ok(Json(serde_json::json!({ "deleted": true })))
 }

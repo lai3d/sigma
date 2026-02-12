@@ -9,6 +9,7 @@ use crate::models::{
     ChangePasswordRequest, LoginRequest, LoginResponse, TotpChallengeResponse, TotpDisableRequest,
     TotpLoginRequest, TotpSetupResponse, TotpVerifyRequest, User, UserResponse,
 };
+use crate::routes::audit_logs::log_audit;
 use crate::routes::AppState;
 
 /// Public routes (no auth required)
@@ -69,6 +70,10 @@ pub async fn login(
         state.jwt_expiry_hours,
     )?;
 
+    let login_user = CurrentUser { id: user.id, email: user.email.clone(), role: user.role.clone(), is_api_key: false };
+    log_audit(&state.db, &login_user, "login", "user", Some(&user.id.to_string()),
+        serde_json::json!({"email": user.email})).await;
+
     let resp = LoginResponse {
         token,
         user: user.into(),
@@ -109,6 +114,10 @@ pub async fn login_totp(
         &state.jwt_secret,
         state.jwt_expiry_hours,
     )?;
+
+    let login_user = CurrentUser { id: user.id, email: user.email.clone(), role: user.role.clone(), is_api_key: false };
+    log_audit(&state.db, &login_user, "login", "user", Some(&user.id.to_string()),
+        serde_json::json!({"email": user.email, "totp": true})).await;
 
     Ok(Json(LoginResponse {
         token,
