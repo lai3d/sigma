@@ -226,6 +226,62 @@ export interface AuditLogQuery {
   per_page?: number;
 }
 
+// ─── Tickets ────────────────────────────────────────────
+
+export type TicketStatus = 'open' | 'in-progress' | 'resolved' | 'closed';
+export type TicketPriority = 'low' | 'medium' | 'high' | 'critical';
+
+export interface Ticket {
+  id: string;
+  title: string;
+  description: string;
+  status: TicketStatus;
+  priority: TicketPriority;
+  vps_id: string | null;
+  provider_id: string | null;
+  created_by: string;
+  assigned_to: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TicketComment {
+  id: string;
+  ticket_id: string;
+  user_id: string;
+  user_email: string;
+  body: string;
+  created_at: string;
+}
+
+export interface CreateTicket {
+  title: string;
+  description?: string;
+  priority?: TicketPriority;
+  vps_id?: string | null;
+  provider_id?: string | null;
+  assigned_to?: string | null;
+}
+
+export interface UpdateTicket {
+  title?: string;
+  description?: string;
+  status?: TicketStatus;
+  priority?: TicketPriority;
+  vps_id?: string | null;
+  provider_id?: string | null;
+  assigned_to?: string | null;
+}
+
+export interface TicketListQuery {
+  status?: string;
+  priority?: string;
+  assigned_to?: string;
+  vps_id?: string;
+  page?: number;
+  per_page?: number;
+}
+
 export interface DashboardStats {
   total_vps: number;
   active_vps: number;

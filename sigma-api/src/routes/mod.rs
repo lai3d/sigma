@@ -9,6 +9,7 @@ pub mod prometheus;
 pub mod providers;
 pub mod rate_limit;
 pub mod stats;
+pub mod tickets;
 pub mod users;
 pub mod vps;
 

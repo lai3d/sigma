@@ -81,6 +81,7 @@ pub async fn setup() -> (Router, PgPool) {
         .merge(routes::auth_routes::protected_router())
         .merge(routes::users::router())
         .merge(routes::audit_logs::router())
+        .merge(routes::tickets::router())
         .layer(axum::middleware::from_fn_with_state(
             app_state.clone(),
             routes::rate_limit::rate_limit,
@@ -195,7 +196,7 @@ pub async fn request_with_api_key(
 pub async fn cleanup(pool: &PgPool) {
     // Truncate all tables in dependency order
     sqlx::query(
-        "TRUNCATE TABLE audit_logs, ip_checks, vps, providers, exchange_rates, users RESTART IDENTITY CASCADE",
+        "TRUNCATE TABLE ticket_comments, tickets, audit_logs, ip_checks, vps, providers, exchange_rates, users RESTART IDENTITY CASCADE",
     )
     .execute(pool)
     .await

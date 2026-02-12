@@ -12,6 +12,9 @@ import LoginPage from '@/pages/LoginPage';
 import ChangePasswordPage from '@/pages/ChangePasswordPage';
 import UserList from '@/pages/UserList';
 import AuditLogList from '@/pages/AuditLogList';
+import TicketList from '@/pages/TicketList';
+import TicketDetail from '@/pages/TicketDetail';
+import TicketForm from '@/pages/TicketForm';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,6 +43,10 @@ export default function App() {
               <Route path="/vps/new" element={<VpsForm />} />
               <Route path="/vps/:id" element={<VpsForm />} />
               <Route path="/providers" element={<ProviderList />} />
+              <Route path="/tickets" element={<TicketList />} />
+              <Route path="/tickets/new" element={<TicketForm />} />
+              <Route path="/tickets/:id" element={<TicketDetail />} />
+              <Route path="/tickets/:id/edit" element={<TicketForm />} />
               <Route path="/users" element={
                 <ProtectedRoute requiredRole="admin"><UserList /></ProtectedRoute>
               } />

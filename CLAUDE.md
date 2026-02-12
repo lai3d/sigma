@@ -88,6 +88,7 @@ sigma/
 - [x] Tests
 - [x] TOTP MFA (two-factor authentication with Google Authenticator / Authy)
 - [x] Audit log (who changed what — tracks all mutations with user, action, resource, details)
+- [x] Ticket system (issue tracking with status workflow, comments, priority, VPS/provider links)
 
 ## Tech Stack
 

@@ -684,6 +684,83 @@ pub struct PaginatedUserResponse {
     pub per_page: i64,
 }
 
+// ─── Tickets ─────────────────────────────────────────────
+
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+pub struct Ticket {
+    pub id: Uuid,
+    pub title: String,
+    pub description: String,
+    pub status: String,
+    pub priority: String,
+    pub vps_id: Option<Uuid>,
+    pub provider_id: Option<Uuid>,
+    pub created_by: Uuid,
+    pub assigned_to: Option<Uuid>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateTicket {
+    pub title: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default = "default_priority")]
+    pub priority: String,
+    pub vps_id: Option<Uuid>,
+    pub provider_id: Option<Uuid>,
+    pub assigned_to: Option<Uuid>,
+}
+
+fn default_priority() -> String { "medium".into() }
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateTicket {
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub status: Option<String>,
+    pub priority: Option<String>,
+    pub vps_id: Option<Option<Uuid>>,
+    pub provider_id: Option<Option<Uuid>>,
+    pub assigned_to: Option<Option<Uuid>>,
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+pub struct TicketComment {
+    pub id: Uuid,
+    pub ticket_id: Uuid,
+    pub user_id: Uuid,
+    pub user_email: String,
+    pub body: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateTicketComment {
+    pub body: String,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct TicketListQuery {
+    pub status: Option<String>,
+    pub priority: Option<String>,
+    pub assigned_to: Option<Uuid>,
+    pub vps_id: Option<Uuid>,
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_per_page")]
+    pub per_page: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct PaginatedTicketResponse {
+    pub data: Vec<Ticket>,
+    pub total: i64,
+    pub page: i64,
+    pub per_page: i64,
+}
+
 // ─── Defaults ────────────────────────────────────────────
 
 fn default_ssh_port() -> i32 { 22 }

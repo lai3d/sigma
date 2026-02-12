@@ -4,13 +4,15 @@ use crate::errors::ErrorResponse;
 #[allow(unused_imports)]
 use crate::models::{
     AgentHeartbeat, AgentRegister, ChangePasswordRequest, ConvertedTotal, CostMonthlyResponse,
-    CostSummaryResponse, CountStat, CreateExchangeRate, CreateIpCheck, CreateProvider, CreateUser,
-    CreateVps, CurrencyBreakdown, DashboardStats, ExchangeRate, ImportRequest, ImportResult,
-    IpCheck, IpCheckSummary, IpEntry, LoginRequest, LoginResponse, MonthlyCostEntry,
-    PaginatedExchangeRateResponse, PaginatedIpCheckResponse, PaginatedProviderResponse,
-    PaginatedUserResponse, PaginatedVpsResponse, PrometheusTarget, Provider,
+    CostSummaryResponse, CountStat, CreateExchangeRate, CreateIpCheck, CreateProvider,
+    CreateTicket, CreateTicketComment, CreateUser, CreateVps, CurrencyBreakdown, DashboardStats,
+    ExchangeRate, ImportRequest, ImportResult, IpCheck, IpCheckSummary, IpEntry, LoginRequest,
+    LoginResponse, MonthlyCostEntry, PaginatedExchangeRateResponse, PaginatedIpCheckResponse,
+    PaginatedProviderResponse, PaginatedTicketResponse, PaginatedUserResponse,
+    PaginatedVpsResponse, PrometheusTarget, Provider, Ticket, TicketComment,
     TotpChallengeResponse, TotpDisableRequest, TotpLoginRequest, TotpSetupResponse,
-    TotpVerifyRequest, UpdateExchangeRate, UpdateProvider, UpdateUser, UpdateVps, UserResponse, Vps,
+    TotpVerifyRequest, UpdateExchangeRate, UpdateProvider, UpdateTicket, UpdateUser, UpdateVps,
+    UserResponse, Vps,
 };
 
 #[derive(OpenApi)]
@@ -78,6 +80,14 @@ use crate::models::{
         // Costs
         crate::routes::costs::summary,
         crate::routes::costs::monthly,
+        // Tickets
+        crate::routes::tickets::list,
+        crate::routes::tickets::get_one,
+        crate::routes::tickets::create,
+        crate::routes::tickets::update,
+        crate::routes::tickets::delete,
+        crate::routes::tickets::list_comments,
+        crate::routes::tickets::add_comment,
     ),
     components(schemas(
         ErrorResponse,
@@ -97,6 +107,8 @@ use crate::models::{
         LoginRequest, LoginResponse, ChangePasswordRequest,
         TotpSetupResponse, TotpVerifyRequest, TotpDisableRequest,
         TotpLoginRequest, TotpChallengeResponse,
+        Ticket, CreateTicket, UpdateTicket, TicketComment, CreateTicketComment,
+        PaginatedTicketResponse,
     )),
     tags(
         (name = "Auth", description = "Authentication and session management"),
@@ -110,6 +122,7 @@ use crate::models::{
         (name = "Ansible", description = "Ansible dynamic inventory"),
         (name = "Exchange Rates", description = "Currency exchange rate management"),
         (name = "Costs", description = "Cost tracking and reporting"),
+        (name = "Tickets", description = "Issue tracking and ticket management"),
     )
 )]
 pub struct ApiDoc;

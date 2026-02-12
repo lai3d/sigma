@@ -102,6 +102,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(routes::auth_routes::protected_router())
         .merge(routes::users::router())
         .merge(routes::audit_logs::router())
+        .merge(routes::tickets::router())
         .layer(axum::middleware::from_fn_with_state(
             app_state.clone(),
             routes::rate_limit::rate_limit,
