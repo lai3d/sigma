@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useVps, useCreateVps, useUpdateVps } from '@/hooks/useVps';
 import { useProviders } from '@/hooks/useProviders';
-import { ipLabelColor } from '@/lib/utils';
+import { ipLabelColor, timeAgo, formatUptime } from '@/lib/utils';
 import type { IpEntry } from '@/types/api';
 
 const IP_LABELS = [
@@ -230,6 +230,57 @@ export default function VpsForm() {
       </h2>
 
       <form onSubmit={handleSubmit(onSubmit)} className="mt-6 max-w-3xl space-y-8">
+        {/* Agent Info (read-only, edit mode only) */}
+        {isEdit && existing?.extra?.last_heartbeat ? (() => {
+          const hb = existing.extra.last_heartbeat as string;
+          const online = Date.now() - new Date(hb).getTime() < 3 * 60 * 1000;
+          const si = existing.extra.system_info as { cpu_cores?: number; ram_mb?: number; disk_gb?: number; uptime_seconds?: number; load_avg?: number[] } | undefined;
+          return (
+            <fieldset className="bg-gray-50 rounded-lg border p-5 space-y-3">
+              <legend className="text-sm font-semibold text-gray-700 px-2">Agent Info</legend>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-sm">
+                <div>
+                  <span className="text-gray-500">Last Heartbeat</span>
+                  <div className="flex items-center gap-1.5 mt-0.5 font-medium">
+                    <span className={`inline-block w-2 h-2 rounded-full ${online ? 'bg-green-500' : 'bg-red-500'}`} />
+                    {timeAgo(hb)}
+                  </div>
+                </div>
+                {si?.cpu_cores != null && (
+                  <div>
+                    <span className="text-gray-500">CPU Cores</span>
+                    <div className="mt-0.5 font-medium">{si.cpu_cores}</div>
+                  </div>
+                )}
+                {si?.ram_mb != null && (
+                  <div>
+                    <span className="text-gray-500">RAM</span>
+                    <div className="mt-0.5 font-medium">{si.ram_mb >= 1024 ? `${(si.ram_mb / 1024).toFixed(1)} GB` : `${si.ram_mb} MB`}</div>
+                  </div>
+                )}
+                {si?.disk_gb != null && (
+                  <div>
+                    <span className="text-gray-500">Disk</span>
+                    <div className="mt-0.5 font-medium">{si.disk_gb} GB</div>
+                  </div>
+                )}
+                {si?.uptime_seconds != null && (
+                  <div>
+                    <span className="text-gray-500">Uptime</span>
+                    <div className="mt-0.5 font-medium">{formatUptime(si.uptime_seconds)}</div>
+                  </div>
+                )}
+                {si?.load_avg && (
+                  <div>
+                    <span className="text-gray-500">Load Average</span>
+                    <div className="mt-0.5 font-medium">{si.load_avg.map(v => v.toFixed(2)).join(' / ')}</div>
+                  </div>
+                )}
+              </div>
+            </fieldset>
+          );
+        })() : null}
+
         {/* Basic Info */}
         <fieldset className="bg-white rounded-lg border p-5 space-y-4">
           <legend className="text-sm font-semibold text-gray-700 px-2">Basic Info</legend>

@@ -56,8 +56,8 @@ sigma/
 
 ### Frontend (sigma-web) — Done:
 - [x] Dashboard: stats cards, charts (by country/status/provider), expiring VPS table
-- [x] VPS list: filterable table (status/purpose/provider/country/tag), retire/delete actions
-- [x] VPS form: create/edit with dynamic IP list + label selector (color-coded)
+- [x] VPS list: filterable table (status/purpose/provider/country/tag), agent online/offline indicator, retire/delete actions
+- [x] VPS form: create/edit with dynamic IP list + label selector (color-coded), read-only agent info panel (heartbeat, CPU, RAM, disk, uptime, load avg)
 - [x] Provider list + create/edit dialog
 - [x] Settings page (API key config in localStorage)
 - [x] Layout with sidebar navigation

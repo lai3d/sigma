@@ -8,7 +8,7 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import ImportExportButtons from '@/components/ImportExportButtons';
 import Pagination from '@/components/Pagination';
 import { exportVps } from '@/api/vps';
-import { formatDate, daysUntil, ipLabelColor, ipLabelShort } from '@/lib/utils';
+import { formatDate, daysUntil, ipLabelColor, ipLabelShort, timeAgo } from '@/lib/utils';
 import type { VpsListQuery } from '@/types/api';
 
 export default function VpsList() {
@@ -129,6 +129,7 @@ export default function VpsList() {
                 <th className="px-4 py-3 font-medium">Provider</th>
                 <th className="px-4 py-3 font-medium">Country</th>
                 <th className="px-4 py-3 font-medium">Purpose</th>
+                <th className="px-4 py-3 font-medium">Agent</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Expires</th>
                 <th className="px-4 py-3 font-medium">Tags</th>
@@ -168,6 +169,19 @@ export default function VpsList() {
                     <td className="px-4 py-3">{providerMap.get(vps.provider_id) || '-'}</td>
                     <td className="px-4 py-3">{vps.country}</td>
                     <td className="px-4 py-3">{vps.purpose || '-'}</td>
+                    <td className="px-4 py-3">
+                      {(() => {
+                        const hb = vps.extra?.last_heartbeat as string | undefined;
+                        if (!hb) return <span className="text-gray-300">-</span>;
+                        const online = Date.now() - new Date(hb).getTime() < 3 * 60 * 1000;
+                        return (
+                          <span className="inline-flex items-center gap-1.5 text-xs" title={`Last: ${timeAgo(hb)}`}>
+                            <span className={`inline-block w-2 h-2 rounded-full ${online ? 'bg-green-500' : 'bg-red-500'}`} />
+                            {online ? 'Online' : 'Offline'}
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={vps.status} />
                     </td>
