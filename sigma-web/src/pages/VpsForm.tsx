@@ -7,6 +7,7 @@ import { useProviders } from '@/hooks/useProviders';
 import { ipLabelColor, timeAgo, formatUptime } from '@/lib/utils';
 import type { IpEntry } from '@/types/api';
 import { COUNTRIES } from '@/lib/countries';
+import { PROJECTS } from '@/lib/projects';
 
 const IP_LABELS = [
   { value: '', display: '-' },
@@ -59,6 +60,9 @@ export default function VpsForm() {
   const [ipList, setIpList] = useState<IpEntry[]>([{ ip: '', label: '' }]);
   const [ipError, setIpError] = useState('');
 
+  // Project selection (stored as p:xxx tags)
+  const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
+
   const {
     register,
     handleSubmit,
@@ -98,6 +102,12 @@ export default function VpsForm() {
           ? existing.ip_addresses
           : [{ ip: '', label: '' }];
       setIpList(ips.map((e) => ({ ...e })));
+      // Split project tags (p:xxx) from regular tags
+      const projectTags = new Set(
+        existing.tags.filter((t) => t.startsWith('p:')).map((t) => t.slice(2)),
+      );
+      const regularTags = existing.tags.filter((t) => !t.startsWith('p:'));
+      setSelectedProjects(projectTags);
       reset({
         hostname: existing.hostname,
         alias: existing.alias,
@@ -117,7 +127,7 @@ export default function VpsForm() {
         expire_date: existing.expire_date || '',
         purpose: existing.purpose,
         vpn_protocol: existing.vpn_protocol,
-        tags_raw: existing.tags.join(', '),
+        tags_raw: regularTags.join(', '),
         monitoring_enabled: existing.monitoring_enabled,
         node_exporter_port: existing.node_exporter_port,
         notes: existing.notes,
@@ -181,9 +191,11 @@ export default function VpsForm() {
       return;
     }
 
-    const tags = data.tags_raw
+    const regularTags = data.tags_raw
       ? data.tags_raw.split(/[,\s]+/).filter(Boolean)
       : [];
+    const projectTags = [...selectedProjects].map((p) => `p:${p}`);
+    const tags = [...regularTags, ...projectTags];
 
     const payload = {
       hostname: data.hostname.trim(),
@@ -484,6 +496,35 @@ export default function VpsForm() {
                 placeholder="wireguard, xray, ..."
               />
             </Field>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Projects</label>
+              <div className="flex flex-wrap gap-2">
+                {PROJECTS.map((proj) => {
+                  const checked = selectedProjects.has(proj.id);
+                  return (
+                    <button
+                      key={proj.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedProjects((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(proj.id)) next.delete(proj.id);
+                          else next.add(proj.id);
+                          return next;
+                        });
+                      }}
+                      className={`px-3 py-1 text-sm rounded-full border transition-colors ${
+                        checked
+                          ? 'bg-purple-50 text-purple-700 border-purple-300'
+                          : 'bg-white text-gray-500 border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      {proj.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <div className="md:col-span-2">
               <Field label="Tags" hint="Comma-separated">
                 <input
