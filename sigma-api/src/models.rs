@@ -428,6 +428,7 @@ pub struct PurgeQuery {
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct AgentRegister {
     pub hostname: String,
+    pub alias: Option<String>,
     #[serde(default)]
     pub ip_addresses: Vec<IpEntry>,
     #[serde(default = "default_ssh_port")]

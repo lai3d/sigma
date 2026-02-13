@@ -10,6 +10,8 @@ pub struct IpEntry {
 #[derive(Debug, Serialize)]
 pub struct AgentRegister {
     pub hostname: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
     pub ip_addresses: Vec<IpEntry>,
     pub ssh_port: i32,
     pub system_info: serde_json::Value,

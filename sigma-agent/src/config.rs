@@ -19,6 +19,10 @@ pub struct Config {
     #[arg(long, env = "AGENT_HOSTNAME")]
     pub hostname: Option<String>,
 
+    /// Alias for this VPS (e.g. vn001.xiaoniuyun.cc)
+    #[arg(long, env = "AGENT_ALIAS")]
+    pub alias: Option<String>,
+
     /// SSH port to report
     #[arg(long, env = "AGENT_SSH_PORT", default_value = "22")]
     pub ssh_port: i32,

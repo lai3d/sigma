@@ -39,6 +39,8 @@ pub async fn register(
 
     let now = chrono::Utc::now().to_rfc3339();
 
+    let alias = input.alias.as_deref().unwrap_or("");
+
     let row = if let Some(existing) = existing {
         let mut extra = existing.extra.clone();
         if let serde_json::Value::Object(ref mut map) = extra {
@@ -49,16 +51,25 @@ pub async fn register(
             );
         }
 
+        // Only update alias if agent provides one; keep existing otherwise
+        let effective_alias = if alias.is_empty() {
+            &existing.alias
+        } else {
+            alias
+        };
+
         sqlx::query_as::<_, Vps>(
             r#"UPDATE vps SET
-                ip_addresses = $2,
-                ssh_port = $3,
-                extra = $4,
+                alias = $2,
+                ip_addresses = $3,
+                ssh_port = $4,
+                extra = $5,
                 status = 'active'
                WHERE id = $1
                RETURNING *"#,
         )
         .bind(existing.id)
+        .bind(effective_alias)
         .bind(&ip_json)
         .bind(input.ssh_port)
         .bind(&extra)
@@ -82,18 +93,19 @@ pub async fn register(
                 monitoring_enabled, node_exporter_port,
                 extra, notes
             ) VALUES (
-                $1, '', NULL,
-                $2, $3,
+                $1, $2, NULL,
+                $3, $4,
                 '', '', '',
                 NULL, NULL, NULL, NULL,
                 NULL, 'USD',
                 'active', NULL, NULL,
                 '', '', '{}',
                 true, 9100,
-                $4, ''
+                $5, ''
             ) RETURNING *"#,
         )
         .bind(&input.hostname)
+        .bind(alias)
         .bind(&ip_json)
         .bind(input.ssh_port)
         .bind(&extra)

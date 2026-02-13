@@ -65,6 +65,7 @@ async fn register(client: &SigmaClient, hostname: &str, config: &Config) -> Resu
 
     let body = AgentRegister {
         hostname: hostname.to_string(),
+        alias: config.alias.clone(),
         ip_addresses,
         ssh_port: config.ssh_port,
         system_info,
