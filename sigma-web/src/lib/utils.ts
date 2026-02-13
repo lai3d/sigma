@@ -61,6 +61,14 @@ export function timeAgo(isoString: string): string {
   return `${days}d ago`;
 }
 
+/** Returns [displayText, cssClasses] for a tag. Tags with `p:` prefix are project tags. */
+export function tagStyle(tag: string): { label: string; className: string } {
+  if (tag.startsWith('p:')) {
+    return { label: tag.slice(2), className: 'bg-purple-50 text-purple-700' };
+  }
+  return { label: tag, className: 'bg-blue-50 text-blue-700' };
+}
+
 export function formatUptime(seconds: number): string {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);

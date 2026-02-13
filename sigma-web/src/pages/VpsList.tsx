@@ -8,7 +8,7 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import ImportExportButtons from '@/components/ImportExportButtons';
 import Pagination from '@/components/Pagination';
 import { exportVps } from '@/api/vps';
-import { formatDate, daysUntil, ipLabelColor, ipLabelShort, timeAgo } from '@/lib/utils';
+import { formatDate, daysUntil, ipLabelColor, ipLabelShort, timeAgo, tagStyle } from '@/lib/utils';
 import type { VpsListQuery } from '@/types/api';
 import { COUNTRIES } from '@/lib/countries';
 
@@ -203,14 +203,17 @@ export default function VpsList() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
-                        {vps.tags.map((t) => (
-                          <span
-                            key={t}
-                            className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-xs rounded"
-                          >
-                            {t}
-                          </span>
-                        ))}
+                        {vps.tags.map((t) => {
+                          const ts = tagStyle(t);
+                          return (
+                            <span
+                              key={t}
+                              className={`px-1.5 py-0.5 text-xs rounded ${ts.className}`}
+                            >
+                              {ts.label}
+                            </span>
+                          );
+                        })}
                       </div>
                     </td>
                     <td className="px-4 py-3">

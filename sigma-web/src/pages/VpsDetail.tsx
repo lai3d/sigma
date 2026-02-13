@@ -7,7 +7,7 @@ import { useTickets } from '@/hooks/useTickets';
 import { useAuth } from '@/contexts/AuthContext';
 import StatusBadge from '@/components/StatusBadge';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import { formatDate, daysUntil, timeAgo, formatUptime, ipLabelColor, ipLabelShort } from '@/lib/utils';
+import { formatDate, daysUntil, timeAgo, formatUptime, ipLabelColor, ipLabelShort, tagStyle } from '@/lib/utils';
 
 const PRIORITY_COLORS: Record<string, string> = {
   low: 'bg-gray-100 text-gray-600',
@@ -203,11 +203,14 @@ export default function VpsDetail() {
               <div className="flex justify-between items-start">
                 <dt className="text-gray-500">Tags</dt>
                 <dd className="flex flex-wrap gap-1 justify-end">
-                  {vps.tags.map((t) => (
-                    <span key={t} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-xs rounded">
-                      {t}
-                    </span>
-                  ))}
+                  {vps.tags.map((t) => {
+                    const ts = tagStyle(t);
+                    return (
+                      <span key={t} className={`px-1.5 py-0.5 text-xs rounded ${ts.className}`}>
+                        {ts.label}
+                      </span>
+                    );
+                  })}
                 </dd>
               </div>
             )}
