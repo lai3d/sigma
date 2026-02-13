@@ -300,6 +300,12 @@ export default function VpsDetail() {
                 )}
               </dd>
             </div>
+            {typeof vps.extra?.retired_at === 'string' && (
+              <div className="flex justify-between">
+                <dt className="text-gray-500">Retired At</dt>
+                <dd className="text-gray-700">{formatDate(vps.extra.retired_at)}</dd>
+              </div>
+            )}
           </dl>
         </div>
 

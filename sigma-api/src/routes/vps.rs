@@ -377,10 +377,17 @@ pub async fn retire(
     Path(id): Path<Uuid>,
 ) -> Result<Json<Vps>, AppError> {
     require_role(&user, &["admin", "operator"])?;
+
+    let now = chrono::Utc::now().to_rfc3339();
     let row = sqlx::query_as::<_, Vps>(
-        "UPDATE vps SET status = 'retired', monitoring_enabled = false WHERE id = $1 RETURNING *",
+        r#"UPDATE vps SET
+            status = 'retired',
+            monitoring_enabled = false,
+            extra = jsonb_set(COALESCE(extra, '{}'::jsonb), '{retired_at}', to_jsonb($2::text))
+           WHERE id = $1 RETURNING *"#,
     )
     .bind(id)
+    .bind(&now)
     .fetch_optional(&state.db)
     .await?
     .ok_or(AppError::NotFound)?;

@@ -195,6 +195,11 @@ export default function VpsList() {
                       <span className={days !== null && days <= 7 ? 'text-red-600 font-medium' : ''}>
                         {formatDate(vps.expire_date)}
                       </span>
+                      {typeof vps.extra?.retired_at === 'string' && (
+                        <div className="text-xs text-gray-400 mt-0.5">
+                          Retired {formatDate(vps.extra.retired_at)}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
