@@ -6,6 +6,7 @@ import { useVps, useCreateVps, useUpdateVps } from '@/hooks/useVps';
 import { useProviders } from '@/hooks/useProviders';
 import { ipLabelColor, timeAgo, formatUptime } from '@/lib/utils';
 import type { IpEntry } from '@/types/api';
+import { COUNTRIES } from '@/lib/countries';
 
 const IP_LABELS = [
   { value: '', display: '-' },
@@ -406,7 +407,14 @@ export default function VpsForm() {
           <legend className="text-sm font-semibold text-gray-700 px-2">Location</legend>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Field label="Country">
-              <input {...register('country')} className="input" placeholder="HK" />
+              <select {...register('country')} className="input">
+                <option value="">Select country...</option>
+                {COUNTRIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.code} - {c.name}
+                  </option>
+                ))}
+              </select>
             </Field>
             <Field label="City">
               <input {...register('city')} className="input" placeholder="Hong Kong" />

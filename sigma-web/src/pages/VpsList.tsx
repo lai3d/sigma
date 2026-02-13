@@ -10,6 +10,7 @@ import Pagination from '@/components/Pagination';
 import { exportVps } from '@/api/vps';
 import { formatDate, daysUntil, ipLabelColor, ipLabelShort, timeAgo } from '@/lib/utils';
 import type { VpsListQuery } from '@/types/api';
+import { COUNTRIES } from '@/lib/countries';
 
 export default function VpsList() {
   const [filters, setFilters] = useState<VpsListQuery>({});
@@ -93,15 +94,20 @@ export default function VpsList() {
           ))}
         </select>
 
-        <input
-          type="text"
-          placeholder="Country (e.g. US)"
+        <select
           value={filters.country || ''}
           onChange={(e) =>
             handleFilterChange({ ...filters, country: e.target.value || undefined })
           }
-          className="border rounded-md px-3 py-1.5 text-sm w-36"
-        />
+          className="border rounded-md px-3 py-1.5 text-sm bg-white"
+        >
+          <option value="">All Countries</option>
+          {COUNTRIES.map((c) => (
+            <option key={c.code} value={c.code}>
+              {c.code} - {c.name}
+            </option>
+          ))}
+        </select>
 
         <input
           type="text"
