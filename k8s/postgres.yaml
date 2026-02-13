@@ -40,8 +40,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: sigma-secrets
-              key: DATABASE_URL
-              # Extract password from DATABASE_URL in production
+              key: DB_PASSWORD
         - name: POSTGRES_DB
           value: sigma
         - name: PGDATA
