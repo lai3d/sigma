@@ -41,26 +41,14 @@ spec:
             cpu: "500m"
         livenessProbe:
           httpGet:
-            path: /api/stats
+            path: /healthz
             port: 3000
-            httpHeaders:
-            - name: X-Api-Key
-              valueFrom:
-                secretKeyRef:
-                  name: sigma-secrets
-                  key: API_KEY
           initialDelaySeconds: 10
           periodSeconds: 30
         readinessProbe:
           httpGet:
-            path: /api/stats
+            path: /healthz
             port: 3000
-            httpHeaders:
-            - name: X-Api-Key
-              valueFrom:
-                secretKeyRef:
-                  name: sigma-secrets
-                  key: API_KEY
           initialDelaySeconds: 5
           periodSeconds: 10
 

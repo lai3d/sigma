@@ -113,6 +113,7 @@ async fn main() -> anyhow::Result<()> {
         ));
 
     let app = Router::new()
+        .route("/healthz", axum::routing::get(|| async { "ok" }))
         .merge(public_routes)
         .merge(api_routes)
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi::ApiDoc::openapi()))
