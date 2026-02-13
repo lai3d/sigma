@@ -114,13 +114,13 @@ export default function Dashboard() {
         <div className="bg-white rounded-lg border p-5 lg:col-span-2">
           <h3 className="text-sm font-semibold text-gray-700 mb-4">By Provider</h3>
           {providerData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={Math.max(200, providerData.length * 36)}>
               <BarChart data={providerData} layout="vertical">
                 <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} />
                 <YAxis
                   type="category"
                   dataKey="name"
-                  width={120}
+                  width={140}
                   tick={{ fontSize: 12 }}
                 />
                 <Tooltip />
