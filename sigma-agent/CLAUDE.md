@@ -59,8 +59,9 @@ sigma-agent/
 cargo build --release
 ./target/release/sigma-agent --api-url http://sigma-api:3000/api --api-key your-key
 
-# Or via Docker:
+# Or via Docker (mount /etc/hostname so agent reports host's hostname):
 docker run -d --name sigma-agent \
+  -v /etc/hostname:/etc/host_hostname:ro \
   -e SIGMA_API_URL=http://sigma-api:3000/api \
   -e SIGMA_API_KEY=your-key \
   sigma-agent

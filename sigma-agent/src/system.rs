@@ -17,8 +17,17 @@ pub fn collect_system_info() -> serde_json::Value {
     })
 }
 
-/// Get hostname from /proc or fallback.
+/// Get hostname: prefer /etc/host_hostname (host hostname mounted into container),
+/// then /proc/sys/kernel/hostname, then libc fallback.
 pub fn get_hostname() -> String {
+    // In Docker, /proc/sys/kernel/hostname returns the container ID.
+    // Users can mount the host's hostname via: -v /etc/hostname:/etc/host_hostname:ro
+    if let Ok(s) = std::fs::read_to_string("/etc/host_hostname") {
+        let trimmed = s.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
     std::fs::read_to_string("/proc/sys/kernel/hostname")
         .map(|s| s.trim().to_string())
         .unwrap_or_else(|_| gethostname_fallback())
@@ -127,8 +136,8 @@ fn is_docker_ip(ip: &IpAddr) -> bool {
     match ip {
         IpAddr::V4(v4) => {
             let octets = v4.octets();
-            // Docker default bridge: 172.17.0.0/16
-            octets[0] == 172 && octets[1] == 17
+            // Docker bridge networks: 172.16.0.0/12 (172.16-31.x.x)
+            octets[0] == 172 && (16..=31).contains(&octets[1])
         }
         _ => false,
     }
