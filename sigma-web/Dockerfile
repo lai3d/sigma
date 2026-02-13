@@ -18,11 +18,17 @@ RUN npm run build
 # Production stage
 FROM nginx:alpine
 
-# Copy custom nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy nginx template (envsubst replaces ${API_URL} at startup)
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 
 # Copy built static files
 COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Default API_URL for Docker Compose (override in K8s)
+ENV API_URL=http://api:3000
+
+# Only substitute API_URL, leave nginx variables like $host untouched
+ENV NGINX_ENVSUBST_FILTER=API_URL
 
 # Expose port 80
 EXPOSE 80

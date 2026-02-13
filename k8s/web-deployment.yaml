@@ -18,6 +18,9 @@ spec:
         image: ghcr.io/lai3d/sigma/web:latest  # Managed by ArgoCD Image Updater
         ports:
         - containerPort: 80
+        env:
+        - name: API_URL
+          value: "http://sigma-api-service:3000"
         resources:
           requests:
             memory: "64Mi"
