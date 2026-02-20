@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Pencil, Trash2, Power, BarChart3, Network } from 'lucide-react';
+import { Pencil, Trash2, Power, BarChart3, Network, Copy, Check } from 'lucide-react';
 import { useVps, useDeleteVps, useRetireVps, useAllocatePorts } from '@/hooks/useVps';
 import { useProvider } from '@/hooks/useProviders';
 import { useTickets } from '@/hooks/useTickets';
@@ -40,6 +40,7 @@ export default function VpsDetail() {
   const [confirmRetire, setConfirmRetire] = useState(false);
   const [allocatedPorts, setAllocatedPorts] = useState<number[] | null>(null);
   const [allocateError, setAllocateError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const allocatePortsMutation = useAllocatePorts();
 
   if (isLoading) return <div className="p-8 text-center text-gray-500">Loading...</div>;
@@ -207,7 +208,19 @@ export default function VpsDetail() {
           )}
           {allocatedPorts && (
             <div>
-              <p className="text-sm text-gray-500 mb-2">{allocatedPorts.length} available ports:</p>
+              <div className="flex items-center gap-2 mb-2">
+                <p className="text-sm text-gray-500">{allocatedPorts.length} available ports:</p>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(allocatedPorts.join(','));
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 text-xs text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                >
+                  {copied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
+                </button>
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 {allocatedPorts.map((port) => (
                   <span key={port} className="px-2 py-0.5 text-xs font-mono bg-green-50 text-green-700 border border-green-200 rounded">
