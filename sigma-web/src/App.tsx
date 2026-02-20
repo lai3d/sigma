@@ -16,6 +16,7 @@ import AuditLogList from '@/pages/AuditLogList';
 import TicketList from '@/pages/TicketList';
 import TicketDetail from '@/pages/TicketDetail';
 import TicketForm from '@/pages/TicketForm';
+import EnvoyPage from '@/pages/EnvoyPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -49,6 +50,7 @@ export default function App() {
               <Route path="/tickets/new" element={<TicketForm />} />
               <Route path="/tickets/:id" element={<TicketDetail />} />
               <Route path="/tickets/:id/edit" element={<TicketForm />} />
+              <Route path="/envoy" element={<EnvoyPage />} />
               <Route path="/users" element={
                 <ProtectedRoute requiredRole="admin"><UserList /></ProtectedRoute>
               } />

@@ -79,11 +79,11 @@ curl -H "X-Api-Key: your-key" http://localhost:3000/api/vps
 curl -X POST http://localhost:3000/api/providers \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "DMIT",
+    "name": "Acme Cloud",
     "country": "US",
-    "website": "https://dmit.io",
+    "website": "https://example.com",
     "rating": 4,
-    "notes": "Good HK & LA nodes, CN optimized"
+    "notes": "Reliable provider with good connectivity"
   }'
 
 # Create a VPS
@@ -109,7 +109,7 @@ curl -X POST http://localhost:3000/api/vps \
     "expire_date": "2025-03-01",
     "purpose": "vpn-exit",
     "vpn_protocol": "wireguard",
-    "tags": ["cn-optimized", "cmhi"]
+    "tags": ["optimized", "premium"]
   }'
 
 # List active VPS expiring within 7 days

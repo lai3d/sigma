@@ -33,14 +33,14 @@ sigma/
 
 ## Data Model
 
-- **Provider** — cloud platform vendor (DMIT, BandwagonHost, RackNerd, etc.)
+- **Provider** — cloud platform vendor (e.g. any VPS hosting company)
 - **VPS** — individual server instance with lifecycle: provisioning → active → retiring → retired
 - **ip_checks** — table for tracking IP reachability from China (API done, probe: `sigma-probe/`)
 
 ### VPS fields of note:
 - `ip_addresses` — JSONB array of `{ip, label}` objects. Labels: `china-telecom`, `china-unicom`, `china-mobile`, `china-cernet`, `overseas`, `internal`, `anycast`
 - `purpose` — enum: vpn-exit, vpn-relay, vpn-entry, monitor, management
-- `tags` — TEXT[] array with GIN index, for flexible categorization (e.g. cn-optimized, iplc, cmhi)
+- `tags` — TEXT[] array with GIN index, for flexible categorization (e.g. optimized, premium, gpu)
 - `extra` — JSONB for arbitrary metadata
 - `monitoring_enabled` + `node_exporter_port` — controls whether this VPS appears in Prometheus targets
 
@@ -94,6 +94,7 @@ sigma/
 - [x] Agent port scanning + Prometheus metrics (`/metrics` endpoint with port usage by process)
 - [x] Agent port allocation (`POST /ports/allocate` on agent, proxied via API)
 - [x] Grafana dashboard for port scan metrics (`grafana/dashboards/port-scan.json`)
+- [x] Envoy xDS control plane (sigma-agent as gRPC xDS server, config stored in PostgreSQL, hot reload via LDS/CDS)
 
 ## Tech Stack
 

@@ -43,7 +43,7 @@ api_key = "your-secret-key"
 sigma providers list
 sigma providers list --page 2 --per-page 10
 sigma providers get <UUID>
-sigma providers create --name "DMIT" --country US --website https://dmit.io
+sigma providers create --name "Acme Cloud" --country US --website https://example.com
 sigma providers update <UUID> --rating 5 --notes "Great provider"
 sigma providers delete <UUID>
 
@@ -57,7 +57,7 @@ sigma providers import providers.json --format json
 ```bash
 sigma vps list
 sigma vps list --status active --country HK --purpose vpn-exit
-sigma vps list --tag cn-optimized --expiring 7
+sigma vps list --tag optimized --expiring 7
 sigma vps get <UUID>
 
 sigma vps create \
@@ -68,7 +68,7 @@ sigma vps create \
   --country HK \
   --status active \
   --purpose vpn-exit \
-  --tag cn-optimized --tag cmhi \
+  --tag optimized --tag premium \
   --cost-monthly 15.99 \
   --expire-date 2025-03-01
 

@@ -19,7 +19,7 @@ pub struct Config {
     #[arg(long, env = "AGENT_HOSTNAME")]
     pub hostname: Option<String>,
 
-    /// Alias for this VPS (e.g. vn001.xiaoniuyun.cc)
+    /// Alias for this VPS (e.g. vn001.example.com)
     #[arg(long, env = "AGENT_ALIAS")]
     pub alias: Option<String>,
 
@@ -42,6 +42,18 @@ pub struct Config {
     /// Port scan interval in seconds
     #[arg(long, env = "AGENT_PORT_SCAN_INTERVAL", default_value = "60")]
     pub port_scan_interval: u64,
+
+    /// Enable xDS gRPC server
+    #[arg(long, env = "AGENT_XDS_ENABLED", default_value = "false")]
+    pub xds_enabled: bool,
+
+    /// xDS gRPC listen port
+    #[arg(long, env = "AGENT_XDS_PORT", default_value = "18000")]
+    pub xds_port: u16,
+
+    /// xDS config poll interval in seconds
+    #[arg(long, env = "AGENT_XDS_POLL_INTERVAL", default_value = "10")]
+    pub xds_poll_interval: u64,
 }
 
 impl Config {

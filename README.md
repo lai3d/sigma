@@ -99,7 +99,7 @@ Set `API_KEY` env var to enable. Pass via `X-Api-Key` header. If unset, auth is 
 # Create a provider
 curl -X POST http://localhost:3000/api/providers \
   -H "Content-Type: application/json" \
-  -d '{"name": "DMIT", "country": "US", "website": "https://dmit.io", "rating": 4}'
+  -d '{"name": "Acme Cloud", "country": "US", "website": "https://example.com", "rating": 4}'
 
 # Create a VPS with labeled IPs
 curl -X POST http://localhost:3000/api/vps \
@@ -114,7 +114,7 @@ curl -X POST http://localhost:3000/api/vps \
     "country": "HK",
     "status": "active",
     "purpose": "vpn-relay",
-    "tags": ["cn-optimized", "iplc"]
+    "tags": ["optimized", "premium"]
   }'
 
 # List active VPS expiring within 7 days

@@ -4,15 +4,16 @@ use crate::errors::ErrorResponse;
 #[allow(unused_imports)]
 use crate::models::{
     AgentHeartbeat, AgentRegister, ChangePasswordRequest, ConvertedTotal, CostMonthlyResponse,
-    CostSummaryResponse, CountStat, CreateExchangeRate, CreateIpCheck, CreateProvider,
-    CreateTicket, CreateTicketComment, CreateUser, CreateVps, CurrencyBreakdown, DashboardStats,
-    ExchangeRate, ImportRequest, ImportResult, IpCheck, IpCheckSummary, IpEntry, LoginRequest,
-    LoginResponse, MonthlyCostEntry, PaginatedExchangeRateResponse, PaginatedIpCheckResponse,
-    PaginatedProviderResponse, PaginatedTicketResponse, PaginatedUserResponse,
-    PaginatedVpsResponse, PrometheusTarget, Provider, Ticket, TicketComment,
-    TotpChallengeResponse, TotpDisableRequest, TotpLoginRequest, TotpSetupResponse,
-    TotpVerifyRequest, UpdateExchangeRate, UpdateProvider, UpdateTicket, UpdateUser, UpdateVps,
-    UserResponse, Vps,
+    CostSummaryResponse, CountStat, CreateEnvoyNode, CreateEnvoyRoute, CreateExchangeRate,
+    CreateIpCheck, CreateProvider, CreateTicket, CreateTicketComment, CreateUser, CreateVps,
+    CurrencyBreakdown, DashboardStats, EnvoyNode, EnvoyRoute, ExchangeRate, ImportRequest,
+    ImportResult, IpCheck, IpCheckSummary, IpEntry, LoginRequest, LoginResponse, MonthlyCostEntry,
+    PaginatedEnvoyNodeResponse, PaginatedEnvoyRouteResponse, PaginatedExchangeRateResponse,
+    PaginatedIpCheckResponse, PaginatedProviderResponse, PaginatedTicketResponse,
+    PaginatedUserResponse, PaginatedVpsResponse, PrometheusTarget, Provider, Ticket,
+    TicketComment, TotpChallengeResponse, TotpDisableRequest, TotpLoginRequest,
+    TotpSetupResponse, TotpVerifyRequest, UpdateEnvoyNode, UpdateEnvoyRoute, UpdateExchangeRate,
+    UpdateProvider, UpdateTicket, UpdateUser, UpdateVps, UserResponse, Vps,
 };
 
 #[derive(OpenApi)]
@@ -88,6 +89,17 @@ use crate::models::{
         crate::routes::tickets::delete,
         crate::routes::tickets::list_comments,
         crate::routes::tickets::add_comment,
+        // Envoy
+        crate::routes::envoy::list_nodes,
+        crate::routes::envoy::get_node,
+        crate::routes::envoy::create_node,
+        crate::routes::envoy::update_node,
+        crate::routes::envoy::delete_node,
+        crate::routes::envoy::list_routes,
+        crate::routes::envoy::get_route,
+        crate::routes::envoy::create_route,
+        crate::routes::envoy::update_route,
+        crate::routes::envoy::delete_route,
     ),
     components(schemas(
         ErrorResponse,
@@ -109,6 +121,8 @@ use crate::models::{
         TotpLoginRequest, TotpChallengeResponse,
         Ticket, CreateTicket, UpdateTicket, TicketComment, CreateTicketComment,
         PaginatedTicketResponse,
+        EnvoyNode, CreateEnvoyNode, UpdateEnvoyNode, PaginatedEnvoyNodeResponse,
+        EnvoyRoute, CreateEnvoyRoute, UpdateEnvoyRoute, PaginatedEnvoyRouteResponse,
     )),
     tags(
         (name = "Auth", description = "Authentication and session management"),
@@ -123,6 +137,7 @@ use crate::models::{
         (name = "Exchange Rates", description = "Currency exchange rate management"),
         (name = "Costs", description = "Cost tracking and reporting"),
         (name = "Tickets", description = "Issue tracking and ticket management"),
+        (name = "Envoy", description = "Envoy xDS control plane — nodes and routes"),
     )
 )]
 pub struct ApiDoc;

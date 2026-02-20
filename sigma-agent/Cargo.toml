@@ -20,3 +20,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 clap = { version = "4", features = ["derive", "env"] }
 axum = "0.8"
 libc = "0.2"
+tonic = "0.12"
+prost = "0.13"
+prost-types = "0.13"
+xds-api = "0.2"
+tokio-stream = "0.1"

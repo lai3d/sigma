@@ -762,6 +762,128 @@ pub struct PaginatedTicketResponse {
     pub per_page: i64,
 }
 
+// ─── Envoy Nodes ─────────────────────────────────────────
+
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+pub struct EnvoyNode {
+    pub id: Uuid,
+    pub vps_id: Uuid,
+    pub node_id: String,
+    pub admin_port: Option<i32>,
+    pub description: String,
+    pub config_version: i64,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateEnvoyNode {
+    pub vps_id: Uuid,
+    pub node_id: String,
+    pub admin_port: Option<i32>,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default = "default_active")]
+    pub status: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateEnvoyNode {
+    pub node_id: Option<String>,
+    pub admin_port: Option<Option<i32>>,
+    pub description: Option<String>,
+    pub status: Option<String>,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct EnvoyNodeListQuery {
+    pub vps_id: Option<Uuid>,
+    pub status: Option<String>,
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_per_page")]
+    pub per_page: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct PaginatedEnvoyNodeResponse {
+    pub data: Vec<EnvoyNode>,
+    pub total: i64,
+    pub page: i64,
+    pub per_page: i64,
+}
+
+// ─── Envoy Routes ────────────────────────────────────────
+
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+pub struct EnvoyRoute {
+    pub id: Uuid,
+    pub envoy_node_id: Uuid,
+    pub name: String,
+    pub listen_port: i32,
+    pub backend_host: Option<String>,
+    pub backend_port: Option<i32>,
+    pub cluster_type: String,
+    pub connect_timeout_secs: i32,
+    pub proxy_protocol: i32,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateEnvoyRoute {
+    pub envoy_node_id: Uuid,
+    pub name: String,
+    pub listen_port: i32,
+    pub backend_host: Option<String>,
+    pub backend_port: Option<i32>,
+    #[serde(default = "default_cluster_type")]
+    pub cluster_type: String,
+    #[serde(default = "default_connect_timeout")]
+    pub connect_timeout_secs: i32,
+    #[serde(default = "default_proxy_protocol")]
+    pub proxy_protocol: i32,
+    #[serde(default = "default_active")]
+    pub status: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateEnvoyRoute {
+    pub name: Option<String>,
+    pub listen_port: Option<i32>,
+    pub backend_host: Option<Option<String>>,
+    pub backend_port: Option<Option<i32>>,
+    pub cluster_type: Option<String>,
+    pub connect_timeout_secs: Option<i32>,
+    pub proxy_protocol: Option<i32>,
+    pub status: Option<String>,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct EnvoyRouteListQuery {
+    pub envoy_node_id: Option<Uuid>,
+    pub status: Option<String>,
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_per_page")]
+    pub per_page: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct PaginatedEnvoyRouteResponse {
+    pub data: Vec<EnvoyRoute>,
+    pub total: i64,
+    pub page: i64,
+    pub per_page: i64,
+}
+
+fn default_active() -> String { "active".into() }
+fn default_cluster_type() -> String { "logical_dns".into() }
+fn default_connect_timeout() -> i32 { 5 }
+fn default_proxy_protocol() -> i32 { 1 }
+
 // ─── Defaults ────────────────────────────────────────────
 
 fn default_ssh_port() -> i32 { 22 }

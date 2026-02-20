@@ -291,3 +291,84 @@ export interface DashboardStats {
   by_status: CountStat[];
   expiring_soon: Vps[];
 }
+
+// ─── Envoy ────────────────────────────────────────────
+
+export interface EnvoyNode {
+  id: string;
+  vps_id: string;
+  node_id: string;
+  admin_port: number | null;
+  description: string;
+  config_version: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateEnvoyNode {
+  vps_id: string;
+  node_id: string;
+  admin_port?: number | null;
+  description?: string;
+  status?: string;
+}
+
+export interface UpdateEnvoyNode {
+  node_id?: string;
+  admin_port?: number | null;
+  description?: string;
+  status?: string;
+}
+
+export interface EnvoyNodeListQuery {
+  vps_id?: string;
+  status?: string;
+  page?: number;
+  per_page?: number;
+}
+
+export interface EnvoyRoute {
+  id: string;
+  envoy_node_id: string;
+  name: string;
+  listen_port: number;
+  backend_host: string | null;
+  backend_port: number | null;
+  cluster_type: string;
+  connect_timeout_secs: number;
+  proxy_protocol: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateEnvoyRoute {
+  envoy_node_id: string;
+  name: string;
+  listen_port: number;
+  backend_host?: string | null;
+  backend_port?: number | null;
+  cluster_type?: string;
+  connect_timeout_secs?: number;
+  proxy_protocol?: number;
+  status?: string;
+}
+
+export interface UpdateEnvoyRoute {
+  name?: string;
+  listen_port?: number;
+  backend_host?: string | null;
+  backend_port?: number | null;
+  cluster_type?: string;
+  connect_timeout_secs?: number;
+  proxy_protocol?: number;
+  status?: string;
+}
+
+export interface EnvoyRouteListQuery {
+  envoy_node_id?: string;
+  status?: string;
+  page?: number;
+  per_page?: number;
+}

@@ -60,4 +60,16 @@ impl SigmaClient {
         }
         resp.json::<T>().await.context("Failed to parse response")
     }
+
+    pub async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
+        let resp = self
+            .add_auth(self.client.get(self.url(path)))
+            .send()
+            .await
+            .context("Failed to connect to API")?;
+        if !resp.status().is_success() {
+            return Err(Self::handle_error(resp).await);
+        }
+        resp.json::<T>().await.context("Failed to parse response")
+    }
 }

@@ -95,7 +95,7 @@ export default function ProviderFormDialog({ id, onClose }: Props) {
           <input
             {...register('name', { required: true })}
             className="input w-full mt-1"
-            placeholder="BandwagonHost"
+            placeholder="Acme Cloud"
           />
         </div>
 
@@ -121,7 +121,7 @@ export default function ProviderFormDialog({ id, onClose }: Props) {
           <input
             {...register('website')}
             className="input w-full mt-1"
-            placeholder="https://bandwagonhost.com"
+            placeholder="https://example.com"
           />
         </div>
 

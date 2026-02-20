@@ -4,6 +4,8 @@ mod metrics;
 mod models;
 mod port_scan;
 mod system;
+mod xds;
+mod xds_resources;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -79,12 +81,41 @@ async fn main() -> Result<()> {
         }
     };
 
-    let client = SigmaClient::new(&config)?;
+    let client = Arc::new(SigmaClient::new(&config)?);
 
     // Initial registration
-    match register(&client, &hostname, &config, public_ip.as_deref()).await {
-        Ok(vps) => info!(id = %vps.id, hostname = %vps.hostname, "Registered with sigma"),
-        Err(e) => error!("Initial registration failed: {:#}", e),
+    let vps_id = match register(&client, &hostname, &config, public_ip.as_deref()).await {
+        Ok(vps) => {
+            info!(id = %vps.id, hostname = %vps.hostname, "Registered with sigma");
+            Some(vps.id)
+        }
+        Err(e) => {
+            error!("Initial registration failed: {:#}", e);
+            None
+        }
+    };
+
+    // Conditionally start xDS gRPC server
+    if config.xds_enabled {
+        let vps_id = vps_id.expect(
+            "VPS registration must succeed before starting xDS server",
+        );
+
+        info!(
+            port = config.xds_port,
+            poll_interval = config.xds_poll_interval,
+            "xDS server enabled (serves all envoy nodes for this VPS)"
+        );
+
+        let xds_server =
+            xds::XdsServer::new(client.clone(), vps_id, config.xds_poll_interval);
+
+        tokio::spawn(xds_server.clone().config_poll_loop());
+        tokio::spawn(async move {
+            if let Err(e) = xds::serve_xds(config.xds_port, xds_server).await {
+                error!("xDS gRPC server failed: {:#}", e);
+            }
+        });
     }
 
     // Heartbeat loop

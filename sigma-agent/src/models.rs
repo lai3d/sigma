@@ -30,3 +30,43 @@ pub struct VpsResponse {
     pub hostname: String,
     pub status: String,
 }
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct PaginatedResponse<T> {
+    pub data: Vec<T>,
+    pub total: i64,
+    pub page: i64,
+    pub per_page: i64,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct EnvoyNode {
+    pub id: uuid::Uuid,
+    pub vps_id: uuid::Uuid,
+    pub node_id: String,
+    pub admin_port: Option<i32>,
+    pub description: String,
+    pub config_version: i64,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct EnvoyRoute {
+    pub id: uuid::Uuid,
+    pub envoy_node_id: uuid::Uuid,
+    pub name: String,
+    pub listen_port: i32,
+    pub backend_host: Option<String>,
+    pub backend_port: Option<i32>,
+    pub cluster_type: String,
+    pub connect_timeout_secs: i32,
+    pub proxy_protocol: i32,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+}

@@ -493,7 +493,7 @@ export default function VpsForm() {
               <input
                 {...register('vpn_protocol')}
                 className="input"
-                placeholder="wireguard, xray, ..."
+                placeholder="e.g. wireguard, nginx, ..."
               />
             </Field>
             <div className="md:col-span-2">
@@ -530,7 +530,7 @@ export default function VpsForm() {
                 <input
                   {...register('tags_raw')}
                   className="input"
-                  placeholder="cn-optimized, iplc, cmhi"
+                  placeholder="optimized, premium, gpu"
                 />
               </Field>
             </div>

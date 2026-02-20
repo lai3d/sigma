@@ -85,6 +85,9 @@ services:
       AGENT_PORT_SCAN: "true"
       AGENT_PORT_SCAN_RANGE: 10000-30000
       AGENT_PORT_SCAN_INTERVAL: 60
+      AGENT_XDS_ENABLED: ${AGENT_XDS_ENABLED:-false}
+      AGENT_XDS_PORT: ${AGENT_XDS_PORT:-18000}
+      AGENT_XDS_POLL_INTERVAL: ${AGENT_XDS_POLL_INTERVAL:-10}
     # volumes:
     #   - /etc/hostname:/etc/host_hostname:ro
     depends_on:

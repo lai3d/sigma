@@ -3,6 +3,7 @@ pub mod ansible;
 pub mod audit_logs;
 pub mod auth_routes;
 pub mod costs;
+pub mod envoy;
 pub mod exchange_rates;
 pub mod ip_checks;
 pub mod prometheus;
