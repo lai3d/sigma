@@ -73,9 +73,13 @@ services:
     image: ghcr.io/lai3d/sigma/agent:latest
     network_mode: host
     environment:
-      SIGMA_API_URL: http://api:3000/api
+      SIGMA_API_URL: http://localhost:3000/api
       SIGMA_API_KEY: ${API_KEY:-change-me-in-production}
       AGENT_INTERVAL: 60
+      AGENT_METRICS_PORT: 9102
+      AGENT_PORT_SCAN: "true"
+      AGENT_PORT_SCAN_RANGE: 10000-30000
+      AGENT_PORT_SCAN_INTERVAL: 60      
     # volumes:
     #   - /etc/hostname:/etc/host_hostname:ro      
     depends_on:
