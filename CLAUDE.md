@@ -13,6 +13,7 @@ sigma/
 ├── sigma-cli/          # Rust CLI client (clap + reqwest)
 ├── sigma-probe/        # IP reachability probe (deployed on China nodes)
 ├── sigma-agent/        # VPS system agent (auto-register + heartbeat + port scan + metrics)
+├── grafana/            # Grafana dashboard JSON definitions
 ├── k8s/                # Kubernetes deployment configs
 ├── docker-compose.yml  # Dev/staging orchestration (db + api + web + probe + agent)
 ├── Makefile            # Common commands
@@ -52,12 +53,13 @@ sigma/
 - [x] Quick retire endpoint: `POST /api/vps/{id}/retire`
 - [x] Prometheus file_sd output: `GET /api/prometheus/targets`
 - [x] Dashboard stats: `GET /api/stats`
+- [x] Port allocation proxy: `POST /api/vps/{id}/allocate-ports` (forwards to agent)
 - [x] Dockerfile (multi-stage, rust:latest → debian:bookworm-slim)
 
 ### Frontend (sigma-web) — Done:
 - [x] Dashboard: stats cards, charts (by country/status/provider), expiring VPS table
 - [x] VPS list: filterable table (status/purpose/provider/country/tag), agent online/offline indicator, retire/delete actions
-- [x] VPS form: create/edit with dynamic IP list + label selector (color-coded), read-only agent info panel (heartbeat, CPU, RAM, disk, uptime, load avg)
+- [x] VPS form: create/edit with dynamic IP list + label selector (color-coded), read-only agent info panel (heartbeat, CPU, RAM, disk, uptime, load avg), port allocation button (find N available ports via agent)
 - [x] Provider list + create/edit dialog
 - [x] Settings page (API key config in localStorage)
 - [x] Layout with sidebar navigation
@@ -90,6 +92,8 @@ sigma/
 - [x] Audit log (who changed what — tracks all mutations with user, action, resource, details)
 - [x] Ticket system (issue tracking with status workflow, comments, priority, VPS/provider links)
 - [x] Agent port scanning + Prometheus metrics (`/metrics` endpoint with port usage by process)
+- [x] Agent port allocation (`POST /ports/allocate` on agent, proxied via API)
+- [x] Grafana dashboard for port scan metrics (`grafana/dashboards/port-scan.json`)
 
 ## Tech Stack
 

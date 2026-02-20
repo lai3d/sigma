@@ -88,6 +88,45 @@ Results are exposed via a Prometheus-compatible `/metrics` endpoint on `--metric
 
 Known sources are always emitted (even at 0) for stable Grafana time series.
 
+### Port Allocation
+
+The agent also exposes `POST /ports/allocate` on the same metrics port. Given a `count` (1-100),
+it returns N available ports from the configured scan range by real-time bind testing.
+This is stateless — no reservation — the caller (e.g. Envoy config) should bind immediately.
+
+The sigma-api proxies this via `POST /api/vps/{id}/allocate-ports`, looking up the VPS IP and
+agent metrics_port from the heartbeat system_info.
+
+### ss Parser
+
+The `parse_ss_line()` function handles both `ss -tlnp` (no Netid column) and `ss -tulnp`
+(with Netid column like `tcp`/`udp`) by dynamically finding the LISTEN position in the first
+two fields.
+
+## Docker Deployment
+
+The agent requires host-level access for accurate port scanning and process attribution:
+
+```yaml
+agent:
+  network_mode: host    # Scan host ports, not container's own
+  pid: host             # See process names across containers
+  cap_add:
+    - SYS_PTRACE        # Required for ss -p to read /proc/<pid>/fd
+```
+
+**Docker Desktop limitation**: The `allocate-ports` API proxy won't work locally because
+containers on bridge network can't reach the agent on host network. This works in production
+where API and agent run on different machines connected via public IPs.
+
+## Grafana Dashboard
+
+A pre-built dashboard is available at `grafana/dashboards/port-scan.json` with:
+- Stat cards (total/available/used ports, utilization %, scan duration)
+- Time series charts (port availability, usage by process over time)
+- Pie chart (port usage breakdown by source)
+- Host summary table (multi-host overview)
+
 ## Dependencies
 
 - Reuses sigma-probe HTTP client pattern (SigmaClient with X-Api-Key auth)
