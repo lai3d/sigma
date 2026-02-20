@@ -73,6 +73,9 @@ services:
     image: ghcr.io/lai3d/sigma/agent:latest
     pull_policy: always
     network_mode: host
+    pid: host
+    cap_add:
+      - SYS_PTRACE    
     environment:
       SIGMA_API_URL: http://localhost:3000/api
       SIGMA_API_KEY: ${API_KEY:-change-me-in-production}
