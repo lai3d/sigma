@@ -6,8 +6,8 @@ use tracing::{debug, warn};
 
 use crate::models::IpEntry;
 
-/// Collect all system info as a JSON value, with optional metrics port.
-pub fn collect_system_info_with_metrics_port(metrics_port: u16) -> serde_json::Value {
+/// Collect all system info as a JSON value, with optional metrics port and public IP.
+pub fn collect_system_info(metrics_port: u16, public_ip: Option<&str>) -> serde_json::Value {
     let mut info = json!({
         "cpu_cores": cpu_cores().unwrap_or(0),
         "ram_mb": ram_mb().unwrap_or(0),
@@ -17,6 +17,9 @@ pub fn collect_system_info_with_metrics_port(metrics_port: u16) -> serde_json::V
     });
     if metrics_port > 0 {
         info["metrics_port"] = json!(metrics_port);
+    }
+    if let Some(ip) = public_ip {
+        info["public_ip"] = json!(ip);
     }
     info
 }
@@ -93,8 +96,8 @@ pub async fn discover_ips() -> Vec<IpEntry> {
     ips
 }
 
-/// Fetch public IP from external services (tries multiple with short timeout).
-async fn fetch_public_ip() -> anyhow::Result<IpEntry> {
+/// Fetch default public IP from external services (the IP the world sees).
+pub async fn fetch_public_ip() -> anyhow::Result<IpEntry> {
     let services = [
         "https://icanhazip.com",
         "https://ifconfig.me/ip",

@@ -450,20 +450,30 @@ pub async fn allocate_ports(
         ));
     }
 
-    // Prefer alias (DNS name like hk004.xiaoniuyun.cc) over raw IP,
-    // as it's more reliable when API and agent are on different networks.
-    // Fall back to first non-internal IP if alias is empty.
-    let agent_host = if !vps.alias.is_empty() {
-        vps.alias.clone()
-    } else {
-        vps.ip_addresses
-            .0
-            .iter()
-            .find(|e| e.label != "internal")
-            .or(vps.ip_addresses.0.first())
-            .map(|e| e.ip.clone())
-            .ok_or_else(|| AppError::BadRequest("VPS has no IP addresses or alias".into()))?
-    };
+    // Use the agent-reported public IP (from ipinfo.io, the default egress IP).
+    // Fall back to alias (DNS name) or first non-internal IP.
+    let agent_host = vps
+        .extra
+        .get("system_info")
+        .and_then(|si| si.get("public_ip"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .or_else(|| {
+            if !vps.alias.is_empty() {
+                Some(vps.alias.clone())
+            } else {
+                None
+            }
+        })
+        .or_else(|| {
+            vps.ip_addresses
+                .0
+                .iter()
+                .find(|e| e.label != "internal")
+                .or(vps.ip_addresses.0.first())
+                .map(|e| e.ip.clone())
+        })
+        .ok_or_else(|| AppError::BadRequest("VPS has no reachable IP address".into()))?;
 
     let agent_url = format!("http://{}:{}/ports/allocate", agent_host, metrics_port);
     tracing::info!(

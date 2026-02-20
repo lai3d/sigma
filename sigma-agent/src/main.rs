@@ -67,10 +67,22 @@ async fn main() -> Result<()> {
         });
     }
 
+    // Fetch public IP once at startup (the IP the world sees via default route)
+    let public_ip = match system::fetch_public_ip().await {
+        Ok(entry) => {
+            info!(ip = %entry.ip, "Detected public IP");
+            Some(entry.ip)
+        }
+        Err(e) => {
+            warn!("Failed to detect public IP: {:#}", e);
+            None
+        }
+    };
+
     let client = SigmaClient::new(&config)?;
 
     // Initial registration
-    match register(&client, &hostname, &config).await {
+    match register(&client, &hostname, &config, public_ip.as_deref()).await {
         Ok(vps) => info!(id = %vps.id, hostname = %vps.hostname, "Registered with sigma"),
         Err(e) => error!("Initial registration failed: {:#}", e),
     }
@@ -79,15 +91,15 @@ async fn main() -> Result<()> {
     loop {
         tokio::time::sleep(Duration::from_secs(config.interval)).await;
 
-        match heartbeat(&client, &hostname, &config).await {
+        match heartbeat(&client, &hostname, &config, public_ip.as_deref()).await {
             Ok(_) => info!(hostname = %hostname, "Heartbeat sent"),
             Err(e) => warn!("Heartbeat failed: {:#}", e),
         }
     }
 }
 
-async fn register(client: &SigmaClient, hostname: &str, config: &Config) -> Result<VpsResponse> {
-    let system_info = system::collect_system_info_with_metrics_port(config.metrics_port);
+async fn register(client: &SigmaClient, hostname: &str, config: &Config, public_ip: Option<&str>) -> Result<VpsResponse> {
+    let system_info = system::collect_system_info(config.metrics_port, public_ip);
     let ip_addresses = system::discover_ips().await;
 
     info!(
@@ -108,8 +120,8 @@ async fn register(client: &SigmaClient, hostname: &str, config: &Config) -> Resu
         .await
 }
 
-async fn heartbeat(client: &SigmaClient, hostname: &str, config: &Config) -> Result<VpsResponse> {
-    let system_info = system::collect_system_info_with_metrics_port(config.metrics_port);
+async fn heartbeat(client: &SigmaClient, hostname: &str, config: &Config, public_ip: Option<&str>) -> Result<VpsResponse> {
+    let system_info = system::collect_system_info(config.metrics_port, public_ip);
 
     let body = AgentHeartbeat {
         hostname: hostname.to_string(),
