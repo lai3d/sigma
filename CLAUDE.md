@@ -12,7 +12,7 @@ sigma/
 ├── sigma-web/          # React frontend (Vite + TypeScript + Tailwind CSS)
 ├── sigma-cli/          # Rust CLI client (clap + reqwest)
 ├── sigma-probe/        # IP reachability probe (deployed on China nodes)
-├── sigma-agent/        # VPS system agent (auto-register + heartbeat)
+├── sigma-agent/        # VPS system agent (auto-register + heartbeat + port scan + metrics)
 ├── k8s/                # Kubernetes deployment configs
 ├── docker-compose.yml  # Dev/staging orchestration (db + api + web + probe + agent)
 ├── Makefile            # Common commands
@@ -89,6 +89,7 @@ sigma/
 - [x] TOTP MFA (two-factor authentication with Google Authenticator / Authy)
 - [x] Audit log (who changed what — tracks all mutations with user, action, resource, details)
 - [x] Ticket system (issue tracking with status workflow, comments, priority, VPS/provider links)
+- [x] Agent port scanning + Prometheus metrics (`/metrics` endpoint with port usage by process)
 
 ## Tech Stack
 

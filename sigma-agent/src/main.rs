@@ -1,17 +1,22 @@
 mod client;
 mod config;
+mod metrics;
 mod models;
+mod port_scan;
 mod system;
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
 use clap::Parser;
+use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 
 use crate::client::SigmaClient;
 use crate::config::Config;
 use crate::models::{AgentHeartbeat, AgentRegister, VpsResponse};
+use crate::port_scan::{PortScanResult, SharedScanResult};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -34,6 +39,30 @@ async fn main() -> Result<()> {
         interval = config.interval,
         "sigma-agent starting"
     );
+
+    // Shared port scan result
+    let scan_result: SharedScanResult = Arc::new(RwLock::new(PortScanResult::default()));
+
+    // Conditionally start port scanning
+    if config.port_scan {
+        let (start, end) = config.parse_port_scan_range()?;
+        info!(range = %config.port_scan_range, interval = config.port_scan_interval, "Port scanning enabled");
+        let shared = scan_result.clone();
+        let interval = config.port_scan_interval;
+        tokio::spawn(async move {
+            port_scan::scan_loop(shared, start, end, interval).await;
+        });
+    }
+
+    // Conditionally start metrics server
+    if config.metrics_port > 0 {
+        let shared = scan_result.clone();
+        let port = config.metrics_port;
+        let hn = hostname.clone();
+        tokio::spawn(async move {
+            metrics::serve_metrics(port, shared, hn).await;
+        });
+    }
 
     let client = SigmaClient::new(&config)?;
 

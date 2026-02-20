@@ -16,11 +16,13 @@ sigma-agent/
 ├── Dockerfile
 ├── CLAUDE.md
 └── src/
-    ├── main.rs      # Entry point: register + heartbeat loop
-    ├── config.rs    # Configuration: env vars + CLI flags (clap)
-    ├── client.rs    # HTTP client (reuses sigma-probe pattern)
-    ├── models.rs    # API request/response types
-    └── system.rs    # Linux system info collection (/proc, statvfs)
+    ├── main.rs        # Entry point: register + heartbeat loop + spawn scan/metrics
+    ├── config.rs      # Configuration: env vars + CLI flags (clap)
+    ├── client.rs      # HTTP client (reuses sigma-probe pattern)
+    ├── models.rs      # API request/response types
+    ├── system.rs      # Linux system info collection (/proc, statvfs)
+    ├── port_scan.rs   # Port scanning: TcpListener::bind test + ss parsing
+    └── metrics.rs     # Prometheus metrics HTTP server (/metrics)
 ```
 
 ## Configuration
@@ -32,6 +34,10 @@ sigma-agent/
 | `AGENT_INTERVAL` | `--interval` | `60` | Heartbeat interval (seconds) |
 | `AGENT_HOSTNAME` | `--hostname` | (auto-detect) | Override hostname |
 | `AGENT_SSH_PORT` | `--ssh-port` | `22` | SSH port to report |
+| `AGENT_METRICS_PORT` | `--metrics-port` | `9102` | Prometheus metrics port (0=disable) |
+| `AGENT_PORT_SCAN` | `--port-scan` | `false` | Enable port scanning |
+| `AGENT_PORT_SCAN_RANGE` | `--port-scan-range` | `10000-30000` | Port scan range (START-END) |
+| `AGENT_PORT_SCAN_INTERVAL` | `--port-scan-interval` | `60` | Port scan interval (seconds) |
 
 ## IP Discovery
 
@@ -67,8 +73,24 @@ docker run -d --name sigma-agent \
   sigma-agent
 ```
 
+## Port Scanning & Prometheus Metrics
+
+When `--port-scan` is enabled, the agent periodically scans the configured port range using
+`TcpListener::bind("0.0.0.0", port)` to detect occupied ports (catches TIME_WAIT etc. that
+`ss` may miss). It also runs `ss -tulnp` to attribute occupied ports to their owning process
+(envoy, sshd, nginx, node_exporter, other, unknown).
+
+Results are exposed via a Prometheus-compatible `/metrics` endpoint on `--metrics-port`:
+- `sigma_ports_total` — total ports in scan range
+- `sigma_ports_available` — free ports
+- `sigma_ports_used{source="..."}` — used ports by process category
+- `sigma_port_scan_duration_seconds` — scan timing
+
+Known sources are always emitted (even at 0) for stable Grafana time series.
+
 ## Dependencies
 
 - Reuses sigma-probe HTTP client pattern (SigmaClient with X-Api-Key auth)
 - Requires sigma-api with /api/agent/* endpoints
 - Linux-only for system info collection (reads /proc filesystem)
+- `iproute2` package required in Docker image (provides `ss` command for port scan)
