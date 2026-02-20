@@ -450,26 +450,40 @@ pub async fn allocate_ports(
         ));
     }
 
-    // Pick first non-internal IP
-    let agent_ip = vps
-        .ip_addresses
-        .0
-        .iter()
-        .find(|e| e.label != "internal")
-        .or(vps.ip_addresses.0.first())
-        .map(|e| e.ip.clone())
-        .ok_or_else(|| AppError::BadRequest("VPS has no IP addresses".into()))?;
+    // Prefer alias (DNS name like hk004.xiaoniuyun.cc) over raw IP,
+    // as it's more reliable when API and agent are on different networks.
+    // Fall back to first non-internal IP if alias is empty.
+    let agent_host = if !vps.alias.is_empty() {
+        vps.alias.clone()
+    } else {
+        vps.ip_addresses
+            .0
+            .iter()
+            .find(|e| e.label != "internal")
+            .or(vps.ip_addresses.0.first())
+            .map(|e| e.ip.clone())
+            .ok_or_else(|| AppError::BadRequest("VPS has no IP addresses or alias".into()))?
+    };
 
-    let agent_url = format!("http://{}:{}/ports/allocate", agent_ip, metrics_port);
+    let agent_url = format!("http://{}:{}/ports/allocate", agent_host, metrics_port);
+    tracing::info!(
+        vps_id = %id,
+        agent_url = %agent_url,
+        count = input.count,
+        "Proxying port allocation request to agent"
+    );
 
     let resp = state
         .http_client
         .post(&agent_url)
         .json(&serde_json::json!({"count": input.count}))
-        .timeout(std::time::Duration::from_secs(30))
+        .timeout(std::time::Duration::from_secs(10))
         .send()
         .await
-        .map_err(|e| AppError::BadGateway(format!("Agent unreachable: {}", e)))?;
+        .map_err(|e| {
+            tracing::error!(agent_url = %agent_url, error = %e, "Agent unreachable");
+            AppError::BadGateway(format!("Agent unreachable at {}: {}", agent_url, e))
+        })?;
 
     if !resp.status().is_success() {
         let status = resp.status();
