@@ -1,0 +1,373 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "title": "Overview",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "text", "value": null }] },
+          "unit": "none"
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Total Ports",
+      "type": "stat",
+      "targets": [{
+        "expr": "sigma_ports_total{hostname=~\"$hostname\"}",
+        "legendFormat": "{{ hostname }}"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 1000 },
+            { "color": "red", "value": 500 }
+          ]},
+          "unit": "none"
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Available Ports",
+      "type": "stat",
+      "targets": [{
+        "expr": "sigma_ports_available{hostname=~\"$hostname\"}",
+        "legendFormat": "{{ hostname }}"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "blue", "value": null }
+          ]},
+          "unit": "none"
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Envoy Ports",
+      "type": "stat",
+      "targets": [{
+        "expr": "sigma_ports_used{hostname=~\"$hostname\", source=\"envoy\"}",
+        "legendFormat": "{{ hostname }}"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "orange", "value": null }
+          ]},
+          "unit": "none"
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Unknown (Connections)",
+      "type": "stat",
+      "targets": [{
+        "expr": "sigma_ports_used{hostname=~\"$hostname\", source=\"unknown\"}",
+        "legendFormat": "{{ hostname }}"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "purple", "value": null }] },
+          "unit": "percentunit",
+          "min": 0, "max": 1
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Usage Rate",
+      "type": "stat",
+      "targets": [{
+        "expr": "1 - (sigma_ports_available{hostname=~\"$hostname\"} / sigma_ports_total{hostname=~\"$hostname\"})",
+        "legendFormat": "{{ hostname }}"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 0.5 },
+            { "color": "red", "value": 1.0 }
+          ]},
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Scan Duration",
+      "type": "stat",
+      "targets": [{
+        "expr": "sigma_port_scan_duration_seconds{hostname=~\"$hostname\"}",
+        "legendFormat": "{{ hostname }}"
+      }]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "title": "Port Usage Over Time",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "stacking": { "mode": "none" }
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Available" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Used" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Available vs Used Ports",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sigma_ports_available{hostname=~\"$hostname\"}",
+          "legendFormat": "Available"
+        },
+        {
+          "expr": "sigma_ports_total{hostname=~\"$hostname\"} - sigma_ports_available{hostname=~\"$hostname\"}",
+          "legendFormat": "Used"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": { "mode": "normal" }
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "envoy" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "unknown" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "nginx" }, "properties": [{ "id": "color", "value": { "fixedColor": "dark-green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "sshd" }, "properties": [{ "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "other" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "node_exporter" }, "properties": [{ "id": "color", "value": { "fixedColor": "dark-orange", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Used Ports by Source",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "sigma_ports_used{hostname=~\"$hostname\"}",
+        "legendFormat": "{{ source }}"
+      }]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "title": "Details",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "envoy" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "unknown" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "nginx" }, "properties": [{ "id": "color", "value": { "fixedColor": "dark-green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "sshd" }, "properties": [{ "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "other" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 15 },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "values": ["value"] },
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "single" }
+      },
+      "title": "Port Usage Breakdown",
+      "type": "piechart",
+      "targets": [{
+        "expr": "sigma_ports_used{hostname=~\"$hostname\"} > 0",
+        "legendFormat": "{{ source }}"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 0.5 },
+            { "color": "red", "value": 1.0 }
+          ]},
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 15 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Scan Duration",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "sigma_port_scan_duration_seconds{hostname=~\"$hostname\"}",
+        "legendFormat": "{{ hostname }}"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 50 },
+            { "color": "red", "value": 80 }
+          ]},
+          "unit": "percentunit",
+          "min": 0, "max": 1,
+          "custom": { "lineWidth": 2, "fillOpacity": 20 }
+        }
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 15 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Port Usage Rate",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "1 - (sigma_ports_available{hostname=~\"$hostname\"} / sigma_ports_total{hostname=~\"$hostname\"})",
+        "legendFormat": "{{ hostname }}"
+      }]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "title": "All Hosts",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "unit": "none" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Usage %" }, "properties": [
+            { "id": "unit", "value": "percentunit" },
+            { "id": "thresholds", "value": { "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "red", "value": 0.8 }
+            ]}},
+            { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } }
+          ]},
+          { "matcher": { "id": "byName", "options": "Scan (s)" }, "properties": [{ "id": "unit", "value": "s" }, { "id": "decimals", "value": 3 }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "options": { "footer": { "enablePagination": false } },
+      "title": "Host Summary",
+      "type": "table",
+      "targets": [
+        { "expr": "sigma_ports_total", "legendFormat": "", "instant": true, "format": "table", "refId": "A" },
+        { "expr": "sigma_ports_available", "legendFormat": "", "instant": true, "format": "table", "refId": "B" },
+        { "expr": "sigma_ports_used{source=\"envoy\"}", "legendFormat": "", "instant": true, "format": "table", "refId": "C" },
+        { "expr": "sigma_ports_used{source=\"unknown\"}", "legendFormat": "", "instant": true, "format": "table", "refId": "D" },
+        { "expr": "1 - (sigma_ports_available / sigma_ports_total)", "legendFormat": "", "instant": true, "format": "table", "refId": "E" },
+        { "expr": "sigma_port_scan_duration_seconds", "legendFormat": "", "instant": true, "format": "table", "refId": "F" }
+      ],
+      "transformations": [
+        { "id": "seriesToColumns", "options": { "byField": "hostname" } },
+        { "id": "organize", "options": {
+          "excludeByName": { "Time 1": true, "Time 2": true, "Time 3": true, "Time 4": true, "Time 5": true, "Time 6": true, "source 1": true, "source 2": true },
+          "renameByName": {
+            "hostname": "Hostname",
+            "Value #A": "Total",
+            "Value #B": "Available",
+            "Value #C": "Envoy",
+            "Value #D": "Unknown",
+            "Value #E": "Usage %",
+            "Value #F": "Scan (s)"
+          }
+        }}
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["sigma", "port-scan", "envoy"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "default", "value": "default" },
+        "hide": 0,
+        "includeAll": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "type": "datasource"
+      },
+      {
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "definition": "label_values(sigma_ports_total, hostname)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "hostname",
+        "query": "label_values(sigma_ports_total, hostname)",
+        "refresh": 2,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "title": "Sigma Port Scan",
+  "uid": "sigma-port-scan"
+}
