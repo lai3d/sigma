@@ -8,6 +8,7 @@ import type {
   CreateEnvoyRoute,
   UpdateEnvoyRoute,
   EnvoyRouteListQuery,
+  BatchCreateEnvoyRoutes,
   PaginatedResponse,
 } from '@/types/api';
 
@@ -77,4 +78,9 @@ export async function updateEnvoyRoute(id: string, input: UpdateEnvoyRoute): Pro
 
 export async function deleteEnvoyRoute(id: string): Promise<void> {
   await apiClient.delete(`/envoy-routes/${id}`);
+}
+
+export async function batchCreateEnvoyRoutes(input: BatchCreateEnvoyRoutes): Promise<EnvoyRoute[]> {
+  const { data } = await apiClient.post('/envoy-routes/batch', input);
+  return data;
 }

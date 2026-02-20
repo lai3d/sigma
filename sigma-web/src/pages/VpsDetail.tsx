@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Pencil, Trash2, Power, BarChart3, Network, Copy, Check } from 'lucide-react';
+import { Pencil, Trash2, Power, BarChart3, Network, Copy, Check, Shield } from 'lucide-react';
 import { useVps, useDeleteVps, useRetireVps, useAllocatePorts } from '@/hooks/useVps';
 import { useProvider } from '@/hooks/useProviders';
 import { useTickets } from '@/hooks/useTickets';
+import { useEnvoyNodes, useBatchCreateEnvoyRoutes } from '@/hooks/useEnvoy';
 import { useAuth } from '@/contexts/AuthContext';
 import StatusBadge from '@/components/StatusBadge';
 import ConfirmDialog from '@/components/ConfirmDialog';
@@ -42,6 +43,19 @@ export default function VpsDetail() {
   const [allocateError, setAllocateError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const allocatePortsMutation = useAllocatePorts();
+
+  // Envoy reserve
+  const { data: nodesResult } = useEnvoyNodes({ vps_id: id, status: 'active' });
+  const activeNodes = nodesResult?.data ?? [];
+  const [selectedNodeId, setSelectedNodeId] = useState<string>('');
+  const batchCreateMutation = useBatchCreateEnvoyRoutes();
+  const [reserveSuccess, setReserveSuccess] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (activeNodes.length === 1 && !selectedNodeId) {
+      setSelectedNodeId(activeNodes[0].id);
+    }
+  }, [activeNodes, selectedNodeId]);
 
   if (isLoading) return <div className="p-8 text-center text-gray-500">Loading...</div>;
   if (!vps) return <div className="p-8 text-center text-gray-400">VPS not found</div>;
@@ -220,7 +234,62 @@ export default function VpsDetail() {
                 >
                   {copied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
                 </button>
+                {activeNodes.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setReserveSuccess(null);
+                      batchCreateMutation.mutate(
+                        {
+                          routes: allocatedPorts.map((port) => ({
+                            envoy_node_id: selectedNodeId,
+                            name: `port-${port}`,
+                            listen_port: port,
+                            backend_host: '127.0.0.1',
+                            backend_port: 1,
+                            cluster_type: 'static' as const,
+                            connect_timeout_secs: 5,
+                            proxy_protocol: 0,
+                          })),
+                        },
+                        {
+                          onSuccess: (data) => setReserveSuccess(data.length),
+                        },
+                      );
+                    }}
+                    disabled={!selectedNodeId || batchCreateMutation.isPending}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 text-xs text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded transition-colors disabled:opacity-50"
+                  >
+                    <Shield size={12} />
+                    {batchCreateMutation.isPending ? 'Reserving...' : 'Reserve'}
+                  </button>
+                )}
+                {activeNodes.length > 1 && (
+                  <select
+                    value={selectedNodeId}
+                    onChange={(e) => setSelectedNodeId(e.target.value)}
+                    className="text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white"
+                  >
+                    <option value="">Select node...</option>
+                    {activeNodes.map((n) => (
+                      <option key={n.id} value={n.id}>{n.node_id}</option>
+                    ))}
+                  </select>
+                )}
+                {activeNodes.length === 1 && (
+                  <span className="text-xs text-gray-400">Node: {activeNodes[0].node_id}</span>
+                )}
               </div>
+              {reserveSuccess && (
+                <p className="text-sm text-green-600 mb-2">
+                  {reserveSuccess} routes reserved as placeholder.{' '}
+                  <Link to="/envoy" className="underline hover:text-green-800">View Envoy routes</Link>
+                </p>
+              )}
+              {batchCreateMutation.isError && (
+                <p className="text-sm text-red-600 mb-2">
+                  Failed to reserve: {batchCreateMutation.error instanceof Error ? batchCreateMutation.error.message : 'Unknown error'}
+                </p>
+              )}
               <div className="flex flex-wrap gap-1.5">
                 {allocatedPorts.map((port) => (
                   <span key={port} className="px-2 py-0.5 text-xs font-mono bg-green-50 text-green-700 border border-green-200 rounded">

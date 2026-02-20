@@ -8,8 +8,8 @@ use uuid::Uuid;
 use crate::auth::{require_role, CurrentUser};
 use crate::errors::AppError;
 use crate::models::{
-    CreateEnvoyNode, CreateEnvoyRoute, EnvoyNode, EnvoyNodeListQuery, EnvoyRoute,
-    EnvoyRouteListQuery, PaginatedEnvoyNodeResponse, PaginatedEnvoyRouteResponse,
+    BatchCreateEnvoyRoutes, CreateEnvoyNode, CreateEnvoyRoute, EnvoyNode, EnvoyNodeListQuery,
+    EnvoyRoute, EnvoyRouteListQuery, PaginatedEnvoyNodeResponse, PaginatedEnvoyRouteResponse,
     PaginatedResponse, UpdateEnvoyNode, UpdateEnvoyRoute,
 };
 use crate::routes::audit_logs::log_audit;
@@ -23,6 +23,7 @@ pub fn router() -> Router<AppState> {
             get(get_node).put(update_node).delete(delete_node),
         )
         .route("/api/envoy-routes", get(list_routes).post(create_route))
+        .route("/api/envoy-routes/batch", axum::routing::post(batch_create_routes))
         .route(
             "/api/envoy-routes/{id}",
             get(get_route).put(update_route).delete(delete_route),
@@ -566,4 +567,91 @@ pub async fn delete_route(
     .await;
 
     Ok(Json(serde_json::json!({ "deleted": true })))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/envoy-routes/batch",
+    tag = "Envoy",
+    request_body = BatchCreateEnvoyRoutes,
+    responses(
+        (status = 200, body = Vec<EnvoyRoute>),
+        (status = 400),
+    )
+)]
+pub async fn batch_create_routes(
+    State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
+    Json(input): Json<BatchCreateEnvoyRoutes>,
+) -> Result<Json<Vec<EnvoyRoute>>, AppError> {
+    require_role(&user, &["admin", "operator"])?;
+
+    if input.routes.is_empty() {
+        return Err(AppError::BadRequest("routes array must not be empty".into()));
+    }
+    if input.routes.len() > 100 {
+        return Err(AppError::BadRequest("maximum 100 routes per batch".into()));
+    }
+
+    // All routes must target the same envoy_node_id
+    let node_id = input.routes[0].envoy_node_id;
+    if !input.routes.iter().all(|r| r.envoy_node_id == node_id) {
+        return Err(AppError::BadRequest(
+            "all routes in a batch must have the same envoy_node_id".into(),
+        ));
+    }
+
+    // Validate the envoy_node_id exists
+    sqlx::query_as::<_, (Uuid,)>("SELECT id FROM envoy_nodes WHERE id = $1")
+        .bind(node_id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::BadRequest(format!("Envoy node {} not found", node_id)))?;
+
+    // Insert all routes using a single connection
+    let mut conn = state.db.acquire().await?;
+    let mut created = Vec::with_capacity(input.routes.len());
+
+    for route in &input.routes {
+        let row = sqlx::query_as::<_, EnvoyRoute>(
+            r#"INSERT INTO envoy_routes (envoy_node_id, name, listen_port, backend_host, backend_port, cluster_type, connect_timeout_secs, proxy_protocol, status)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+               RETURNING *"#,
+        )
+        .bind(route.envoy_node_id)
+        .bind(&route.name)
+        .bind(route.listen_port)
+        .bind(&route.backend_host)
+        .bind(route.backend_port)
+        .bind(&route.cluster_type)
+        .bind(route.connect_timeout_secs)
+        .bind(route.proxy_protocol)
+        .bind(&route.status)
+        .fetch_one(&mut *conn)
+        .await?;
+        created.push(row);
+    }
+
+    // Bump config_version once
+    sqlx::query("UPDATE envoy_nodes SET config_version = config_version + 1, updated_at = now() WHERE id = $1")
+        .bind(node_id)
+        .execute(&mut *conn)
+        .await?;
+
+    let ports: Vec<i32> = created.iter().map(|r| r.listen_port).collect();
+    log_audit(
+        &state.db,
+        &user,
+        "batch_create",
+        "envoy_route",
+        None,
+        serde_json::json!({
+            "envoy_node_id": node_id.to_string(),
+            "count": created.len(),
+            "ports": ports,
+        }),
+    )
+    .await;
+
+    Ok(Json(created))
 }

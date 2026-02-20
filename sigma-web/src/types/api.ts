@@ -372,3 +372,7 @@ export interface EnvoyRouteListQuery {
   page?: number;
   per_page?: number;
 }
+
+export interface BatchCreateEnvoyRoutes {
+  routes: CreateEnvoyRoute[];
+}

@@ -7,6 +7,7 @@ import type {
   CreateEnvoyRoute,
   UpdateEnvoyRoute,
   EnvoyRouteListQuery,
+  BatchCreateEnvoyRoutes,
 } from '@/types/api';
 
 // ─── Envoy Nodes ─────────────────────────────────────────
@@ -95,6 +96,17 @@ export function useDeleteEnvoyRoute() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.deleteEnvoyRoute(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['envoy-routes'] });
+      qc.invalidateQueries({ queryKey: ['envoy-nodes'] });
+    },
+  });
+}
+
+export function useBatchCreateEnvoyRoutes() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: BatchCreateEnvoyRoutes) => api.batchCreateEnvoyRoutes(input),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['envoy-routes'] });
       qc.invalidateQueries({ queryKey: ['envoy-nodes'] });

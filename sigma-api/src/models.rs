@@ -879,6 +879,13 @@ pub struct PaginatedEnvoyRouteResponse {
     pub per_page: i64,
 }
 
+// ─── Batch Operations ────────────────────────────────────
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct BatchCreateEnvoyRoutes {
+    pub routes: Vec<CreateEnvoyRoute>,
+}
+
 fn default_active() -> String { "active".into() }
 fn default_cluster_type() -> String { "logical_dns".into() }
 fn default_connect_timeout() -> i32 { 5 }

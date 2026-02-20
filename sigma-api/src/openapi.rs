@@ -3,7 +3,7 @@ use utoipa::OpenApi;
 use crate::errors::ErrorResponse;
 #[allow(unused_imports)]
 use crate::models::{
-    AgentHeartbeat, AgentRegister, ChangePasswordRequest, ConvertedTotal, CostMonthlyResponse,
+    AgentHeartbeat, AgentRegister, BatchCreateEnvoyRoutes, ChangePasswordRequest, ConvertedTotal, CostMonthlyResponse,
     CostSummaryResponse, CountStat, CreateEnvoyNode, CreateEnvoyRoute, CreateExchangeRate,
     CreateIpCheck, CreateProvider, CreateTicket, CreateTicketComment, CreateUser, CreateVps,
     CurrencyBreakdown, DashboardStats, EnvoyNode, EnvoyRoute, ExchangeRate, ImportRequest,
@@ -100,6 +100,7 @@ use crate::models::{
         crate::routes::envoy::create_route,
         crate::routes::envoy::update_route,
         crate::routes::envoy::delete_route,
+        crate::routes::envoy::batch_create_routes,
     ),
     components(schemas(
         ErrorResponse,
@@ -123,6 +124,7 @@ use crate::models::{
         PaginatedTicketResponse,
         EnvoyNode, CreateEnvoyNode, UpdateEnvoyNode, PaginatedEnvoyNodeResponse,
         EnvoyRoute, CreateEnvoyRoute, UpdateEnvoyRoute, PaginatedEnvoyRouteResponse,
+        BatchCreateEnvoyRoutes,
     )),
     tags(
         (name = "Auth", description = "Authentication and session management"),
