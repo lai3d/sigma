@@ -80,7 +80,7 @@ export default function VpsDetail() {
   // Agent info
   const hb = vps.extra?.last_heartbeat as string | undefined;
   const agentOnline = hb ? Date.now() - new Date(hb).getTime() < 3 * 60 * 1000 : false;
-  const si = vps.extra?.system_info as { cpu_cores?: number; ram_mb?: number; disk_gb?: number; uptime_seconds?: number; load_avg?: number[] } | undefined;
+  const si = vps.extra?.system_info as { cpu_cores?: number; ram_mb?: number; disk_gb?: number; uptime_seconds?: number; load_avg?: number[]; metrics_port?: number } | undefined;
 
   return (
     <div>
