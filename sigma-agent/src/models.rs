@@ -54,6 +54,13 @@ pub struct EnvoyNode {
     pub updated_at: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct CreateEnvoyNode {
+    pub vps_id: uuid::Uuid,
+    pub node_id: String,
+    pub description: String,
+}
+
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct EnvoyRoute {

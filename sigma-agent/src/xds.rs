@@ -17,7 +17,7 @@ use xds_api::pb::envoy::service::discovery::v3::{
 use xds_api::pb::google::protobuf::Any as XdsAny;
 
 use crate::client::SigmaClient;
-use crate::models::{EnvoyNode, EnvoyRoute, PaginatedResponse};
+use crate::models::{CreateEnvoyNode, EnvoyNode, EnvoyRoute, PaginatedResponse};
 use crate::xds_resources;
 
 /// Per-node xDS configuration snapshot.
@@ -165,6 +165,41 @@ impl XdsServer {
         Ok(updated)
     }
 
+    /// Auto-register an envoy node if it doesn't exist yet.
+    /// Returns true if a new node was created.
+    async fn auto_register_node(&self, node_id: &str) -> bool {
+        // Check if we already have config for this node (meaning it exists in the API)
+        {
+            let state = self.state.read().await;
+            if state.configs.contains_key(node_id) {
+                return false;
+            }
+        }
+
+        // Create the node via API
+        let body = CreateEnvoyNode {
+            vps_id: self.vps_id,
+            node_id: node_id.to_string(),
+            description: format!("Auto-registered by agent"),
+        };
+
+        match self.client.post::<_, EnvoyNode>("/envoy-nodes", &body).await {
+            Ok(node) => {
+                info!(node_id = %node_id, id = %node.id, "Auto-registered envoy node");
+                // Trigger a config refresh so the new node gets picked up
+                if let Err(e) = self.fetch_and_update_configs().await {
+                    warn!("Config refresh after auto-register failed: {:#}", e);
+                }
+                true
+            }
+            Err(e) => {
+                // May fail if node already exists (race with poll loop) — that's fine
+                warn!(node_id = %node_id, "Auto-register envoy node failed (may already exist): {:#}", e);
+                false
+            }
+        }
+    }
+
     /// Push config for a specific node_id (CDS then LDS) to a connected client.
     async fn send_config(
         &self,
@@ -245,7 +280,10 @@ impl AggregatedDiscoveryService for XdsServer {
 
             info!(node_id = %node_id, "xDS client connected");
 
-            // Send initial config (may fail if node not yet known — retry on next poll)
+            // Auto-register if this node doesn't exist yet
+            server.auto_register_node(&node_id).await;
+
+            // Send initial config (may send empty config if no routes yet)
             let mut nonce: u64 = 0;
             match server.send_config(&node_id, &tx, &mut nonce).await {
                 Ok(()) => {}
