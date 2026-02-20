@@ -70,26 +70,32 @@ fn extract_process_name(users_field: &str) -> Option<&str> {
     Some(&rest[..end])
 }
 
-/// Parse a single ss output line, returning (port, process_name) if successful
+/// Parse a single ss output line, returning (port, process_name) if successful.
+/// Handles both `ss -tlnp` (no Netid column) and `ss -tulnp` (with Netid column):
+///   LISTEN  0  4096  0.0.0.0:10001  0.0.0.0:*  users:(("envoy",...))
+///   tcp  LISTEN  0  4096  0.0.0.0:10001  0.0.0.0:*  users:(("envoy",...))
 fn parse_ss_line(line: &str) -> Option<(u16, String)> {
     let fields: Vec<&str> = line.split_whitespace().collect();
-    if fields.len() < 5 {
-        return None;
-    }
 
-    // State field should be LISTEN
-    if fields[0] != "LISTEN" {
+    // Find the position of "LISTEN" in the first two fields
+    let listen_idx = if fields.first() == Some(&"LISTEN") {
+        0
+    } else if fields.get(1) == Some(&"LISTEN") {
+        1
+    } else {
         return None;
-    }
+    };
 
-    // Local address:port is field index 3
-    let local_addr = fields[3];
+    // Local address:port is 3 fields after LISTEN (Recv-Q, Send-Q, then addr)
+    let addr_idx = listen_idx + 3;
+    let local_addr = fields.get(addr_idx)?;
     let port_str = local_addr.rsplit(':').next()?;
     let port: u16 = port_str.parse().ok()?;
 
-    // Process info is field index 5 (if present)
-    let process_name = if fields.len() > 5 {
-        extract_process_name(fields[5]).unwrap_or("unknown").to_string()
+    // Process info is 2 fields after addr (peer addr, then users:...)
+    let process_idx = addr_idx + 2;
+    let process_name = if let Some(field) = fields.get(process_idx) {
+        extract_process_name(field).unwrap_or("unknown").to_string()
     } else {
         "unknown".to_string()
     };
@@ -197,10 +203,28 @@ mod tests {
 
     #[test]
     fn test_parse_ss_line_ipv4() {
+        // ss -tlnp format (no Netid column)
         let line = r#"LISTEN  0  4096  0.0.0.0:10001  0.0.0.0:*  users:(("envoy",pid=1234,fd=5))"#;
         let (port, process) = parse_ss_line(line).unwrap();
         assert_eq!(port, 10001);
         assert_eq!(process, "envoy");
+    }
+
+    #[test]
+    fn test_parse_ss_line_with_netid() {
+        // ss -tulnp format (with Netid column)
+        let line = r#"tcp   LISTEN 0      4096         0.0.0.0:10008      0.0.0.0:*    users:(("envoy",pid=2209,fd=27))"#;
+        let (port, process) = parse_ss_line(line).unwrap();
+        assert_eq!(port, 10008);
+        assert_eq!(process, "envoy");
+    }
+
+    #[test]
+    fn test_parse_ss_line_with_netid_no_process() {
+        let line = "tcp   LISTEN 0      4096         0.0.0.0:9912       0.0.0.0:*";
+        let (port, process) = parse_ss_line(line).unwrap();
+        assert_eq!(port, 9912);
+        assert_eq!(process, "unknown");
     }
 
     #[test]
@@ -229,8 +253,19 @@ mod tests {
 
     #[test]
     fn test_parse_ss_line_header_skipped() {
-        // Non-LISTEN lines should return None
         let line = "State  Recv-Q  Send-Q  Local Address:Port  Peer Address:Port  Process";
+        assert!(parse_ss_line(line).is_none());
+    }
+
+    #[test]
+    fn test_parse_ss_line_netid_header_skipped() {
+        let line = "Netid State  Recv-Q Send-Q Local Address:Port  Peer Address:Port Process";
+        assert!(parse_ss_line(line).is_none());
+    }
+
+    #[test]
+    fn test_parse_ss_line_udp_skipped() {
+        let line = "udp   UNCONN 0      0          127.0.0.1:323        0.0.0.0:*";
         assert!(parse_ss_line(line).is_none());
     }
 
