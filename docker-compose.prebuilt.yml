@@ -71,6 +71,7 @@ services:
 
   agent:
     image: ghcr.io/lai3d/sigma/agent:latest
+    pull_policy: always
     network_mode: host
     environment:
       SIGMA_API_URL: http://localhost:3000/api
@@ -81,8 +82,6 @@ services:
       AGENT_PORT_SCAN: "true"
       AGENT_PORT_SCAN_RANGE: 10000-30000
       AGENT_PORT_SCAN_INTERVAL: 60      
-    # volumes:
-    #   - /etc/hostname:/etc/host_hostname:ro      
     depends_on:
       - api
     restart: unless-stopped
