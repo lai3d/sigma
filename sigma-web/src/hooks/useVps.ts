@@ -58,3 +58,10 @@ export function useImportVps() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['vps'] }),
   });
 }
+
+export function useAllocatePorts() {
+  return useMutation({
+    mutationFn: ({ id, count }: { id: string; count: number }) =>
+      api.allocatePorts(id, count),
+  });
+}

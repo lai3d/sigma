@@ -79,7 +79,7 @@ async fn main() -> Result<()> {
     loop {
         tokio::time::sleep(Duration::from_secs(config.interval)).await;
 
-        match heartbeat(&client, &hostname).await {
+        match heartbeat(&client, &hostname, &config).await {
             Ok(_) => info!(hostname = %hostname, "Heartbeat sent"),
             Err(e) => warn!("Heartbeat failed: {:#}", e),
         }
@@ -87,7 +87,7 @@ async fn main() -> Result<()> {
 }
 
 async fn register(client: &SigmaClient, hostname: &str, config: &Config) -> Result<VpsResponse> {
-    let system_info = system::collect_system_info();
+    let system_info = system::collect_system_info_with_metrics_port(config.metrics_port);
     let ip_addresses = system::discover_ips().await;
 
     info!(
@@ -108,8 +108,8 @@ async fn register(client: &SigmaClient, hostname: &str, config: &Config) -> Resu
         .await
 }
 
-async fn heartbeat(client: &SigmaClient, hostname: &str) -> Result<VpsResponse> {
-    let system_info = system::collect_system_info();
+async fn heartbeat(client: &SigmaClient, hostname: &str, config: &Config) -> Result<VpsResponse> {
+    let system_info = system::collect_system_info_with_metrics_port(config.metrics_port);
 
     let body = AgentHeartbeat {
         hostname: hostname.to_string(),

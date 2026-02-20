@@ -49,6 +49,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/vps/import", axum::routing::post(import))
         .route("/api/vps/{id}", get(get_one).put(update).delete(delete))
         .route("/api/vps/{id}/retire", axum::routing::post(retire))
+        .route("/api/vps/{id}/allocate-ports", axum::routing::post(allocate_ports))
 }
 
 #[utoipa::path(
@@ -396,6 +397,95 @@ pub async fn retire(
         serde_json::json!({"hostname": row.hostname})).await;
 
     Ok(Json(row))
+}
+
+// ─── Allocate Ports (proxy to agent) ─────────────────────
+
+#[derive(Debug, serde::Deserialize, utoipa::ToSchema)]
+pub struct AllocatePortsRequest {
+    pub count: u32,
+}
+
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+pub struct AllocatePortsResponse {
+    pub ports: Vec<u16>,
+}
+
+#[utoipa::path(
+    post, path = "/api/vps/{id}/allocate-ports",
+    tag = "VPS",
+    params(("id" = Uuid, Path, description = "VPS ID")),
+    request_body = AllocatePortsRequest,
+    responses(
+        (status = 200, body = AllocatePortsResponse, description = "Allocated available ports"),
+        (status = 404, body = ErrorResponse),
+        (status = 502, body = ErrorResponse, description = "Agent unreachable"),
+    )
+)]
+pub async fn allocate_ports(
+    State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
+    Path(id): Path<Uuid>,
+    Json(input): Json<AllocatePortsRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    require_role(&user, &["admin", "operator"])?;
+
+    let vps = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or(AppError::NotFound)?;
+
+    // Get agent metrics port from extra.system_info.metrics_port
+    let metrics_port = vps
+        .extra
+        .get("system_info")
+        .and_then(|si| si.get("metrics_port"))
+        .and_then(|p| p.as_u64())
+        .unwrap_or(9102) as u16;
+
+    if metrics_port == 0 {
+        return Err(AppError::BadRequest(
+            "Agent metrics server is disabled on this VPS".into(),
+        ));
+    }
+
+    // Pick first non-internal IP
+    let agent_ip = vps
+        .ip_addresses
+        .0
+        .iter()
+        .find(|e| e.label != "internal")
+        .or(vps.ip_addresses.0.first())
+        .map(|e| e.ip.clone())
+        .ok_or_else(|| AppError::BadRequest("VPS has no IP addresses".into()))?;
+
+    let agent_url = format!("http://{}:{}/ports/allocate", agent_ip, metrics_port);
+
+    let resp = state
+        .http_client
+        .post(&agent_url)
+        .json(&serde_json::json!({"count": input.count}))
+        .timeout(std::time::Duration::from_secs(30))
+        .send()
+        .await
+        .map_err(|e| AppError::BadGateway(format!("Agent unreachable: {}", e)))?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err(AppError::BadGateway(format!(
+            "Agent returned {}: {}",
+            status, body
+        )));
+    }
+
+    let body: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| AppError::BadGateway(format!("Invalid agent response: {}", e)))?;
+
+    Ok(Json(body))
 }
 
 // ─── Export ──────────────────────────────────────────────

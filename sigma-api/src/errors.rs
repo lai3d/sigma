@@ -29,6 +29,9 @@ pub enum AppError {
 
     #[error("Internal error: {0}")]
     Internal(String),
+
+    #[error("Bad gateway: {0}")]
+    BadGateway(String),
 }
 
 impl IntoResponse for AppError {
@@ -43,6 +46,7 @@ impl IntoResponse for AppError {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Database error".into())
             }
             AppError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            AppError::BadGateway(_) => (StatusCode::BAD_GATEWAY, self.to_string()),
         };
 
         (status, Json(json!({ "error": msg }))).into_response()

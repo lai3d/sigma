@@ -6,15 +6,19 @@ use tracing::{debug, warn};
 
 use crate::models::IpEntry;
 
-/// Collect all system info as a JSON value.
-pub fn collect_system_info() -> serde_json::Value {
-    json!({
+/// Collect all system info as a JSON value, with optional metrics port.
+pub fn collect_system_info_with_metrics_port(metrics_port: u16) -> serde_json::Value {
+    let mut info = json!({
         "cpu_cores": cpu_cores().unwrap_or(0),
         "ram_mb": ram_mb().unwrap_or(0),
         "disk_gb": disk_gb().unwrap_or(0),
         "uptime_seconds": uptime_seconds().unwrap_or(0),
         "load_avg": load_avg().unwrap_or_default(),
-    })
+    });
+    if metrics_port > 0 {
+        info["metrics_port"] = json!(metrics_port);
+    }
+    info
 }
 
 /// Get hostname: prefer /etc/host_hostname (host hostname mounted into container),

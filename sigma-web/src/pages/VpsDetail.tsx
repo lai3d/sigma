@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Pencil, Trash2, Power, BarChart3 } from 'lucide-react';
-import { useVps, useDeleteVps, useRetireVps } from '@/hooks/useVps';
+import { Pencil, Trash2, Power, BarChart3, Network } from 'lucide-react';
+import { useVps, useDeleteVps, useRetireVps, useAllocatePorts } from '@/hooks/useVps';
 import { useProvider } from '@/hooks/useProviders';
 import { useTickets } from '@/hooks/useTickets';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,6 +38,9 @@ export default function VpsDetail() {
 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmRetire, setConfirmRetire] = useState(false);
+  const [allocatedPorts, setAllocatedPorts] = useState<number[] | null>(null);
+  const [allocateError, setAllocateError] = useState<string | null>(null);
+  const allocatePortsMutation = useAllocatePorts();
 
   if (isLoading) return <div className="p-8 text-center text-gray-500">Loading...</div>;
   if (!vps) return <div className="p-8 text-center text-gray-400">VPS not found</div>;
@@ -58,6 +61,21 @@ export default function VpsDetail() {
 
   const days = daysUntil(vps.expire_date);
   const tickets = ticketsResult?.data;
+
+  const handleAllocatePorts = (count: number) => {
+    setAllocateError(null);
+    setAllocatedPorts(null);
+    allocatePortsMutation.mutate(
+      { id: vps.id, count },
+      {
+        onSuccess: (data) => setAllocatedPorts(data.ports),
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : 'Failed to allocate ports';
+          setAllocateError(msg);
+        },
+      },
+    );
+  };
 
   // Agent info
   const hb = vps.extra?.last_heartbeat as string | undefined;
@@ -160,6 +178,45 @@ export default function VpsDetail() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Port Allocation */}
+      {canMutate && agentOnline && si?.metrics_port && (
+        <div className="mt-6 bg-white rounded-lg border p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-700">Port Allocation</h3>
+            <div className="flex items-center gap-2">
+              {[5, 10, 20].map((n) => (
+                <button
+                  key={n}
+                  onClick={() => handleAllocatePorts(n)}
+                  disabled={allocatePortsMutation.isPending}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 disabled:opacity-50"
+                >
+                  <Network size={14} /> {n} ports
+                </button>
+              ))}
+            </div>
+          </div>
+          {allocatePortsMutation.isPending && (
+            <p className="text-sm text-gray-500">Scanning available ports...</p>
+          )}
+          {allocateError && (
+            <p className="text-sm text-red-600">{allocateError}</p>
+          )}
+          {allocatedPorts && (
+            <div>
+              <p className="text-sm text-gray-500 mb-2">{allocatedPorts.length} available ports:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {allocatedPorts.map((port) => (
+                  <span key={port} className="px-2 py-0.5 text-xs font-mono bg-green-50 text-green-700 border border-green-200 rounded">
+                    {port}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

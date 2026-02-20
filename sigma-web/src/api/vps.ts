@@ -49,3 +49,8 @@ export async function importVps(format: 'csv' | 'json', data: string): Promise<I
   const { data: result } = await apiClient.post('/vps/import', { format, data });
   return result;
 }
+
+export async function allocatePorts(id: string, count: number): Promise<{ ports: number[] }> {
+  const { data } = await apiClient.post(`/vps/${id}/allocate-ports`, { count });
+  return data;
+}
