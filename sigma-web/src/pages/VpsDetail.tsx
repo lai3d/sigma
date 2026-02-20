@@ -162,7 +162,7 @@ export default function VpsDetail() {
             )}
             {si?.disk_gb != null && (
               <div>
-                <span className="text-gray-500">Disk</span>
+                <span className="text-gray-500">Disk (Used / Total)</span>
                 <div className="mt-0.5 font-medium">{si.disk_used_gb != null ? `${si.disk_used_gb} / ${si.disk_gb} GB` : `${si.disk_gb} GB`}</div>
               </div>
             )}
