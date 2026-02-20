@@ -43,8 +43,22 @@ fn classify_process(name: &str) -> &'static str {
 }
 
 /// Try to bind to a port; returns true if the port is available
-fn try_bind(port: u16) -> bool {
+pub fn try_bind(port: u16) -> bool {
     TcpListener::bind(("0.0.0.0", port)).is_ok()
+}
+
+/// Find N available ports in the given range by real-time bind testing
+pub fn find_available_ports(start: u16, end: u16, count: usize) -> Vec<u16> {
+    let mut ports = Vec::with_capacity(count);
+    for port in start..=end {
+        if try_bind(port) {
+            ports.push(port);
+            if ports.len() == count {
+                break;
+            }
+        }
+    }
+    ports
 }
 
 /// Extract process name from ss users field like: users:(("envoy",pid=1234,fd=5))

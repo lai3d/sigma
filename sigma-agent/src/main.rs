@@ -44,7 +44,7 @@ async fn main() -> Result<()> {
     let scan_result: SharedScanResult = Arc::new(RwLock::new(PortScanResult::default()));
 
     // Conditionally start port scanning
-    if config.port_scan {
+    let port_range = if config.port_scan {
         let (start, end) = config.parse_port_scan_range()?;
         info!(range = %config.port_scan_range, interval = config.port_scan_interval, "Port scanning enabled");
         let shared = scan_result.clone();
@@ -52,7 +52,10 @@ async fn main() -> Result<()> {
         tokio::spawn(async move {
             port_scan::scan_loop(shared, start, end, interval).await;
         });
-    }
+        Some((start, end))
+    } else {
+        None
+    };
 
     // Conditionally start metrics server
     if config.metrics_port > 0 {
@@ -60,7 +63,7 @@ async fn main() -> Result<()> {
         let port = config.metrics_port;
         let hn = hostname.clone();
         tokio::spawn(async move {
-            metrics::serve_metrics(port, shared, hn).await;
+            metrics::serve_metrics(port, shared, hn, port_range).await;
         });
     }
 

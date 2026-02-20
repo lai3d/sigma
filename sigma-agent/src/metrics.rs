@@ -2,14 +2,16 @@ use std::fmt::Write;
 use std::sync::Arc;
 
 use axum::extract::State;
-use axum::http::header;
+use axum::http::{header, StatusCode};
 use axum::response::IntoResponse;
-use axum::routing::get;
-use axum::Router;
+use axum::routing::{get, post};
+use axum::{Json, Router};
+use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
+use tokio::task::spawn_blocking;
 use tracing::{error, info};
 
-use crate::port_scan::{PortScanResult, SharedScanResult};
+use crate::port_scan::{self, PortScanResult, SharedScanResult};
 
 /// Known sources that are always emitted (even when count=0) for stable time series
 const KNOWN_SOURCES: &[&str] = &[
@@ -24,6 +26,17 @@ const KNOWN_SOURCES: &[&str] = &[
 struct MetricsState {
     scan_result: SharedScanResult,
     hostname: String,
+    port_range: Option<(u16, u16)>,
+}
+
+#[derive(Deserialize)]
+struct AllocateRequest {
+    count: usize,
+}
+
+#[derive(Serialize)]
+struct AllocateResponse {
+    ports: Vec<u16>,
 }
 
 /// Render Prometheus text format from scan results
@@ -121,15 +134,64 @@ async fn metrics_handler(State(state): State<Arc<MetricsState>>) -> impl IntoRes
     )
 }
 
+async fn allocate_handler(
+    State(state): State<Arc<MetricsState>>,
+    Json(req): Json<AllocateRequest>,
+) -> Result<Json<AllocateResponse>, (StatusCode, String)> {
+    let (start, end) = state.port_range.ok_or_else(|| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Port scanning is not enabled".to_string(),
+        )
+    })?;
+
+    if req.count == 0 || req.count > 1000 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "count must be between 1 and 1000".to_string(),
+        ));
+    }
+
+    let count = req.count;
+    let ports = spawn_blocking(move || port_scan::find_available_ports(start, end, count))
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Scan failed: {}", e),
+            )
+        })?;
+
+    if ports.len() < count {
+        return Err((
+            StatusCode::CONFLICT,
+            format!(
+                "Only {} available ports found, requested {}",
+                ports.len(),
+                count
+            ),
+        ));
+    }
+
+    Ok(Json(AllocateResponse { ports }))
+}
+
 /// Start the metrics HTTP server on the given port
-pub async fn serve_metrics(port: u16, scan_result: SharedScanResult, hostname: String) {
+pub async fn serve_metrics(
+    port: u16,
+    scan_result: SharedScanResult,
+    hostname: String,
+    port_range: Option<(u16, u16)>,
+) {
     let state = Arc::new(MetricsState {
         scan_result,
         hostname,
+        port_range,
     });
 
     let app = Router::new()
         .route("/metrics", get(metrics_handler))
+        .route("/ports/allocate", post(allocate_handler))
         .with_state(state);
 
     let addr = format!("0.0.0.0:{}", port);
