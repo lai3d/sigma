@@ -76,6 +76,7 @@ services:
       SIGMA_API_URL: http://localhost:3000/api
       SIGMA_API_KEY: ${API_KEY:-change-me-in-production}
       AGENT_INTERVAL: 60
+      AGENT_ALIAS: hk004.example.com
       AGENT_METRICS_PORT: 9102
       AGENT_PORT_SCAN: "true"
       AGENT_PORT_SCAN_RANGE: 10000-30000
