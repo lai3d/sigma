@@ -72,6 +72,10 @@ services:
   agent:
     build: ./sigma-agent
     network_mode: host
+    # Port scanning requires host network to see real port usage.
+    # The allocate-ports proxy from API won't work in local Docker Desktop
+    # (API can't reach host network). Works in production where agent runs
+    # directly on VPS and API connects via public IP.
     environment:
       SIGMA_API_URL: http://localhost:3000/api
       SIGMA_API_KEY: ${API_KEY:-change-me-in-production}
