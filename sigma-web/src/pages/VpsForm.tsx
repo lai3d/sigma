@@ -265,7 +265,7 @@ export default function VpsForm() {
         {isEdit && existing?.extra?.last_heartbeat ? (() => {
           const hb = existing.extra.last_heartbeat as string;
           const online = Date.now() - new Date(hb).getTime() < 3 * 60 * 1000;
-          const si = existing.extra.system_info as { cpu_cores?: number; ram_mb?: number; disk_gb?: number; uptime_seconds?: number; load_avg?: number[] } | undefined;
+          const si = existing.extra.system_info as { cpu_cores?: number; ram_mb?: number; disk_gb?: number; disk_used_gb?: number; uptime_seconds?: number; load_avg?: number[] } | undefined;
           return (
             <fieldset className="bg-gray-50 rounded-lg border p-5 space-y-3">
               <legend className="text-sm font-semibold text-gray-700 px-2">Agent Info</legend>
@@ -292,7 +292,7 @@ export default function VpsForm() {
                 {si?.disk_gb != null && (
                   <div>
                     <span className="text-gray-500">Disk</span>
-                    <div className="mt-0.5 font-medium">{si.disk_gb} GB</div>
+                    <div className="mt-0.5 font-medium">{si.disk_used_gb != null ? `${si.disk_used_gb} / ${si.disk_gb} GB` : `${si.disk_gb} GB`}</div>
                   </div>
                 )}
                 {si?.uptime_seconds != null && (

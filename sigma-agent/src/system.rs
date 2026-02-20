@@ -8,10 +8,12 @@ use crate::models::IpEntry;
 
 /// Collect all system info as a JSON value, with optional metrics port and public IP.
 pub fn collect_system_info(metrics_port: u16, public_ip: Option<&str>) -> serde_json::Value {
+    let (disk_total, disk_used) = disk_stats().unwrap_or((0, 0));
     let mut info = json!({
         "cpu_cores": cpu_cores().unwrap_or(0),
         "ram_mb": ram_mb().unwrap_or(0),
-        "disk_gb": disk_gb().unwrap_or(0),
+        "disk_gb": disk_total,
+        "disk_used_gb": disk_used,
         "uptime_seconds": uptime_seconds().unwrap_or(0),
         "load_avg": load_avg().unwrap_or_default(),
     });
@@ -178,13 +180,15 @@ fn ram_mb() -> Option<u64> {
     None
 }
 
-fn disk_gb() -> Option<u64> {
+fn disk_stats() -> Option<(u64, u64)> {
     unsafe {
         let path = std::ffi::CString::new("/").ok()?;
         let mut stat: libc::statvfs = std::mem::zeroed();
         if libc::statvfs(path.as_ptr(), &mut stat) == 0 {
-            let total_bytes = stat.f_blocks as u64 * stat.f_frsize as u64;
-            Some(total_bytes / (1024 * 1024 * 1024))
+            let block_size = stat.f_frsize as u64;
+            let total = stat.f_blocks as u64 * block_size / (1024 * 1024 * 1024);
+            let used = (stat.f_blocks - stat.f_bfree) as u64 * block_size / (1024 * 1024 * 1024);
+            Some((total, used))
         } else {
             None
         }
