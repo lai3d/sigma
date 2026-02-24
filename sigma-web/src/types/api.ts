@@ -409,12 +409,15 @@ export interface TopologyResponse {
   edges: TopologyEdge[];
 }
 
-// ─── Cloudflare ────────────────────────────────────────────
+// ─── DNS (multi-provider) ──────────────────────────────────
 
-export interface CloudflareAccountResponse {
+export type DnsProviderType = 'cloudflare' | 'route53' | 'godaddy' | 'namecom';
+
+export interface DnsAccountResponse {
   id: string;
   name: string;
-  masked_token: string;
+  provider_type: DnsProviderType;
+  masked_config: Record<string, string>;
   zones_count: number;
   records_count: number;
   last_synced: string | null;
@@ -422,17 +425,18 @@ export interface CloudflareAccountResponse {
   updated_at: string;
 }
 
-export interface CreateCloudflareAccount {
+export interface CreateDnsAccount {
   name: string;
-  api_token: string;
+  provider_type: DnsProviderType;
+  config: Record<string, string>;
 }
 
-export interface UpdateCloudflareAccount {
+export interface UpdateDnsAccount {
   name?: string;
-  api_token?: string;
+  config?: Record<string, string>;
 }
 
-export interface CloudflareZone {
+export interface DnsZone {
   id: string;
   account_id: string;
   zone_id: string;
@@ -445,7 +449,7 @@ export interface CloudflareZone {
   updated_at: string;
 }
 
-export interface CloudflareDnsRecord {
+export interface DnsRecord {
   id: string;
   zone_uuid: string;
   record_id: string;
@@ -453,31 +457,31 @@ export interface CloudflareDnsRecord {
   name: string;
   content: string;
   ttl: number;
-  proxied: boolean;
+  extra: Record<string, unknown>;
   vps_id: string | null;
   synced_at: string;
   created_at: string;
   updated_at: string;
   zone_name: string | null;
-  zone_id_cf: string | null;
+  zone_id_ext: string | null;
   vps_hostname: string | null;
   vps_country: string | null;
 }
 
-export interface CloudflareSyncResult {
+export interface DnsSyncResult {
   zones_count: number;
   records_count: number;
   records_linked: number;
   records_deleted: number;
 }
 
-export interface CloudflareZoneListQuery {
+export interface DnsZoneListQuery {
   account_id?: string;
   page?: number;
   per_page?: number;
 }
 
-export interface CloudflareDnsListQuery {
+export interface DnsRecordListQuery {
   account_id?: string;
   zone_name?: string;
   record_type?: string;

@@ -936,23 +936,25 @@ fn default_status() -> String { "provisioning".into() }
 fn default_true() -> bool { true }
 fn default_node_exporter_port() -> i32 { 9100 }
 
-// ─── Cloudflare ──────────────────────────────────────────
+// ─── DNS (multi-provider) ────────────────────────────────
 
 #[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
-pub struct CloudflareAccount {
+pub struct DnsAccount {
     pub id: Uuid,
     pub name: String,
+    pub provider_type: String,
     #[serde(skip_serializing)]
-    pub api_token: String,
+    pub config: serde_json::Value,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-pub struct CloudflareAccountResponse {
+pub struct DnsAccountResponse {
     pub id: Uuid,
     pub name: String,
-    pub masked_token: String,
+    pub provider_type: String,
+    pub masked_config: serde_json::Value,
     pub zones_count: i64,
     pub records_count: i64,
     pub last_synced: Option<DateTime<Utc>>,
@@ -961,19 +963,20 @@ pub struct CloudflareAccountResponse {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
-pub struct CreateCloudflareAccount {
+pub struct CreateDnsAccount {
     pub name: String,
-    pub api_token: String,
+    pub provider_type: String,
+    pub config: serde_json::Value,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
-pub struct UpdateCloudflareAccount {
+pub struct UpdateDnsAccount {
     pub name: Option<String>,
-    pub api_token: Option<String>,
+    pub config: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
-pub struct CloudflareZone {
+pub struct DnsZone {
     pub id: Uuid,
     pub account_id: Uuid,
     pub zone_id: String,
@@ -987,7 +990,7 @@ pub struct CloudflareZone {
 }
 
 #[derive(Debug, Deserialize, IntoParams)]
-pub struct CloudflareZoneListQuery {
+pub struct DnsZoneListQuery {
     pub account_id: Option<Uuid>,
     #[serde(default = "default_page")]
     pub page: i64,
@@ -996,7 +999,7 @@ pub struct CloudflareZoneListQuery {
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
-pub struct CloudflareDnsRecord {
+pub struct DnsRecord {
     pub id: Uuid,
     pub zone_uuid: Uuid,
     pub record_id: String,
@@ -1004,20 +1007,20 @@ pub struct CloudflareDnsRecord {
     pub name: String,
     pub content: String,
     pub ttl: i32,
-    pub proxied: bool,
+    pub extra: serde_json::Value,
     pub vps_id: Option<Uuid>,
     pub synced_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     // joined fields
     pub zone_name: Option<String>,
-    pub zone_id_cf: Option<String>,
+    pub zone_id_ext: Option<String>,
     pub vps_hostname: Option<String>,
     pub vps_country: Option<String>,
 }
 
 #[derive(Debug, Deserialize, IntoParams)]
-pub struct CloudflareDnsListQuery {
+pub struct DnsRecordListQuery {
     pub account_id: Option<Uuid>,
     pub zone_name: Option<String>,
     pub record_type: Option<String>,
@@ -1029,7 +1032,7 @@ pub struct CloudflareDnsListQuery {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-pub struct CloudflareSyncResult {
+pub struct DnsSyncResult {
     pub zones_count: i64,
     pub records_count: i64,
     pub records_linked: i64,
@@ -1037,31 +1040,31 @@ pub struct CloudflareSyncResult {
 }
 
 #[derive(Serialize, ToSchema)]
-pub struct PaginatedCloudflareAccountResponse {
-    pub data: Vec<CloudflareAccountResponse>,
+pub struct PaginatedDnsAccountResponse {
+    pub data: Vec<DnsAccountResponse>,
     pub total: i64,
     pub page: i64,
     pub per_page: i64,
 }
 
 #[derive(Serialize, ToSchema)]
-pub struct PaginatedCloudflareZoneResponse {
-    pub data: Vec<CloudflareZone>,
+pub struct PaginatedDnsZoneResponse {
+    pub data: Vec<DnsZone>,
     pub total: i64,
     pub page: i64,
     pub per_page: i64,
 }
 
 #[derive(Serialize, ToSchema)]
-pub struct PaginatedCloudflareDnsResponse {
-    pub data: Vec<CloudflareDnsRecord>,
+pub struct PaginatedDnsRecordResponse {
+    pub data: Vec<DnsRecord>,
     pub total: i64,
     pub page: i64,
     pub per_page: i64,
 }
 
 #[derive(Debug, Deserialize, IntoParams)]
-pub struct CloudflareAccountListQuery {
+pub struct DnsAccountListQuery {
     #[serde(default = "default_page")]
     pub page: i64,
     #[serde(default = "default_per_page")]

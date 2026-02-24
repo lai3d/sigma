@@ -2,18 +2,32 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, RefreshCw, Pencil, Trash2, Cloud, ArrowRight } from 'lucide-react';
 import {
-  useCloudflareAccounts,
-  useDeleteCloudflareAccount,
-  useSyncCloudflareAccount,
-  useCloudflareZones,
-  useCloudflareDnsRecords,
-} from '@/hooks/useCloudflare';
+  useDnsAccounts,
+  useDeleteDnsAccount,
+  useSyncDnsAccount,
+  useDnsZones,
+  useDnsRecords,
+} from '@/hooks/useDns';
 import Pagination from '@/components/Pagination';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import CloudflareAccountDialog from './CloudflareAccountDialog';
-import type { CloudflareSyncResult } from '@/types/api';
+import DnsAccountDialog from './DnsAccountDialog';
+import type { DnsSyncResult, DnsProviderType } from '@/types/api';
 
 type Tab = 'accounts' | 'zones' | 'records';
+
+const PROVIDER_LABELS: Record<DnsProviderType, string> = {
+  cloudflare: 'Cloudflare',
+  route53: 'Route 53',
+  godaddy: 'GoDaddy',
+  namecom: 'Name.com',
+};
+
+const PROVIDER_COLORS: Record<DnsProviderType, string> = {
+  cloudflare: 'bg-orange-100 text-orange-800',
+  route53: 'bg-yellow-100 text-yellow-800',
+  godaddy: 'bg-green-100 text-green-800',
+  namecom: 'bg-blue-100 text-blue-800',
+};
 
 export default function DomainsPage() {
   const [tab, setTab] = useState<Tab>('accounts');
@@ -49,15 +63,15 @@ export default function DomainsPage() {
 
 function AccountsTab() {
   const [page, setPage] = useState(1);
-  const { data: result, isLoading } = useCloudflareAccounts({ page, per_page: 25 });
-  const deleteMutation = useDeleteCloudflareAccount();
-  const syncMutation = useSyncCloudflareAccount();
+  const { data: result, isLoading } = useDnsAccounts({ page, per_page: 25 });
+  const deleteMutation = useDeleteDnsAccount();
+  const syncMutation = useSyncDnsAccount();
 
   const [showCreate, setShowCreate] = useState(false);
-  const [editAccount, setEditAccount] = useState<{ id: string; name: string } | null>(null);
+  const [editAccount, setEditAccount] = useState<{ id: string; name: string; provider_type: DnsProviderType } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
-  const [syncResult, setSyncResult] = useState<CloudflareSyncResult | null>(null);
+  const [syncResult, setSyncResult] = useState<DnsSyncResult | null>(null);
 
   async function handleSync(id: string) {
     setSyncingId(id);
@@ -71,6 +85,12 @@ function AccountsTab() {
     } finally {
       setSyncingId(null);
     }
+  }
+
+  function maskedConfigSummary(masked: Record<string, string>): string {
+    // Show first masked credential value as summary
+    const values = Object.values(masked).filter((v) => v !== '****');
+    return values[0] || '****';
   }
 
   return (
@@ -99,13 +119,14 @@ function AccountsTab() {
         {isLoading ? (
           <div className="p-8 text-center text-gray-500">Loading...</div>
         ) : !result?.data.length ? (
-          <div className="p-8 text-center text-gray-400">No Cloudflare accounts configured</div>
+          <div className="p-8 text-center text-gray-400">No DNS accounts configured</div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-gray-500 border-b bg-gray-50">
                 <th className="px-4 py-3 font-medium">Name</th>
-                <th className="px-4 py-3 font-medium">Token</th>
+                <th className="px-4 py-3 font-medium">Type</th>
+                <th className="px-4 py-3 font-medium">Credentials</th>
                 <th className="px-4 py-3 font-medium text-right">Zones</th>
                 <th className="px-4 py-3 font-medium text-right">Records</th>
                 <th className="px-4 py-3 font-medium">Last Synced</th>
@@ -116,7 +137,16 @@ function AccountsTab() {
               {result.data.map((acc) => (
                 <tr key={acc.id} className="border-b last:border-0 hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{acc.name}</td>
-                  <td className="px-4 py-3 text-gray-500 font-mono text-xs">{acc.masked_token}</td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                      PROVIDER_COLORS[acc.provider_type] || 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {PROVIDER_LABELS[acc.provider_type] || acc.provider_type}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 font-mono text-xs">
+                    {maskedConfigSummary(acc.masked_config)}
+                  </td>
                   <td className="px-4 py-3 text-right">{acc.zones_count}</td>
                   <td className="px-4 py-3 text-right">{acc.records_count}</td>
                   <td className="px-4 py-3 text-gray-500">
@@ -135,7 +165,7 @@ function AccountsTab() {
                         <RefreshCw size={15} className={syncingId === acc.id ? 'animate-spin' : ''} />
                       </button>
                       <button
-                        onClick={() => setEditAccount({ id: acc.id, name: acc.name })}
+                        onClick={() => setEditAccount({ id: acc.id, name: acc.name, provider_type: acc.provider_type })}
                         className="p-1.5 text-gray-500 hover:text-gray-700"
                         title="Edit"
                       >
@@ -166,14 +196,14 @@ function AccountsTab() {
         />
       )}
 
-      {showCreate && <CloudflareAccountDialog onClose={() => setShowCreate(false)} />}
+      {showCreate && <DnsAccountDialog onClose={() => setShowCreate(false)} />}
       {editAccount && (
-        <CloudflareAccountDialog account={editAccount} onClose={() => setEditAccount(null)} />
+        <DnsAccountDialog account={editAccount} onClose={() => setEditAccount(null)} />
       )}
 
       <ConfirmDialog
         open={!!confirmDelete}
-        title="Delete Cloudflare Account"
+        title="Delete DNS Account"
         message="This will delete this account and all its synced zones and records."
         confirmLabel="Delete"
         variant="danger"
@@ -209,8 +239,8 @@ function ExpiryCell({ date }: { date: string | null }) {
 function ZonesTab() {
   const [page, setPage] = useState(1);
   const [accountFilter, setAccountFilter] = useState('');
-  const { data: accounts } = useCloudflareAccounts({ per_page: 100 });
-  const { data: result, isLoading } = useCloudflareZones({
+  const { data: accounts } = useDnsAccounts({ per_page: 100 });
+  const { data: result, isLoading } = useDnsZones({
     account_id: accountFilter || undefined,
     page,
     per_page: 25,
@@ -303,13 +333,13 @@ function RecordsTab() {
   const [typeFilter, setTypeFilter] = useState('');
   const [vpsFilter, setVpsFilter] = useState('');
 
-  const { data: accounts } = useCloudflareAccounts({ per_page: 100 });
-  const { data: zones } = useCloudflareZones({
+  const { data: accounts } = useDnsAccounts({ per_page: 100 });
+  const { data: zones } = useDnsZones({
     account_id: accountFilter || undefined,
     per_page: 1000,
   });
 
-  const { data: result, isLoading } = useCloudflareDnsRecords({
+  const { data: result, isLoading } = useDnsRecords({
     account_id: accountFilter || undefined,
     zone_name: zoneFilter || undefined,
     record_type: typeFilter || undefined,
@@ -388,50 +418,53 @@ function RecordsTab() {
               </tr>
             </thead>
             <tbody>
-              {result.data.map((rec) => (
-                <tr key={rec.id} className="border-b last:border-0 hover:bg-gray-50">
-                  <td className="px-4 py-3 text-gray-500">{rec.zone_name}</td>
-                  <td className="px-4 py-3 font-medium text-gray-900 max-w-xs truncate">
-                    {rec.name}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                      RECORD_TYPE_COLORS[rec.record_type] || 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {rec.record_type}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600 font-mono text-xs max-w-xs truncate">
-                    {rec.content}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500">
-                    {rec.ttl === 1 ? 'Auto' : rec.ttl}
-                  </td>
-                  <td className="px-4 py-3">
-                    {rec.proxied ? (
-                      <Cloud size={16} className="text-orange-500" />
-                    ) : (
-                      <span className="text-gray-400 text-xs">Direct</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {rec.vps_id ? (
-                      <Link
-                        to={`/vps/${rec.vps_id}`}
-                        className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs"
-                      >
-                        {rec.vps_hostname || 'VPS'}
-                        {rec.vps_country && (
-                          <span className="text-gray-400">({rec.vps_country})</span>
-                        )}
-                        <ArrowRight size={12} />
-                      </Link>
-                    ) : (
-                      <span className="text-gray-300">&mdash;</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {result.data.map((rec) => {
+                const proxied = rec.extra?.proxied === true;
+                return (
+                  <tr key={rec.id} className="border-b last:border-0 hover:bg-gray-50">
+                    <td className="px-4 py-3 text-gray-500">{rec.zone_name}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900 max-w-xs truncate">
+                      {rec.name}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        RECORD_TYPE_COLORS[rec.record_type] || 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {rec.record_type}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 font-mono text-xs max-w-xs truncate">
+                      {rec.content}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {rec.ttl === 1 ? 'Auto' : rec.ttl}
+                    </td>
+                    <td className="px-4 py-3">
+                      {proxied ? (
+                        <Cloud size={16} className="text-orange-500" />
+                      ) : (
+                        <span className="text-gray-400 text-xs">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {rec.vps_id ? (
+                        <Link
+                          to={`/vps/${rec.vps_id}`}
+                          className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs"
+                        >
+                          {rec.vps_hostname || 'VPS'}
+                          {rec.vps_country && (
+                            <span className="text-gray-400">({rec.vps_country})</span>
+                          )}
+                          <ArrowRight size={12} />
+                        </Link>
+                      ) : (
+                        <span className="text-gray-300">&mdash;</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
