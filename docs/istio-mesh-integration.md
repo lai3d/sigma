@@ -2,286 +2,216 @@
 
 ## Goal
 
-VPS 上跑 XrayR，K8s（airport-prod EKS）里跑 Xboard。在 Kiali 上看到 **XrayR → Xboard** 的流量拓扑，包括请求量、错误率、延迟。
+VPS 上跑 XrayR，K8s（airport-prod EKS）里跑 Xboard。希望在 Kiali 上看到 **per-VPS → Xboard** 的流量拓扑，包括请求量、错误率、延迟。
 
-**核心原则：VPS 上不装任何 Istio 组件**。用户 VPN 流量零风险。所有可观测性来自 K8s 侧 Xboard 的 Envoy sidecar。
+## 方案评估结论
 
-## Infrastructure
+**WorkloadEntry 方案无法实现 per-VPS 流量区分。** 原因见下方详细分析。
 
-```
-┌─── central-platform EKS ──┐     ┌─── airport-prod EKS ──────────┐
-│ sigma-api                 │     │ xboard + Envoy sidecar         │
-│ sigma-web                 │     │ mysql / mariadb                │
-│ postgres, redis           │     │ redis                          │
-│                           │     │                                │
-│ (管理面，不入 mesh)        │     │ istiod + Kiali + Prometheus    │
-└───────────────────────────┘     │                                │
-                                  │ WorkloadEntry (per VPS,        │
-         sigma-agent              │   仅 IP 记录，VPS 上不装东西)   │
-           register/heartbeat ──→ │                                │
-           (走 central-platform)  └────────────────────────────────┘
-                                             ▲
-                                             │ HTTP 直连 (无 Envoy)
-                                ┌────────────┼────────────┐
-                                │            │            │
-                           ┌────────┐  ┌────────┐  ┌────────┐
-                           │ VPS JP │  │ VPS HK │  │ VPS US │
-                           │        │  │        │  │        │
-                           │ XrayR  │  │ XrayR  │  │ XrayR  │
-                           │ sigma- │  │ sigma- │  │ sigma- │
-                           │ agent  │  │ agent  │  │ agent  │
-                           │        │  │        │  │        │
-                           │ 无Envoy │  │ 无Envoy │  │ 无Envoy │
-                           │无iptables│ │无iptables│ │无iptables│
-                           └────────┘  └────────┘  └────────┘
-```
+当前 Kiali 已经能看到 `istio-ingressgateway → xboard → mysql/redis` 的完整内部拓扑，但外部 VPS 流量全部聚合在 ingressgateway 节点上，无法区分来自哪台 VPS。
 
-## How It Works
+## 尝试过的方案：K8s 侧 WorkloadEntry
 
-XrayR 直连 Xboard（和现在一样），不经过任何代理。可观测性完全来自 **K8s 侧**：
+### 思路
 
-1. Xboard pod 的 **Envoy sidecar** 看到所有入站请求的**源 IP**
-2. 源 IP 匹配 **WorkloadEntry**（sigma-api 自动创建）→ Kiali 知道「这个请求来自 xrayr/vps-jp-01」
-3. Kiali 画出 xrayr → xboard 的流量拓扑
+不在 VPS 上装任何 Istio 组件（零风险），仅在 K8s 侧创建 WorkloadEntry 记录每台 VPS 的公网 IP。期望 Xboard sidecar 通过源 IP 匹配 WorkloadEntry，让 Kiali 识别流量来源。
 
-```
-XrayR (VPS, 103.x.x.x)
-  → HTTP POST /api/v1/server/push
-  → Xboard pod's Envoy sidecar (入站)
-      → sidecar 记录: source_ip=103.x.x.x → 匹配 WorkloadEntry vps-jp-01
-      → 指标上报 Prometheus: source_workload=vps-jp-01, app=xrayr
-  → Xboard app container
-  → response 原路返回
+### 实际测试
 
-Prometheus → Kiali query → 画出 xrayr → xboard 的边 + 指标
-```
-
-### 为什么不在 VPS 上装 Istio
-
-| 风险 | 说明 |
-|------|------|
-| iptables 劫持用户 VPN 流量 | istio-agent 默认配 iptables 拦截所有出入站流量，配错一点用户全断 |
-| Envoy 处理 V2Ray/Trojan 加密隧道 | Envoy 不认识这些协议，会导致连接失败 |
-| 性能开销 | 几万用户流量全过 Envoy 增加延迟 |
-| 运维复杂度 | 月抛 VPS 上维护 istio-agent + Envoy + iptables 成本高 |
-
-**结论**：只在 K8s 侧做，VPS 完全不动，零风险。
-
-## What Kiali Shows
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│  Kiali Service Graph (namespace: airport-prod)                │
-│                                                              │
-│  ┌───────────────┐  HTTP /api/v1/*   ┌──────────────┐       │
-│  │ xrayr         │─────────────────→ │ xboard       │       │
-│  │ (30 VPS nodes)│  config/push/     │ (K8s pod)    │       │
-│  │ JP,HK,US,DE  │  alive            └──────┬───────┘       │
-│  └───────────────┘                         │ TCP            │
-│                                            ▼                │
-│                                    ┌──────────────┐         │
-│                                    │ mysql        │         │
-│                                    │ (K8s pod)    │         │
-│                                    └──────────────┘         │
-│                                                              │
-│  Click xrayr → xboard edge:                                 │
-│    Request rate: 120 req/min                                 │
-│    Error rate: 0.2%                                          │
-│    P99 latency: 45ms                                         │
-│    Per-workload breakdown: JP-01: 4req/m, HK-03: 4req/m ... │
-└──────────────────────────────────────────────────────────────┘
-```
-
-- XrayR 每个 VPS 节点是一个 workload，聚合在 `xrayr` service 下
-- 点击边可以看每个节点的请求量/错误/延迟
-- 节点掉线（停止发 heartbeat/push）→ Kiali 显示流量消失
-- Xboard 返回 5xx → 边变红
-
-### 看得到 vs 看不到
-
-| 能看到 | 看不到 |
-|--------|--------|
-| XrayR → Xboard 请求量、错误率、延迟 | VPS 出站侧指标（VPS 没有 Envoy） |
-| 每个 VPS 节点的请求明细 | VPS 之间的流量（relay chain 等） |
-| Xboard → MySQL/Redis 内部调用链 | 用户 → XrayR 的连接数（不在 mesh 内） |
-
-对运营来说够用 — 你关心的是哪个节点在调 Xboard、有没有报错、延迟多少，这些全能看到。
-
-## Implementation Plan
-
-### Phase 1: airport-prod 集群安装 Istio
-
-```bash
-istioctl install --set profile=default \
-  --set values.global.meshID=airport-mesh \
-  --set values.global.multiCluster.clusterName=airport-prod
-```
-
-不需要 VM support 相关配置（VPS 上不装 istio-agent），只需要标准 Istio。
-
-### Phase 2: 安装 Kiali + Prometheus
-
-```bash
-kubectl apply -f samples/addons/prometheus.yaml
-kubectl apply -f samples/addons/kiali.yaml
-kubectl apply -f samples/addons/grafana.yaml    # optional
-```
-
-### Phase 3: Xboard namespace 开启 sidecar 注入
+在 airport-prod 集群创建了以下资源：
 
 ```yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: airport-prod
-  labels:
-    istio-injection: enabled
-```
-
-重启 Xboard 相关 pod 让 sidecar 注入：
-
-```bash
-kubectl -n airport-prod rollout restart deployment xboard
-# mysql, redis 也可以注入，这样 Kiali 能看到 xboard → mysql 的边
-```
-
-验证 pod 变成 `2/2`（app + istio-proxy）。
-
-### Phase 4: 创建 ServiceAccount + WorkloadGroup
-
-```yaml
-# airport-prod/istio/xrayr-workload.yaml
+# ServiceAccount
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: xrayr-vm
+  name: edge-vm
   namespace: airport-prod
----
-apiVersion: networking.istio.io/v1beta1
+
+# WorkloadGroup (per region)
+apiVersion: networking.istio.io/v1
 kind: WorkloadGroup
 metadata:
-  name: xrayr
+  name: edge-nodes-jp
   namespace: airport-prod
 spec:
   metadata:
     labels:
-      app: xrayr
-      version: v1
+      app: edge-node
+      region: jp
   template:
-    serviceAccount: xrayr-vm
-```
+    serviceAccount: edge-vm
+    network: external
 
-### Phase 5: 为每台 VPS 创建 WorkloadEntry
-
-每台跑 XrayR 的 VPS 对应一个 WorkloadEntry（只是 K8s 里的一条记录，VPS 上什么都不装）：
-
-```yaml
-apiVersion: networking.istio.io/v1beta1
-kind: WorkloadEntry
-metadata:
-  name: vps-jp-01
-  namespace: airport-prod
-  labels:
-    app: xrayr
-    country: jp
-spec:
-  address: 103.x.x.x          # VPS 公网 IP
-  labels:
-    app: xrayr
-    version: v1
-    country: jp
-  serviceAccount: xrayr-vm
-```
-
-**这是关键**：Xboard 的 Envoy sidecar 收到来自 `103.x.x.x` 的请求时，查 WorkloadEntry 得知源是 `xrayr/vps-jp-01`，上报给 Prometheus，Kiali 就能画出拓扑。
-
-### Phase 6: 定义 ServiceEntry
-
-```yaml
-# airport-prod/istio/xrayr-service.yaml
-apiVersion: networking.istio.io/v1beta1
+# ServiceEntry (聚合所有 edge-node)
+apiVersion: networking.istio.io/v1
 kind: ServiceEntry
 metadata:
-  name: xrayr-nodes
+  name: edge-nodes
   namespace: airport-prod
 spec:
   hosts:
-  - xrayr.airport-prod.mesh
+  - edge-nodes.airport-prod.mesh
   location: MESH_INTERNAL
   ports:
-  - number: 443
-    name: https
-    protocol: TCP
+  - number: 8080       # 占位，VPS 只是流量源不是目的地
+    name: http
+    protocol: HTTP
   resolution: STATIC
   workloadSelector:
     labels:
-      app: xrayr
+      app: edge-node
+
+# WorkloadEntry (per VPS)
+apiVersion: networking.istio.io/v1
+kind: WorkloadEntry
+metadata:
+  name: edge-jp-004
+  namespace: airport-prod
+  labels:
+    app: edge-node
+spec:
+  address: <VPS_PUBLIC_IP>
+  labels:
+    app: edge-node
+    region: jp
+    node: jp-004
+  serviceAccount: edge-vm
+  network: external
 ```
 
-ServiceEntry + workloadSelector 把所有 WorkloadEntry（label `app=xrayr`）聚合成一个 service，Kiali 显示为一个 `xrayr` 节点，展开看每个 VPS workload。
+### 结果
 
-## 自动化：sigma-api 管理 WorkloadEntry
+Kiali 中 `edge-nodes.airport-prod.mesh` 出现为一个孤立的 ServiceEntry 节点（三角形图标），**但没有任何流量边连接到它**。VPS 的流量仍然全部显示为 `istio-ingressgateway → xboard`。
 
-手动为每台 VPS 创建/删除 WorkloadEntry 不现实（月抛 VPS）。sigma-api 自动化：
+### 根本原因：Ingress Gateway 遮蔽了源 IP
+
+WorkloadEntry 的源 IP 匹配工作在 **TCP/网络层**。但 VPS 到 Xboard 的实际流量路径是：
 
 ```
-VPS 启动
-  → sigma-agent POST /api/agent/register (central-platform)
-  → sigma-api 创建 VPS 记录
-  → sigma-api 调 airport-prod K8s API → 创建 WorkloadEntry
-  → Xboard sidecar 开始识别该 VPS 的流量 → Kiali 可见
-
-VPS 退役
-  → POST /api/vps/{id}/retire
-  → sigma-api 删除 airport-prod 的 WorkloadEntry
-  → Kiali 中该节点消失
+VPS (XrayR)
+  → AWS NLB (proxy protocol)
+    → istio-ingressgateway pod
+      → Xboard pod sidecar (入站)
+        → Xboard app container
 ```
 
-### sigma-api 改造
+Xboard sidecar 看到的 TCP 源 IP 是 **ingressgateway 的 pod IP**（如 `10.x.x.x`），不是 VPS 的公网 IP。
 
-需要 airport-prod 集群的 K8s 访问权限：
+虽然 NLB 配置了 proxy protocol、ingress gateway 配置了 `X-Forwarded-For` 头，真实 VPS IP 保留在了 **HTTP 头**里 — 但 Istio 做 WorkloadEntry 匹配用的是**网络层源 IP**，不是 HTTP 头。
 
-```toml
-# sigma-api/Cargo.toml 新增
-[dependencies]
-kube = { version = "0.98", features = ["runtime", "client", "derive"] }
-k8s-openapi = { version = "0.24", features = ["latest"] }
+```
+TCP 源 IP:        10.x.x.x (ingressgateway pod)  ← Istio 用这个做匹配
+HTTP X-Forwarded-For: <VPS_PUBLIC_IP>              ← 应用层可见，Istio 不用
 ```
 
-新增配置：
+所以 WorkloadEntry 永远匹配不到，Kiali 只能看到 `ingressgateway → xboard`。
 
-| Env var | Description |
-|---------|-------------|
-| `AIRPORT_KUBECONFIG` | airport-prod 集群的 kubeconfig 路径（或用 IAM role for service account 跨集群访问） |
-| `AIRPORT_NAMESPACE` | WorkloadEntry 创建的 namespace（默认 `airport-prod`） |
+### 为什么直连也不可行
 
-在 agent register 和 VPS retire handler 中添加 WorkloadEntry 的创建/删除逻辑。
+要让 WorkloadEntry 匹配生效，VPS 需要**绕过 ingress gateway 直连 Xboard pod IP**。这要求：
+- VPS 能路由到 K8s pod 网络（VPC peering + pod CIDR 路由）
+- 或者走 east-west gateway + mTLS（需要 VPS 上装 istio-agent）
 
-### VPS 侧改动
+前者增加网络暴露面，后者回到了"VPS 装 Istio"的老路。
 
-**无。** sigma-agent 不需要任何改动。XrayR 不需要任何改动。VPS 上没有新进程、没有 iptables 变更、用户流量完全不受影响。
+## 为什么不在 VPS 上装 Istio
 
-## Checklist
+| 风险 | 说明 |
+|------|------|
+| iptables 劫持用户流量 | istio-agent 默认配 iptables 拦截所有出入站流量，影响 VPN 用户连接 |
+| Envoy 处理加密隧道协议 | Envoy 不认识 V2Ray/Trojan 等协议，会导致连接失败 |
+| 性能开销 | 大量用户流量全过 Envoy 增加延迟 |
+| 运维复杂度 | 月抛 VPS 上维护 istio-agent + Envoy + iptables 成本高 |
 
-- [ ] airport-prod EKS 安装 Istio (`istioctl install`)
-- [ ] 安装 Kiali + Prometheus (`kubectl apply -f samples/addons/`)
-- [ ] Xboard namespace 开启 `istio-injection: enabled`
-- [ ] 重启 Xboard pod，验证 sidecar 注入 (2/2)
-- [ ] 创建 ServiceAccount `xrayr-vm`
-- [ ] 创建 WorkloadGroup `xrayr`
-- [ ] 创建 ServiceEntry `xrayr-nodes`
-- [ ] 为现有 VPS 批量创建 WorkloadEntry（可写脚本从 sigma-api 拉 VPS 列表）
-- [ ] 验证 Kiali 显示 xrayr → xboard 流量
-- [ ] sigma-api 添加 K8s client，自动管理 WorkloadEntry 生命周期
+**结论**：VPS 上不装 Istio 组件，用户流量零风险。
 
-## Summary
+## 当前状态：Kiali 已有的可见性
 
-| 组件 | 部署位置 | 改动 |
-|------|---------|------|
-| istiod + Kiali + Prometheus | airport-prod EKS | 新装 |
-| Xboard + Envoy sidecar | airport-prod EKS | 加 sidecar |
-| WorkloadEntry (per VPS) | airport-prod EKS | sigma-api 自动创建 |
-| XrayR | 每台 VPS | **不改** |
-| sigma-agent | 每台 VPS | **不改** |
-| 用户 VPN 流量 | 每台 VPS | **不受影响** |
-| sigma-api | central-platform EKS | 新增 K8s client 管理 WorkloadEntry |
+即使没有 per-VPS 区分，airport-prod 的 Kiali 已经能看到：
+
+```
+istio-ingressgateway → airport-xboard → rds-external-mysql
+                     → airport-xboard → airport-xboard-redis-with-pv
+                     → airport-xboard-subscribe-api → ...
+                     → airport-xboard-lite-api → ...
+```
+
+K8s 内部的服务间调用链完整可见。
+
+## 替代方案（待评估）
+
+如果需要 per-VPS 维度的可观测性，可以考虑以下方向：
+
+### 方案 A：应用层指标（推荐）
+
+在 Xboard 或 Nginx ingress 层，利用 `X-Forwarded-For` 头导出 Prometheus 指标，按 VPS IP 分组。在 Grafana 中展示 per-VPS 请求量/错误率/延迟。
+
+- 优点：不依赖 Istio mesh，纯应用层方案
+- 缺点：不在 Kiali 拓扑图上，需要单独 Grafana dashboard
+
+### 方案 B：VPS 侧 Prometheus 指标
+
+sigma-agent 已有 `/metrics` endpoint。可以让 XrayR 或 sigma-agent 上报 API 调用指标（对 Xboard 的请求量/延迟/错误），由中心化 Prometheus 抓取。
+
+- 优点：指标来自源头，最准确
+- 缺点：需要 sigma-agent 改造，VPS 上增加指标采集
+
+### 方案 C：Envoy access log 分析
+
+利用 ingress gateway 的 access log，按 `X-Forwarded-For` 头提取 VPS IP，通过 Loki/Promtail 聚合。
+
+- 优点：不改任何应用代码
+- 缺点：基于日志而非指标，实时性和查询性能不如 Prometheus
+
+## Infrastructure
+
+```
+┌─── central-platform EKS ──┐     ┌─── airport-prod EKS ──────────────┐
+│ sigma-api                 │     │ xboard + Envoy sidecar             │
+│ sigma-web                 │     │ xboard-subscribe-api               │
+│ postgres, redis           │     │ xboard-lite-api                    │
+│                           │     │ redis, mysql (RDS)                 │
+│ (管理面)                   │     │                                    │
+└───────────────────────────┘     │ istiod + Kiali + Prometheus        │
+                                  │ istio-ingressgateway (NLB + PP)    │
+         sigma-agent              │ istio-eastwestgateway              │
+           register/heartbeat ──→ │                                    │
+           (走 central-platform)  └────────────────────────────────────┘
+                                             ▲
+                                             │ HTTPS via NLB
+                                             │ (ingress gateway 终结 TLS)
+                                ┌────────────┼────────────┐
+                                │            │            │
+                           ┌────────┐  ┌────────┐  ┌────────┐
+                           │ VPS JP │  │ VPS HK │  │ VPS US │
+                           │ XrayR  │  │ XrayR  │  │ XrayR  │
+                           │ sigma- │  │ sigma- │  │ sigma- │
+                           │ agent  │  │ agent  │  │ agent  │
+                           │        │  │        │  │        │
+                           │ 无Istio │  │ 无Istio │  │ 无Istio │
+                           └────────┘  └────────┘  └────────┘
+```
+
+## 流量路径
+
+XrayR 每 60s 轮询 Xboard API（配置拉取、心跳、流量上报）：
+
+```
+XrayR (VPS)
+  → HTTPS POST /api/v1/server/...
+  → DNS 解析 → NLB (proxy protocol 保留真实 IP)
+  → istio-ingressgateway (终结 TLS, 设置 X-Forwarded-For)
+  → Xboard pod sidecar (入站, 只看到 gateway pod IP)
+  → Xboard app container
+  → response 原路返回
+```
+
+## 可见性对照
+
+| 已有 (Kiali) | 缺失 | 可通过替代方案获得 |
+|-------------|------|------------------|
+| ingressgateway → xboard 请求量/错误/延迟 | per-VPS 流量区分 | 方案 A/B/C |
+| xboard → mysql/redis 内部调用链 | VPS 出站侧指标 | 方案 B |
+| K8s 内服务间拓扑 | VPS 之间的流量 | N/A |
+| 整体错误率、延迟分布 | 单个 VPS 的错误/延迟 | 方案 A/B/C |
