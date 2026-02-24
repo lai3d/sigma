@@ -376,3 +376,35 @@ export interface EnvoyRouteListQuery {
 export interface BatchCreateEnvoyRoutes {
   routes: CreateEnvoyRoute[];
 }
+
+// ─── Envoy Topology ────────────────────────────────────────
+
+export interface TopologyNode {
+  id: string;
+  hostname: string;
+  alias: string;
+  country: string;
+  purpose: string;
+  status: string;
+  ip_addresses: IpEntry[];
+}
+
+export interface TopologyRouteInfo {
+  name: string;
+  listen_port: number;
+  backend_host: string | null;
+  backend_port: number | null;
+  proxy_protocol: number;
+}
+
+export interface TopologyEdge {
+  source_vps_id: string;
+  target_vps_id: string | null;
+  target_external: string | null;
+  routes: TopologyRouteInfo[];
+}
+
+export interface TopologyResponse {
+  nodes: TopologyNode[];
+  edges: TopologyEdge[];
+}

@@ -12,6 +12,7 @@ use crate::models::{
     PaginatedIpCheckResponse, PaginatedProviderResponse, PaginatedTicketResponse,
     PaginatedUserResponse, PaginatedVpsResponse, PrometheusTarget, Provider, Ticket,
     TicketComment, TotpChallengeResponse, TotpDisableRequest, TotpLoginRequest,
+    TopologyEdge, TopologyNode, TopologyResponse, TopologyRouteInfo,
     TotpSetupResponse, TotpVerifyRequest, UpdateEnvoyNode, UpdateEnvoyRoute, UpdateExchangeRate,
     UpdateProvider, UpdateTicket, UpdateUser, UpdateVps, UserResponse, Vps,
 };
@@ -101,6 +102,7 @@ use crate::models::{
         crate::routes::envoy::update_route,
         crate::routes::envoy::delete_route,
         crate::routes::envoy::batch_create_routes,
+        crate::routes::envoy::get_topology,
     ),
     components(schemas(
         ErrorResponse,
@@ -125,6 +127,7 @@ use crate::models::{
         EnvoyNode, CreateEnvoyNode, UpdateEnvoyNode, PaginatedEnvoyNodeResponse,
         EnvoyRoute, CreateEnvoyRoute, UpdateEnvoyRoute, PaginatedEnvoyRouteResponse,
         BatchCreateEnvoyRoutes,
+        TopologyNode, TopologyRouteInfo, TopologyEdge, TopologyResponse,
     )),
     tags(
         (name = "Auth", description = "Authentication and session management"),

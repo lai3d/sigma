@@ -113,3 +113,12 @@ export function useBatchCreateEnvoyRoutes() {
     },
   });
 }
+
+// ─── Topology ────────────────────────────────────────────
+
+export function useEnvoyTopology() {
+  return useQuery({
+    queryKey: ['envoy-topology'],
+    queryFn: () => api.getEnvoyTopology(),
+  });
+}

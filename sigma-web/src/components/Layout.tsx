@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Server, Building2, Settings, Users, ClipboardList, Ticket, Network, LogOut } from 'lucide-react';
+import { LayoutDashboard, Server, Building2, Settings, Users, ClipboardList, Ticket, Network, GitBranch, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -12,6 +12,7 @@ export default function Layout() {
     { to: '/providers', icon: Building2, label: 'Providers' },
     { to: '/tickets', icon: Ticket, label: 'Tickets' },
     { to: '/envoy', icon: Network, label: 'Envoy' },
+    { to: '/topology', icon: GitBranch, label: 'Topology' },
     ...(user?.role === 'admin'
       ? [
           { to: '/users', icon: Users, label: 'Users' },

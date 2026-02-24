@@ -7,10 +7,13 @@ use uuid::Uuid;
 
 use crate::auth::{require_role, CurrentUser};
 use crate::errors::AppError;
+use std::collections::{HashMap, HashSet};
+
 use crate::models::{
     BatchCreateEnvoyRoutes, CreateEnvoyNode, CreateEnvoyRoute, EnvoyNode, EnvoyNodeListQuery,
-    EnvoyRoute, EnvoyRouteListQuery, PaginatedEnvoyNodeResponse, PaginatedEnvoyRouteResponse,
-    PaginatedResponse, UpdateEnvoyNode, UpdateEnvoyRoute,
+    EnvoyRoute, EnvoyRouteListQuery, IpEntry, PaginatedEnvoyNodeResponse,
+    PaginatedEnvoyRouteResponse, PaginatedResponse, TopologyEdge, TopologyNode,
+    TopologyResponse, TopologyRouteInfo, UpdateEnvoyNode, UpdateEnvoyRoute,
 };
 use crate::routes::audit_logs::log_audit;
 use crate::routes::AppState;
@@ -28,6 +31,7 @@ pub fn router() -> Router<AppState> {
             "/api/envoy-routes/{id}",
             get(get_route).put(update_route).delete(delete_route),
         )
+        .route("/api/envoy-topology", get(get_topology))
 }
 
 // ─── Envoy Nodes ─────────────────────────────────────────
@@ -654,4 +658,133 @@ pub async fn batch_create_routes(
     .await;
 
     Ok(Json(created))
+}
+
+// ─── Topology ────────────────────────────────────────────
+
+#[derive(sqlx::FromRow)]
+struct RouteWithSource {
+    route_name: String,
+    listen_port: i32,
+    backend_host: Option<String>,
+    backend_port: Option<i32>,
+    proxy_protocol: i32,
+    source_vps_id: Uuid,
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/envoy-topology",
+    tag = "Envoy",
+    responses(
+        (status = 200, body = TopologyResponse),
+    )
+)]
+pub async fn get_topology(
+    State(state): State<AppState>,
+) -> Result<Json<TopologyResponse>, AppError> {
+    // 1. Fetch active routes joined with envoy_nodes to get source vps_id
+    let rows = sqlx::query_as::<_, RouteWithSource>(
+        r#"SELECT
+             r.name AS route_name,
+             r.listen_port,
+             r.backend_host,
+             r.backend_port,
+             r.proxy_protocol,
+             n.vps_id AS source_vps_id
+           FROM envoy_routes r
+           JOIN envoy_nodes n ON n.id = r.envoy_node_id
+           WHERE r.status = 'active' AND n.status = 'active'"#,
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    // 2. Fetch all non-retired VPS
+    let all_vps = sqlx::query_as::<_, crate::models::Vps>(
+        "SELECT * FROM vps WHERE status != 'retired'",
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    // 3. Build lookup maps: hostname→VPS, ip→VPS
+    let mut hostname_map: HashMap<&str, &crate::models::Vps> = HashMap::new();
+    let mut ip_map: HashMap<&str, &crate::models::Vps> = HashMap::new();
+    let mut vps_by_id: HashMap<Uuid, &crate::models::Vps> = HashMap::new();
+
+    for v in &all_vps {
+        hostname_map.insert(&v.hostname, v);
+        vps_by_id.insert(v.id, v);
+        for entry in v.ip_addresses.iter() {
+            ip_map.insert(&entry.ip, v);
+        }
+    }
+
+    // 4. Resolve backend_host → target VPS, group edges
+    let mut edge_map: HashMap<(Uuid, Option<Uuid>, Option<String>), Vec<TopologyRouteInfo>> =
+        HashMap::new();
+    let mut involved: HashSet<Uuid> = HashSet::new();
+
+    for r in &rows {
+        let backend = match &r.backend_host {
+            Some(h) if !h.is_empty() => h,
+            _ => continue, // skip placeholder routes
+        };
+
+        involved.insert(r.source_vps_id);
+
+        let (target_id, target_ext) =
+            if let Some(v) = hostname_map.get(backend.as_str()) {
+                involved.insert(v.id);
+                (Some(v.id), None)
+            } else if let Some(v) = ip_map.get(backend.as_str()) {
+                involved.insert(v.id);
+                (Some(v.id), None)
+            } else {
+                (None, Some(backend.clone()))
+            };
+
+        let key = (r.source_vps_id, target_id, target_ext);
+        edge_map.entry(key).or_default().push(TopologyRouteInfo {
+            name: r.route_name.clone(),
+            listen_port: r.listen_port,
+            backend_host: r.backend_host.clone(),
+            backend_port: r.backend_port,
+            proxy_protocol: r.proxy_protocol,
+        });
+    }
+
+    // 5. Build response nodes (only VPS that participate in edges)
+    let nodes: Vec<TopologyNode> = involved
+        .iter()
+        .filter_map(|id| vps_by_id.get(id))
+        .map(|v| TopologyNode {
+            id: v.id,
+            hostname: v.hostname.clone(),
+            alias: v.alias.clone(),
+            country: v.country.clone(),
+            purpose: v.purpose.clone(),
+            status: v.status.clone(),
+            ip_addresses: v
+                .ip_addresses
+                .iter()
+                .map(|e| IpEntry {
+                    ip: e.ip.clone(),
+                    label: e.label.clone(),
+                })
+                .collect(),
+        })
+        .collect();
+
+    // 6. Build response edges
+    let edges: Vec<TopologyEdge> = edge_map
+        .into_iter()
+        .map(|((src, tgt, ext), routes)| TopologyEdge {
+            source_vps_id: src,
+            target_vps_id: tgt,
+            target_external: ext,
+            routes,
+        })
+        .collect();
+
+    Ok(Json(TopologyResponse { nodes, edges }))
 }

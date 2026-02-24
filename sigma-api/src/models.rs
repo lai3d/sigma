@@ -886,6 +886,43 @@ pub struct BatchCreateEnvoyRoutes {
     pub routes: Vec<CreateEnvoyRoute>,
 }
 
+// ─── Envoy Topology ─────────────────────────────────────
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TopologyNode {
+    pub id: Uuid,
+    pub hostname: String,
+    pub alias: String,
+    pub country: String,
+    pub purpose: String,
+    pub status: String,
+    #[schema(value_type = Vec<IpEntry>)]
+    pub ip_addresses: Vec<IpEntry>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TopologyRouteInfo {
+    pub name: String,
+    pub listen_port: i32,
+    pub backend_host: Option<String>,
+    pub backend_port: Option<i32>,
+    pub proxy_protocol: i32,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TopologyEdge {
+    pub source_vps_id: Uuid,
+    pub target_vps_id: Option<Uuid>,
+    pub target_external: Option<String>,
+    pub routes: Vec<TopologyRouteInfo>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TopologyResponse {
+    pub nodes: Vec<TopologyNode>,
+    pub edges: Vec<TopologyEdge>,
+}
+
 fn default_active() -> String { "active".into() }
 fn default_cluster_type() -> String { "logical_dns".into() }
 fn default_connect_timeout() -> i32 { 5 }

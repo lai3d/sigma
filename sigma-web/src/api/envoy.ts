@@ -10,6 +10,7 @@ import type {
   EnvoyRouteListQuery,
   BatchCreateEnvoyRoutes,
   PaginatedResponse,
+  TopologyResponse,
 } from '@/types/api';
 
 // ─── Envoy Nodes ─────────────────────────────────────────
@@ -82,5 +83,12 @@ export async function deleteEnvoyRoute(id: string): Promise<void> {
 
 export async function batchCreateEnvoyRoutes(input: BatchCreateEnvoyRoutes): Promise<EnvoyRoute[]> {
   const { data } = await apiClient.post('/envoy-routes/batch', input);
+  return data;
+}
+
+// ─── Topology ────────────────────────────────────────────
+
+export async function getEnvoyTopology(): Promise<TopologyResponse> {
+  const { data } = await apiClient.get('/envoy-topology');
   return data;
 }
