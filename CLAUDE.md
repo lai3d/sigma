@@ -36,6 +36,9 @@ sigma/
 - **Provider** — cloud platform vendor (e.g. any VPS hosting company)
 - **VPS** — individual server instance with lifecycle: provisioning → active → retiring → retired
 - **ip_checks** — table for tracking IP reachability from China (API done, probe: `sigma-probe/`)
+- **dns_accounts** — DNS provider accounts (Cloudflare, Route 53, GoDaddy, Name.com) with `provider_type` and JSONB `config`
+- **dns_zones** — synced DNS zones per account, with domain/cert expiry tracking
+- **dns_records** — synced DNS records with auto VPS-IP linking and provider-specific `extra` JSONB
 
 ### VPS fields of note:
 - `ip_addresses` — JSONB array of `{ip, label}` objects. Labels: `china-telecom`, `china-unicom`, `china-mobile`, `china-cernet`, `overseas`, `internal`, `anycast`
@@ -95,6 +98,7 @@ sigma/
 - [x] Agent port allocation (`POST /ports/allocate` on agent, proxied via API)
 - [x] Grafana dashboard for port scan metrics (`grafana/dashboards/port-scan.json`)
 - [x] Envoy xDS control plane (sigma-agent as gRPC xDS server, config stored in PostgreSQL, hot reload via LDS/CDS)
+- [x] Multi-provider DNS management (Cloudflare, Route 53, GoDaddy, Name.com — read-only sync with VPS-IP linking, domain/cert expiry tracking)
 
 ## Tech Stack
 
