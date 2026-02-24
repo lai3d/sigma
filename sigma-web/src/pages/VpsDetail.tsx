@@ -202,7 +202,7 @@ export default function VpsDetail() {
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-gray-700">Port Allocation</h3>
             <div className="flex items-center gap-2">
-              {[5, 10, 20].map((n) => (
+              {[1, 5, 10, 20].map((n) => (
                 <button
                   key={n}
                   onClick={() => handleAllocatePorts(n)}
