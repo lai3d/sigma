@@ -3,18 +3,22 @@ use utoipa::OpenApi;
 use crate::errors::ErrorResponse;
 #[allow(unused_imports)]
 use crate::models::{
-    AgentHeartbeat, AgentRegister, BatchCreateEnvoyRoutes, ChangePasswordRequest, ConvertedTotal, CostMonthlyResponse,
-    CostSummaryResponse, CountStat, CreateEnvoyNode, CreateEnvoyRoute, CreateExchangeRate,
+    AgentHeartbeat, AgentRegister, BatchCreateEnvoyRoutes, ChangePasswordRequest,
+    CloudflareAccountResponse, CloudflareDnsRecord, CloudflareSyncResult, CloudflareZone,
+    ConvertedTotal, CostMonthlyResponse, CostSummaryResponse, CountStat,
+    CreateCloudflareAccount, CreateEnvoyNode, CreateEnvoyRoute, CreateExchangeRate,
     CreateIpCheck, CreateProvider, CreateTicket, CreateTicketComment, CreateUser, CreateVps,
     CurrencyBreakdown, DashboardStats, EnvoyNode, EnvoyRoute, ExchangeRate, ImportRequest,
     ImportResult, IpCheck, IpCheckSummary, IpEntry, LoginRequest, LoginResponse, MonthlyCostEntry,
-    PaginatedEnvoyNodeResponse, PaginatedEnvoyRouteResponse, PaginatedExchangeRateResponse,
-    PaginatedIpCheckResponse, PaginatedProviderResponse, PaginatedTicketResponse,
-    PaginatedUserResponse, PaginatedVpsResponse, PrometheusTarget, Provider, Ticket,
-    TicketComment, TotpChallengeResponse, TotpDisableRequest, TotpLoginRequest,
+    PaginatedCloudflareAccountResponse, PaginatedCloudflareDnsResponse,
+    PaginatedCloudflareZoneResponse, PaginatedEnvoyNodeResponse, PaginatedEnvoyRouteResponse,
+    PaginatedExchangeRateResponse, PaginatedIpCheckResponse, PaginatedProviderResponse,
+    PaginatedTicketResponse, PaginatedUserResponse, PaginatedVpsResponse, PrometheusTarget,
+    Provider, Ticket, TicketComment, TotpChallengeResponse, TotpDisableRequest, TotpLoginRequest,
     TopologyEdge, TopologyNode, TopologyResponse, TopologyRouteInfo,
-    TotpSetupResponse, TotpVerifyRequest, UpdateEnvoyNode, UpdateEnvoyRoute, UpdateExchangeRate,
-    UpdateProvider, UpdateTicket, UpdateUser, UpdateVps, UserResponse, Vps,
+    TotpSetupResponse, TotpVerifyRequest, UpdateCloudflareAccount, UpdateEnvoyNode,
+    UpdateEnvoyRoute, UpdateExchangeRate, UpdateProvider, UpdateTicket, UpdateUser, UpdateVps,
+    UserResponse, Vps,
 };
 
 #[derive(OpenApi)]
@@ -103,6 +107,15 @@ use crate::models::{
         crate::routes::envoy::delete_route,
         crate::routes::envoy::batch_create_routes,
         crate::routes::envoy::get_topology,
+        // Cloudflare
+        crate::routes::cloudflare::list_accounts,
+        crate::routes::cloudflare::get_account,
+        crate::routes::cloudflare::create_account,
+        crate::routes::cloudflare::update_account,
+        crate::routes::cloudflare::delete_account,
+        crate::routes::cloudflare::sync_account,
+        crate::routes::cloudflare::list_zones,
+        crate::routes::cloudflare::list_dns_records,
     ),
     components(schemas(
         ErrorResponse,
@@ -128,6 +141,10 @@ use crate::models::{
         EnvoyRoute, CreateEnvoyRoute, UpdateEnvoyRoute, PaginatedEnvoyRouteResponse,
         BatchCreateEnvoyRoutes,
         TopologyNode, TopologyRouteInfo, TopologyEdge, TopologyResponse,
+        CloudflareAccountResponse, CreateCloudflareAccount, UpdateCloudflareAccount,
+        CloudflareZone, CloudflareDnsRecord, CloudflareSyncResult,
+        PaginatedCloudflareAccountResponse, PaginatedCloudflareZoneResponse,
+        PaginatedCloudflareDnsResponse,
     )),
     tags(
         (name = "Auth", description = "Authentication and session management"),
@@ -143,6 +160,7 @@ use crate::models::{
         (name = "Costs", description = "Cost tracking and reporting"),
         (name = "Tickets", description = "Issue tracking and ticket management"),
         (name = "Envoy", description = "Envoy xDS control plane — nodes and routes"),
+        (name = "Cloudflare", description = "Cloudflare DNS domain management (read-only sync)"),
     )
 )]
 pub struct ApiDoc;

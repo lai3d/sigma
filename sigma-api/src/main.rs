@@ -104,6 +104,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(routes::audit_logs::router())
         .merge(routes::tickets::router())
         .merge(routes::envoy::router())
+        .merge(routes::cloudflare::router())
         .layer(axum::middleware::from_fn_with_state(
             app_state.clone(),
             routes::rate_limit::rate_limit,

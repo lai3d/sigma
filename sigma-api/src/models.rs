@@ -935,3 +935,135 @@ fn default_currency() -> String { "USD".into() }
 fn default_status() -> String { "provisioning".into() }
 fn default_true() -> bool { true }
 fn default_node_exporter_port() -> i32 { 9100 }
+
+// ─── Cloudflare ──────────────────────────────────────────
+
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+pub struct CloudflareAccount {
+    pub id: Uuid,
+    pub name: String,
+    #[serde(skip_serializing)]
+    pub api_token: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CloudflareAccountResponse {
+    pub id: Uuid,
+    pub name: String,
+    pub masked_token: String,
+    pub zones_count: i64,
+    pub records_count: i64,
+    pub last_synced: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateCloudflareAccount {
+    pub name: String,
+    pub api_token: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateCloudflareAccount {
+    pub name: Option<String>,
+    pub api_token: Option<String>,
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+pub struct CloudflareZone {
+    pub id: Uuid,
+    pub account_id: Uuid,
+    pub zone_id: String,
+    pub zone_name: String,
+    pub status: String,
+    pub domain_expires_at: Option<DateTime<Utc>>,
+    pub cert_expires_at: Option<DateTime<Utc>>,
+    pub synced_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct CloudflareZoneListQuery {
+    pub account_id: Option<Uuid>,
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_per_page")]
+    pub per_page: i64,
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+pub struct CloudflareDnsRecord {
+    pub id: Uuid,
+    pub zone_uuid: Uuid,
+    pub record_id: String,
+    pub record_type: String,
+    pub name: String,
+    pub content: String,
+    pub ttl: i32,
+    pub proxied: bool,
+    pub vps_id: Option<Uuid>,
+    pub synced_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    // joined fields
+    pub zone_name: Option<String>,
+    pub zone_id_cf: Option<String>,
+    pub vps_hostname: Option<String>,
+    pub vps_country: Option<String>,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct CloudflareDnsListQuery {
+    pub account_id: Option<Uuid>,
+    pub zone_name: Option<String>,
+    pub record_type: Option<String>,
+    pub has_vps: Option<bool>,
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_per_page")]
+    pub per_page: i64,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CloudflareSyncResult {
+    pub zones_count: i64,
+    pub records_count: i64,
+    pub records_linked: i64,
+    pub records_deleted: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct PaginatedCloudflareAccountResponse {
+    pub data: Vec<CloudflareAccountResponse>,
+    pub total: i64,
+    pub page: i64,
+    pub per_page: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct PaginatedCloudflareZoneResponse {
+    pub data: Vec<CloudflareZone>,
+    pub total: i64,
+    pub page: i64,
+    pub per_page: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct PaginatedCloudflareDnsResponse {
+    pub data: Vec<CloudflareDnsRecord>,
+    pub total: i64,
+    pub page: i64,
+    pub per_page: i64,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct CloudflareAccountListQuery {
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_per_page")]
+    pub per_page: i64,
+}

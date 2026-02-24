@@ -408,3 +408,80 @@ export interface TopologyResponse {
   nodes: TopologyNode[];
   edges: TopologyEdge[];
 }
+
+// ─── Cloudflare ────────────────────────────────────────────
+
+export interface CloudflareAccountResponse {
+  id: string;
+  name: string;
+  masked_token: string;
+  zones_count: number;
+  records_count: number;
+  last_synced: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateCloudflareAccount {
+  name: string;
+  api_token: string;
+}
+
+export interface UpdateCloudflareAccount {
+  name?: string;
+  api_token?: string;
+}
+
+export interface CloudflareZone {
+  id: string;
+  account_id: string;
+  zone_id: string;
+  zone_name: string;
+  status: string;
+  domain_expires_at: string | null;
+  cert_expires_at: string | null;
+  synced_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CloudflareDnsRecord {
+  id: string;
+  zone_uuid: string;
+  record_id: string;
+  record_type: string;
+  name: string;
+  content: string;
+  ttl: number;
+  proxied: boolean;
+  vps_id: string | null;
+  synced_at: string;
+  created_at: string;
+  updated_at: string;
+  zone_name: string | null;
+  zone_id_cf: string | null;
+  vps_hostname: string | null;
+  vps_country: string | null;
+}
+
+export interface CloudflareSyncResult {
+  zones_count: number;
+  records_count: number;
+  records_linked: number;
+  records_deleted: number;
+}
+
+export interface CloudflareZoneListQuery {
+  account_id?: string;
+  page?: number;
+  per_page?: number;
+}
+
+export interface CloudflareDnsListQuery {
+  account_id?: string;
+  zone_name?: string;
+  record_type?: string;
+  has_vps?: boolean;
+  page?: number;
+  per_page?: number;
+}
