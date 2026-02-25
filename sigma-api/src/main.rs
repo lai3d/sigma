@@ -105,6 +105,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(routes::tickets::router())
         .merge(routes::envoy::router())
         .merge(routes::dns::router())
+        .merge(routes::vps_purposes::router())
         .layer(axum::middleware::from_fn_with_state(
             app_state.clone(),
             routes::rate_limit::rate_limit,

@@ -14,6 +14,7 @@ pub mod stats;
 pub mod tickets;
 pub mod users;
 pub mod vps;
+pub mod vps_purposes;
 
 use axum::{
     extract::Request,

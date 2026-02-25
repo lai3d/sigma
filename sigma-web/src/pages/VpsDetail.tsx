@@ -6,6 +6,7 @@ import { useProvider } from '@/hooks/useProviders';
 import { useTickets } from '@/hooks/useTickets';
 import { useEnvoyNodes, useBatchCreateEnvoyRoutes } from '@/hooks/useEnvoy';
 import { useAuth } from '@/contexts/AuthContext';
+import { useVpsPurposes } from '@/hooks/useVpsPurposes';
 import StatusBadge from '@/components/StatusBadge';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { formatDate, daysUntil, timeAgo, formatUptime, ipLabelColor, ipLabelShort, tagStyle } from '@/lib/utils';
@@ -34,6 +35,8 @@ export default function VpsDetail() {
   const { data: vps, isLoading } = useVps(id || '');
   const { data: provider } = useProvider(vps?.provider_id || '');
   const { data: ticketsResult } = useTickets({ vps_id: id, per_page: 10 });
+  const { data: purposesResult } = useVpsPurposes({ per_page: 100 });
+  const purposeLabel = purposesResult?.data.find(p => p.name === vps?.purpose)?.label;
   const deleteMutation = useDeleteVps();
   const retireMutation = useRetireVps();
 
@@ -330,7 +333,7 @@ export default function VpsDetail() {
             )}
             <div className="flex justify-between">
               <dt className="text-gray-500">Purpose</dt>
-              <dd className="text-gray-700">{vps.purpose || '-'}</dd>
+              <dd className="text-gray-700">{purposeLabel || vps.purpose || '-'}</dd>
             </div>
             {vps.vpn_protocol && (
               <div className="flex justify-between">

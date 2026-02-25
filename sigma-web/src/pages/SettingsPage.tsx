@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Key, User, Shield, BarChart3 } from 'lucide-react';
+import { Key, User, Shield, BarChart3, Tags, Pencil, Trash2, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import * as authApi from '@/api/auth';
-import type { TotpSetupResponse } from '@/types/api';
+import { useVpsPurposes, useCreateVpsPurpose, useUpdateVpsPurpose, useDeleteVpsPurpose } from '@/hooks/useVpsPurposes';
+import { AVAILABLE_COLORS, getPurposeColor } from '@/lib/purposeColors';
+import type { TotpSetupResponse, VpsPurposeRecord } from '@/types/api';
 
 export default function SettingsPage() {
   const { user, updateUser } = useAuth();
@@ -21,6 +23,19 @@ export default function SettingsPage() {
   const [totpLoading, setTotpLoading] = useState(false);
   const [totpError, setTotpError] = useState('');
   const [totpSuccess, setTotpSuccess] = useState('');
+
+  // VPS Purposes state
+  const canMutate = user?.role === 'admin' || user?.role === 'operator';
+  const { data: purposesResult } = useVpsPurposes({ per_page: 100 });
+  const purposes = purposesResult?.data ?? [];
+  const createPurpose = useCreateVpsPurpose();
+  const updatePurpose = useUpdateVpsPurpose();
+  const deletePurpose = useDeleteVpsPurpose();
+  const [editingPurpose, setEditingPurpose] = useState<string | null>(null);
+  const [addingPurpose, setAddingPurpose] = useState(false);
+  const [purposeForm, setPurposeForm] = useState({ name: '', label: '', color: 'gray', sort_order: 0 });
+  const [purposeError, setPurposeError] = useState('');
+  const [confirmDeletePurpose, setConfirmDeletePurpose] = useState<VpsPurposeRecord | null>(null);
 
   useEffect(() => {
     setApiKey(localStorage.getItem('sigma_api_key') || '');
@@ -235,6 +250,250 @@ export default function SettingsPage() {
                 {totpLoading ? 'Disabling...' : 'Disable 2FA'}
               </button>
             </form>
+          )}
+        </div>
+      )}
+
+      {/* VPS Purposes Card */}
+      {canMutate && (
+        <div className="mt-4 max-w-2xl bg-white rounded-lg border p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-gray-700">
+              <Tags size={18} />
+              <h3 className="text-sm font-semibold">VPS Purposes</h3>
+            </div>
+            {!addingPurpose && (
+              <button
+                onClick={() => {
+                  setPurposeForm({ name: '', label: '', color: 'gray', sort_order: purposes.length + 1 });
+                  setAddingPurpose(true);
+                  setEditingPurpose(null);
+                  setPurposeError('');
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              >
+                <Plus size={14} /> Add Purpose
+              </button>
+            )}
+          </div>
+
+          {purposeError && (
+            <div className="p-3 text-sm text-red-700 bg-red-50 rounded-md">{purposeError}</div>
+          )}
+
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-gray-500 border-b">
+                <th className="pb-2 font-medium">Name</th>
+                <th className="pb-2 font-medium">Label</th>
+                <th className="pb-2 font-medium">Color</th>
+                <th className="pb-2 font-medium">Order</th>
+                <th className="pb-2 font-medium w-20"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {purposes.map((p) => (
+                editingPurpose === p.id ? (
+                  <tr key={p.id} className="border-b">
+                    <td className="py-2 pr-2">
+                      <input
+                        value={purposeForm.name}
+                        onChange={(e) => setPurposeForm({ ...purposeForm, name: e.target.value })}
+                        className="input w-full text-sm"
+                      />
+                    </td>
+                    <td className="py-2 pr-2">
+                      <input
+                        value={purposeForm.label}
+                        onChange={(e) => setPurposeForm({ ...purposeForm, label: e.target.value })}
+                        className="input w-full text-sm"
+                      />
+                    </td>
+                    <td className="py-2 pr-2">
+                      <select
+                        value={purposeForm.color}
+                        onChange={(e) => setPurposeForm({ ...purposeForm, color: e.target.value })}
+                        className="input text-sm"
+                      >
+                        {AVAILABLE_COLORS.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-2 pr-2">
+                      <input
+                        type="number"
+                        value={purposeForm.sort_order}
+                        onChange={(e) => setPurposeForm({ ...purposeForm, sort_order: Number(e.target.value) })}
+                        className="input w-16 text-sm"
+                      />
+                    </td>
+                    <td className="py-2">
+                      <div className="flex gap-1">
+                        <button
+                          onClick={async () => {
+                            setPurposeError('');
+                            try {
+                              await updatePurpose.mutateAsync({ id: p.id, data: purposeForm });
+                              setEditingPurpose(null);
+                            } catch (err: unknown) {
+                              const msg = err instanceof Error ? err.message : 'Failed to update';
+                              setPurposeError(msg);
+                            }
+                          }}
+                          className="px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setEditingPurpose(null)}
+                          className="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={p.id} className="border-b">
+                    <td className="py-2 pr-2 font-mono text-xs">{p.name}</td>
+                    <td className="py-2 pr-2">{p.label}</td>
+                    <td className="py-2 pr-2">
+                      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium ${getPurposeColor(p.color).badge}`}>
+                        <span className={`w-2 h-2 rounded-full ${getPurposeColor(p.color).bg} border ${getPurposeColor(p.color).border}`} />
+                        {p.color}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-2 text-gray-500">{p.sort_order}</td>
+                    <td className="py-2">
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => {
+                            setPurposeForm({ name: p.name, label: p.label, color: p.color, sort_order: p.sort_order });
+                            setEditingPurpose(p.id);
+                            setAddingPurpose(false);
+                            setPurposeError('');
+                          }}
+                          className="p-1 text-gray-400 hover:text-blue-600"
+                          title="Edit"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeletePurpose(p)}
+                          className="p-1 text-gray-400 hover:text-red-600"
+                          title="Delete"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              ))}
+              {addingPurpose && (
+                <tr className="border-b">
+                  <td className="py-2 pr-2">
+                    <input
+                      value={purposeForm.name}
+                      onChange={(e) => setPurposeForm({ ...purposeForm, name: e.target.value })}
+                      className="input w-full text-sm"
+                      placeholder="e.g. cdn-node"
+                    />
+                  </td>
+                  <td className="py-2 pr-2">
+                    <input
+                      value={purposeForm.label}
+                      onChange={(e) => setPurposeForm({ ...purposeForm, label: e.target.value })}
+                      className="input w-full text-sm"
+                      placeholder="e.g. CDN Node"
+                    />
+                  </td>
+                  <td className="py-2 pr-2">
+                    <select
+                      value={purposeForm.color}
+                      onChange={(e) => setPurposeForm({ ...purposeForm, color: e.target.value })}
+                      className="input text-sm"
+                    >
+                      {AVAILABLE_COLORS.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="py-2 pr-2">
+                    <input
+                      type="number"
+                      value={purposeForm.sort_order}
+                      onChange={(e) => setPurposeForm({ ...purposeForm, sort_order: Number(e.target.value) })}
+                      className="input w-16 text-sm"
+                    />
+                  </td>
+                  <td className="py-2">
+                    <div className="flex gap-1">
+                      <button
+                        onClick={async () => {
+                          setPurposeError('');
+                          if (!purposeForm.name.trim() || !purposeForm.label.trim()) {
+                            setPurposeError('Name and label are required');
+                            return;
+                          }
+                          try {
+                            await createPurpose.mutateAsync(purposeForm);
+                            setAddingPurpose(false);
+                          } catch (err: unknown) {
+                            const msg = err instanceof Error ? err.message : 'Failed to create';
+                            setPurposeError(msg);
+                          }
+                        }}
+                        className="px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+                      >
+                        Add
+                      </button>
+                      <button
+                        onClick={() => setAddingPurpose(false)}
+                        className="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+
+          {/* Delete confirmation */}
+          {confirmDeletePurpose && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-sm text-red-700">
+                Delete purpose <strong>{confirmDeletePurpose.label}</strong> ({confirmDeletePurpose.name})?
+                This will fail if any VPS instances use it.
+              </p>
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={async () => {
+                    setPurposeError('');
+                    try {
+                      await deletePurpose.mutateAsync(confirmDeletePurpose.id);
+                      setConfirmDeletePurpose(null);
+                    } catch (err: unknown) {
+                      const msg = err instanceof Error ? err.message : 'Failed to delete';
+                      setPurposeError(msg);
+                      setConfirmDeletePurpose(null);
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded hover:bg-red-700"
+                >
+                  Delete
+                </button>
+                <button
+                  onClick={() => setConfirmDeletePurpose(null)}
+                  className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           )}
         </div>
       )}

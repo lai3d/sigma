@@ -16,18 +16,9 @@ import {
 import '@xyflow/react/dist/style.css';
 import dagre from 'dagre';
 import { useEnvoyTopology } from '@/hooks/useEnvoy';
+import { useVpsPurposes } from '@/hooks/useVpsPurposes';
+import { buildPurposeColorMap, buildPurposeLabelMap, getPurposeColor } from '@/lib/purposeColors';
 import type { TopologyNode, TopologyEdge, TopologyRouteInfo } from '@/types/api';
-
-// ─── Constants ────────────────────────────────────────────
-
-const PURPOSE_COLORS: Record<string, { bg: string; border: string; badge: string }> = {
-  'vpn-relay':  { bg: 'bg-blue-50',   border: 'border-blue-300',   badge: 'bg-blue-100 text-blue-700' },
-  'vpn-exit':   { bg: 'bg-green-50',  border: 'border-green-300',  badge: 'bg-green-100 text-green-700' },
-  'vpn-entry':  { bg: 'bg-orange-50', border: 'border-orange-300', badge: 'bg-orange-100 text-orange-700' },
-  'monitor':    { bg: 'bg-purple-50', border: 'border-purple-300', badge: 'bg-purple-100 text-purple-700' },
-  'management':    { bg: 'bg-gray-50',   border: 'border-gray-300',   badge: 'bg-gray-100 text-gray-700' },
-  'core-services': { bg: 'bg-cyan-50',   border: 'border-cyan-300',   badge: 'bg-cyan-100 text-cyan-700' },
-};
 
 const NODE_WIDTH = 200;
 const NODE_HEIGHT = 80;
@@ -39,11 +30,13 @@ interface VpsNodeData {
   alias: string;
   country: string;
   purpose: string;
+  purposeLabel?: string;
   [key: string]: unknown;
 }
 
 function VpsNode({ data }: { data: VpsNodeData }) {
-  const colors = PURPOSE_COLORS[data.purpose] || PURPOSE_COLORS['management'];
+  const colorMap = data._colorMap as Record<string, ReturnType<typeof getPurposeColor>> | undefined;
+  const colors = colorMap?.[data.purpose] ?? getPurposeColor('gray');
   return (
     <>
       <Handle type="target" position={Position.Left} />
@@ -58,7 +51,7 @@ function VpsNode({ data }: { data: VpsNodeData }) {
           <div className="text-xs text-gray-500 truncate">{data.alias}</div>
         )}
         <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-xs font-medium ${colors.badge}`}>
-          {data.purpose || 'unknown'}
+          {data.purposeLabel || data.purpose || 'unknown'}
         </span>
       </div>
       <Handle type="source" position={Position.Right} />
@@ -136,7 +129,12 @@ function getEdgeColor(routes: TopologyRouteInfo[]): string {
 
 // ─── Transform API → React Flow ──────────────────────────
 
-function buildFlowElements(apiNodes: TopologyNode[], apiEdges: TopologyEdge[]) {
+function buildFlowElements(
+  apiNodes: TopologyNode[],
+  apiEdges: TopologyEdge[],
+  colorMap: Record<string, { bg: string; border: string; badge: string; minimap: string }>,
+  labelMap: Record<string, string>,
+) {
   const flowNodes: Node[] = [];
   const flowEdges: Edge[] = [];
 
@@ -150,6 +148,8 @@ function buildFlowElements(apiNodes: TopologyNode[], apiEdges: TopologyEdge[]) {
         alias: n.alias,
         country: n.country,
         purpose: n.purpose,
+        purposeLabel: labelMap[n.purpose],
+        _colorMap: colorMap,
       },
     });
   }
@@ -196,12 +196,17 @@ function buildFlowElements(apiNodes: TopologyNode[], apiEdges: TopologyEdge[]) {
 
 export default function TopologyPage() {
   const { data, isLoading, error } = useEnvoyTopology();
+  const { data: purposesResult } = useVpsPurposes({ per_page: 100 });
+  const purposes = purposesResult?.data ?? [];
+
+  const colorMap = useMemo(() => buildPurposeColorMap(purposes), [purposes]);
+  const labelMap = useMemo(() => buildPurposeLabelMap(purposes), [purposes]);
 
   const { layoutNodes, layoutEdges } = useMemo(() => {
     if (!data) return { layoutNodes: [] as Node[], layoutEdges: [] as Edge[] };
-    const { nodes, edges } = buildFlowElements(data.nodes, data.edges);
+    const { nodes, edges } = buildFlowElements(data.nodes, data.edges, colorMap, labelMap);
     return { layoutNodes: nodes, layoutEdges: edges };
-  }, [data]);
+  }, [data, colorMap, labelMap]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -244,16 +249,15 @@ export default function TopologyPage() {
     <div>
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">Network Topology</h2>
-        <div className="flex items-center gap-3 text-xs text-gray-500">
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded bg-blue-200 border border-blue-400" /> Relay
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded bg-green-200 border border-green-400" /> Exit
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded bg-orange-200 border border-orange-400" /> Entry
-          </span>
+        <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
+          {purposes.map((p) => {
+            const c = getPurposeColor(p.color);
+            return (
+              <span key={p.id} className="flex items-center gap-1">
+                <span className={`w-3 h-3 rounded ${c.bg} border ${c.border}`} /> {p.label}
+              </span>
+            );
+          })}
           <span className="flex items-center gap-1">
             <span className="w-3 h-3 rounded border-2 border-dashed border-red-300 bg-red-100" /> External
           </span>
@@ -282,10 +286,7 @@ export default function TopologyPage() {
             nodeColor={(node) => {
               if (node.type === 'externalNode') return '#fecaca';
               const purpose = (node.data as VpsNodeData)?.purpose;
-              if (purpose === 'vpn-relay') return '#93c5fd';
-              if (purpose === 'vpn-exit') return '#86efac';
-              if (purpose === 'vpn-entry') return '#fdba74';
-              return '#d1d5db';
+              return colorMap[purpose]?.minimap ?? '#d1d5db';
             }}
           />
         </ReactFlow>

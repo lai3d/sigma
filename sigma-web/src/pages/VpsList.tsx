@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Plus, Pencil, Trash2, Power } from 'lucide-react';
 import { useVpsList, useDeleteVps, useRetireVps, useImportVps } from '@/hooks/useVps';
 import { useProviders } from '@/hooks/useProviders';
+import { useVpsPurposes } from '@/hooks/useVpsPurposes';
 import StatusBadge from '@/components/StatusBadge';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import ImportExportButtons from '@/components/ImportExportButtons';
@@ -17,6 +18,7 @@ export default function VpsList() {
   const [page, setPage] = useState(1);
   const { data: result, isLoading } = useVpsList({ ...filters, page, per_page: 25 });
   const { data: providersResult } = useProviders();
+  const { data: purposesResult } = useVpsPurposes({ per_page: 100 });
   const deleteMutation = useDeleteVps();
   const retireMutation = useRetireVps();
   const importMutation = useImportVps();
@@ -72,12 +74,9 @@ export default function VpsList() {
           className="border rounded-md px-3 py-1.5 text-sm bg-white"
         >
           <option value="">All Purposes</option>
-          <option value="vpn-exit">VPN Exit</option>
-          <option value="vpn-relay">VPN Relay</option>
-          <option value="vpn-entry">VPN Entry</option>
-          <option value="monitor">Monitor</option>
-          <option value="management">Management</option>
-          <option value="core-services">Core Services</option>
+          {purposesResult?.data.map((p) => (
+            <option key={p.id} value={p.name}>{p.label}</option>
+          ))}
         </select>
 
         <select

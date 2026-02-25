@@ -959,6 +959,55 @@ fn default_cluster_type() -> String { "logical_dns".into() }
 fn default_connect_timeout() -> i32 { 5 }
 fn default_proxy_protocol() -> i32 { 1 }
 
+// ─── VPS Purposes ────────────────────────────────────────
+
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+pub struct VpsPurpose {
+    pub id: Uuid,
+    pub name: String,
+    pub label: String,
+    pub color: String,
+    pub sort_order: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateVpsPurpose {
+    pub name: String,
+    pub label: String,
+    #[serde(default = "default_color")]
+    pub color: String,
+    #[serde(default)]
+    pub sort_order: i32,
+}
+
+fn default_color() -> String { "gray".into() }
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateVpsPurpose {
+    pub name: Option<String>,
+    pub label: Option<String>,
+    pub color: Option<String>,
+    pub sort_order: Option<i32>,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct VpsPurposeListQuery {
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_per_page")]
+    pub per_page: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct PaginatedVpsPurposeResponse {
+    pub data: Vec<VpsPurpose>,
+    pub total: i64,
+    pub page: i64,
+    pub per_page: i64,
+}
+
 // ─── Defaults ────────────────────────────────────────────
 
 fn default_ssh_port() -> i32 { 22 }

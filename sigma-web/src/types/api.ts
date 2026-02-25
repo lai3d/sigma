@@ -1,5 +1,31 @@
 export type VpsStatus = 'provisioning' | 'active' | 'retiring' | 'retired';
-export type VpsPurpose = 'vpn-exit' | 'vpn-relay' | 'vpn-entry' | 'monitor' | 'management' | 'core-services' | '';
+export type VpsPurpose = string;
+
+// ─── VPS Purposes ────────────────────────────────────────
+
+export interface VpsPurposeRecord {
+  id: string;
+  name: string;
+  label: string;
+  color: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateVpsPurpose {
+  name: string;
+  label: string;
+  color?: string;
+  sort_order?: number;
+}
+
+export interface UpdateVpsPurpose {
+  name?: string;
+  label?: string;
+  color?: string;
+  sort_order?: number;
+}
 
 // ─── Auth & Users ────────────────────────────────────────
 

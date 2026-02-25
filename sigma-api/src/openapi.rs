@@ -7,6 +7,7 @@ use crate::models::{
     ConvertedTotal, CostMonthlyResponse, CostSummaryResponse, CountStat,
     CreateDnsAccount, CreateEnvoyNode, CreateEnvoyRoute, CreateExchangeRate,
     CreateIpCheck, CreateProvider, CreateTicket, CreateTicketComment, CreateUser, CreateVps,
+    CreateVpsPurpose,
     CurrencyBreakdown, DashboardStats, DnsAccountResponse, DnsRecord, DnsSyncResult, DnsZone,
     EnvoyNode, EnvoyRoute, ExchangeRate, ImportRequest, StaticRouteEntry, SyncStaticRoutes,
     SyncStaticRoutesResponse,
@@ -14,12 +15,13 @@ use crate::models::{
     PaginatedDnsAccountResponse, PaginatedDnsRecordResponse,
     PaginatedDnsZoneResponse, PaginatedEnvoyNodeResponse, PaginatedEnvoyRouteResponse,
     PaginatedExchangeRateResponse, PaginatedIpCheckResponse, PaginatedProviderResponse,
-    PaginatedTicketResponse, PaginatedUserResponse, PaginatedVpsResponse, PrometheusTarget,
+    PaginatedTicketResponse, PaginatedUserResponse, PaginatedVpsResponse,
+    PaginatedVpsPurposeResponse, PrometheusTarget,
     Provider, Ticket, TicketComment, TotpChallengeResponse, TotpDisableRequest, TotpLoginRequest,
     TopologyEdge, TopologyNode, TopologyResponse, TopologyRouteInfo,
     TotpSetupResponse, TotpVerifyRequest, UpdateDnsAccount, UpdateEnvoyNode,
     UpdateEnvoyRoute, UpdateExchangeRate, UpdateProvider, UpdateTicket, UpdateUser, UpdateVps,
-    UserResponse, Vps,
+    UpdateVpsPurpose, UserResponse, Vps, VpsPurpose,
 };
 
 #[derive(OpenApi)]
@@ -118,6 +120,12 @@ use crate::models::{
         crate::routes::dns::sync_account,
         crate::routes::dns::list_zones,
         crate::routes::dns::list_dns_records,
+        // VPS Purposes
+        crate::routes::vps_purposes::list,
+        crate::routes::vps_purposes::get_one,
+        crate::routes::vps_purposes::create,
+        crate::routes::vps_purposes::update,
+        crate::routes::vps_purposes::delete,
     ),
     components(schemas(
         ErrorResponse,
@@ -147,6 +155,7 @@ use crate::models::{
         DnsZone, DnsRecord, DnsSyncResult,
         PaginatedDnsAccountResponse, PaginatedDnsZoneResponse,
         PaginatedDnsRecordResponse,
+        VpsPurpose, CreateVpsPurpose, UpdateVpsPurpose, PaginatedVpsPurposeResponse,
     )),
     tags(
         (name = "Auth", description = "Authentication and session management"),
@@ -163,6 +172,7 @@ use crate::models::{
         (name = "Tickets", description = "Issue tracking and ticket management"),
         (name = "Envoy", description = "Envoy xDS control plane — nodes and routes"),
         (name = "DNS", description = "Multi-provider DNS domain management (read-only sync)"),
+        (name = "VPS Purposes", description = "VPS purpose type management"),
     )
 )]
 pub struct ApiDoc;

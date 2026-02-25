@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { BarChart3 } from 'lucide-react';
 import { useVps, useCreateVps, useUpdateVps } from '@/hooks/useVps';
 import { useProviders } from '@/hooks/useProviders';
+import { useVpsPurposes } from '@/hooks/useVpsPurposes';
 import { ipLabelColor, timeAgo, formatUptime } from '@/lib/utils';
 import type { IpEntry } from '@/types/api';
 import { COUNTRIES } from '@/lib/countries';
@@ -53,6 +54,8 @@ export default function VpsForm() {
   const { data: existing } = useVps(id || '');
   const { data: providersResult } = useProviders({ per_page: 100 });
   const providers = providersResult?.data;
+  const { data: purposesResult } = useVpsPurposes({ per_page: 100 });
+  const purposes = purposesResult?.data;
   const createMutation = useCreateVps();
   const updateMutation = useUpdateVps();
 
@@ -482,12 +485,9 @@ export default function VpsForm() {
             <Field label="Purpose">
               <select {...register('purpose')} className="input">
                 <option value="">None</option>
-                <option value="vpn-exit">VPN Exit</option>
-                <option value="vpn-relay">VPN Relay</option>
-                <option value="vpn-entry">VPN Entry</option>
-                <option value="monitor">Monitor</option>
-                <option value="management">Management</option>
-                <option value="core-services">Core Services</option>
+                {purposes?.map((p) => (
+                  <option key={p.id} value={p.name}>{p.label}</option>
+                ))}
               </select>
             </Field>
             <Field label="VPN Protocol">
