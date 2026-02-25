@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+fn default_source() -> String { "dynamic".into() }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IpEntry {
     pub ip: String,
@@ -73,6 +75,7 @@ pub struct EnvoyRoute {
     pub cluster_type: String,
     pub connect_timeout_secs: i32,
     pub proxy_protocol: i32,
+    #[serde(default = "default_source")]
     pub source: String,
     pub status: String,
     pub created_at: String,
