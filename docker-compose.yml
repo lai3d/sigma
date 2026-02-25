@@ -88,8 +88,12 @@ services:
       AGENT_XDS_ENABLED: ${AGENT_XDS_ENABLED:-false}
       AGENT_XDS_PORT: ${AGENT_XDS_PORT:-18000}
       AGENT_XDS_POLL_INTERVAL: ${AGENT_XDS_POLL_INTERVAL:-10}
+      AGENT_ENVOY_CONFIG_PATH: ${AGENT_ENVOY_CONFIG_PATH:-/etc/envoy/envoy.yaml}
+      AGENT_ENVOY_CONFIG_SYNC: ${AGENT_ENVOY_CONFIG_SYNC:-false}
+      AGENT_ENVOY_CONFIG_SYNC_INTERVAL: ${AGENT_ENVOY_CONFIG_SYNC_INTERVAL:-60}
     # volumes:
     #   - /etc/hostname:/etc/host_hostname:ro
+    #   - /etc/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro  # Mount for static config sync
     depends_on:
       - api
     restart: unless-stopped
