@@ -1,5 +1,8 @@
 pub mod alibaba;
 pub mod aws;
+pub mod digitalocean;
+pub mod linode;
+pub mod volcengine;
 
 use axum::{
     extract::{Path, Query, State},
@@ -17,7 +20,7 @@ use crate::models::{
 use crate::routes::audit_logs::log_audit;
 use crate::routes::AppState;
 
-const VALID_PROVIDER_TYPES: &[&str] = &["aws", "alibaba"];
+const VALID_PROVIDER_TYPES: &[&str] = &["aws", "alibaba", "digitalocean", "linode", "volcengine"];
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -38,12 +41,16 @@ pub fn router() -> Router<AppState> {
 // ─── Provider dispatch helpers ───────────────────────────
 
 async fn validate_credentials(
+    state: &AppState,
     provider_type: &str,
     config: &serde_json::Value,
 ) -> Result<(), AppError> {
     match provider_type {
         "aws" => aws::validate(config).await,
         "alibaba" => alibaba::validate(config).await,
+        "digitalocean" => digitalocean::validate(&state.http_client, config).await,
+        "linode" => linode::validate(&state.http_client, config).await,
+        "volcengine" => volcengine::validate(config).await,
         _ => Err(AppError::BadRequest(format!(
             "Unknown provider type: {provider_type}"
         ))),
@@ -54,6 +61,9 @@ fn mask_config(provider_type: &str, config: &serde_json::Value) -> serde_json::V
     match provider_type {
         "aws" => aws::mask_config(config),
         "alibaba" => alibaba::mask_config(config),
+        "digitalocean" => digitalocean::mask_config(config),
+        "linode" => linode::mask_config(config),
+        "volcengine" => volcengine::mask_config(config),
         _ => serde_json::json!({}),
     }
 }
@@ -65,6 +75,9 @@ async fn sync_provider(
     match account.provider_type.as_str() {
         "aws" => aws::sync(state, account).await,
         "alibaba" => alibaba::sync(state, account).await,
+        "digitalocean" => digitalocean::sync(state, account).await,
+        "linode" => linode::sync(state, account).await,
+        "volcengine" => volcengine::sync(state, account).await,
         _ => Err(AppError::BadRequest(format!(
             "Unknown provider type: {}",
             account.provider_type
@@ -187,7 +200,7 @@ pub async fn create_account(
         )));
     }
 
-    validate_credentials(&input.provider_type, &input.config).await?;
+    validate_credentials(&state, &input.provider_type, &input.config).await?;
 
     let acc = sqlx::query_as::<_, CloudAccount>(
         "INSERT INTO cloud_accounts (name, provider_type, config) VALUES ($1, $2, $3) RETURNING *",
@@ -252,7 +265,7 @@ pub async fn update_account(
 
     // Re-validate if config changed
     if new_config != existing.config {
-        validate_credentials(&existing.provider_type, &new_config).await?;
+        validate_credentials(&state, &existing.provider_type, &new_config).await?;
     }
 
     let acc = sqlx::query_as::<_, CloudAccount>(

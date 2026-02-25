@@ -13,11 +13,17 @@ import type { CloudSyncResult, CloudProviderType } from '@/types/api';
 const PROVIDER_LABELS: Record<CloudProviderType, string> = {
   aws: 'AWS EC2',
   alibaba: 'Alibaba Cloud',
+  digitalocean: 'DigitalOcean',
+  linode: 'Linode',
+  volcengine: 'Volcengine',
 };
 
 const PROVIDER_COLORS: Record<CloudProviderType, string> = {
   aws: 'bg-yellow-100 text-yellow-800',
   alibaba: 'bg-orange-100 text-orange-800',
+  digitalocean: 'bg-blue-100 text-blue-800',
+  linode: 'bg-green-100 text-green-800',
+  volcengine: 'bg-indigo-100 text-indigo-800',
 };
 
 export default function CloudAccountsPage() {

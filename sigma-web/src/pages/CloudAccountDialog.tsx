@@ -22,11 +22,22 @@ interface FormData {
   ali_access_key_id: string;
   ali_access_key_secret: string;
   ali_regions: string;
+  // DigitalOcean
+  do_api_token: string;
+  // Linode
+  linode_api_token: string;
+  // Volcengine
+  volc_access_key_id: string;
+  volc_secret_access_key: string;
+  volc_regions: string;
 }
 
 const PROVIDER_LABELS: Record<CloudProviderType, string> = {
   aws: 'AWS EC2',
   alibaba: 'Alibaba Cloud ECS',
+  digitalocean: 'DigitalOcean',
+  linode: 'Linode (Akamai)',
+  volcengine: 'Volcengine (火山引擎)',
 };
 
 function buildConfig(data: FormData): Record<string, unknown> {
@@ -45,6 +56,19 @@ function buildConfig(data: FormData): Record<string, unknown> {
         access_key_id: data.ali_access_key_id,
         access_key_secret: data.ali_access_key_secret,
         regions: data.ali_regions
+          .split(',')
+          .map((r) => r.trim())
+          .filter(Boolean),
+      };
+    case 'digitalocean':
+      return { api_token: data.do_api_token };
+    case 'linode':
+      return { api_token: data.linode_api_token };
+    case 'volcengine':
+      return {
+        access_key_id: data.volc_access_key_id,
+        secret_access_key: data.volc_secret_access_key,
+        regions: data.volc_regions
           .split(',')
           .map((r) => r.trim())
           .filter(Boolean),
@@ -74,6 +98,11 @@ export default function CloudAccountDialog({ account, onClose }: Props) {
       ali_access_key_id: '',
       ali_access_key_secret: '',
       ali_regions: 'cn-hangzhou',
+      do_api_token: '',
+      linode_api_token: '',
+      volc_access_key_id: '',
+      volc_secret_access_key: '',
+      volc_regions: 'cn-beijing',
     },
   });
 
@@ -94,6 +123,11 @@ export default function CloudAccountDialog({ account, onClose }: Props) {
         ali_access_key_id: '',
         ali_access_key_secret: '',
         ali_regions: 'cn-hangzhou',
+        do_api_token: '',
+        linode_api_token: '',
+        volc_access_key_id: '',
+        volc_secret_access_key: '',
+        volc_regions: 'cn-beijing',
       });
     }
   }, [account, reset]);
@@ -106,7 +140,13 @@ export default function CloudAccountDialog({ account, onClose }: Props) {
         const hasConfig =
           data.provider_type === 'aws'
             ? data.aws_access_key_id !== '' || data.aws_secret_access_key !== ''
-            : data.ali_access_key_id !== '' || data.ali_access_key_secret !== '';
+            : data.provider_type === 'alibaba'
+              ? data.ali_access_key_id !== '' || data.ali_access_key_secret !== ''
+              : data.provider_type === 'digitalocean'
+                ? data.do_api_token !== ''
+                : data.provider_type === 'linode'
+                  ? data.linode_api_token !== ''
+                  : data.volc_access_key_id !== '' || data.volc_secret_access_key !== '';
         await updateMutation.mutateAsync({
           id: account.id,
           data: {
@@ -244,6 +284,75 @@ export default function CloudAccountDialog({ account, onClose }: Props) {
               />
               <p className="mt-1 text-xs text-gray-500">
                 Comma-separated Alibaba Cloud region IDs
+              </p>
+            </div>
+          </>
+        )}
+
+        {/* DigitalOcean fields */}
+        {providerType === 'digitalocean' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              API Token {isEdit ? '(leave blank to keep current)' : '*'}
+            </label>
+            <input
+              {...register('do_api_token', { required: !isEdit })}
+              type="password"
+              className="input w-full mt-1"
+              placeholder={isEdit ? '••••••••' : 'dop_v1_...'}
+            />
+          </div>
+        )}
+
+        {/* Linode fields */}
+        {providerType === 'linode' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              API Token {isEdit ? '(leave blank to keep current)' : '*'}
+            </label>
+            <input
+              {...register('linode_api_token', { required: !isEdit })}
+              type="password"
+              className="input w-full mt-1"
+              placeholder={isEdit ? '••••••••' : 'Linode Personal Access Token'}
+            />
+          </div>
+        )}
+
+        {/* Volcengine fields */}
+        {providerType === 'volcengine' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Access Key ID {isEdit ? '(leave blank to keep current)' : '*'}
+              </label>
+              <input
+                {...register('volc_access_key_id', { required: !isEdit })}
+                type="password"
+                className="input w-full mt-1"
+                placeholder={isEdit ? '••••••••' : 'AK...'}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Secret Access Key {isEdit ? '(leave blank to keep current)' : '*'}
+              </label>
+              <input
+                {...register('volc_secret_access_key', { required: !isEdit })}
+                type="password"
+                className="input w-full mt-1"
+                placeholder={isEdit ? '••••••••' : 'Secret Access Key'}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Regions</label>
+              <input
+                {...register('volc_regions')}
+                className="input w-full mt-1"
+                placeholder="cn-beijing, cn-shanghai"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Comma-separated region IDs
               </p>
             </div>
           </>

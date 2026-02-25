@@ -523,7 +523,7 @@ export interface DnsRecordListQuery {
 
 // ─── Cloud Accounts (VPS sync) ──────────────────────────────
 
-export type CloudProviderType = 'aws' | 'alibaba';
+export type CloudProviderType = 'aws' | 'alibaba' | 'digitalocean' | 'linode' | 'volcengine';
 
 export interface CloudAccountResponse {
   id: string;
