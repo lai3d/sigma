@@ -37,6 +37,7 @@ sigma/
 - **VPS** — individual server instance with lifecycle: provisioning → active → retiring → retired
 - **ip_checks** — table for tracking IP reachability from China (API done, probe: `sigma-probe/`)
 - **envoy_routes** — Envoy forwarding routes with `source` column (`dynamic` = managed via API/UI, `static` = synced from envoy.yaml)
+- **cloud_accounts** — cloud provider accounts (AWS, Alibaba Cloud, DigitalOcean, Linode, Volcengine) with `provider_type` and JSONB `config`; manual sync pulls all instances and upserts into VPS table
 - **dns_accounts** — DNS provider accounts (Cloudflare, Route 53, GoDaddy, Name.com) with `provider_type` and JSONB `config`
 - **dns_zones** — synced DNS zones per account, with domain/cert expiry tracking
 - **dns_records** — synced DNS records with auto VPS-IP linking and provider-specific `extra` JSONB
@@ -45,7 +46,9 @@ sigma/
 - `ip_addresses` — JSONB array of `{ip, label}` objects. Labels: `china-telecom`, `china-unicom`, `china-mobile`, `china-cernet`, `overseas`, `internal`, `anycast`
 - `purpose` — enum: vpn-exit, vpn-relay, vpn-entry, monitor, management, core-services
 - `tags` — TEXT[] array with GIN index, for flexible categorization (e.g. optimized, premium, gpu)
-- `extra` — JSONB for arbitrary metadata
+- `extra` — JSONB for arbitrary metadata (cloud-synced VPS stores `cloud_instance_id`, `cloud_provider`, `cloud_region`)
+- `source` — origin of the VPS record: `manual`, `agent`, `cloud-sync`
+- `cloud_account_id` — FK to `cloud_accounts` table (NULL for manual/agent VPS)
 - `monitoring_enabled` + `node_exporter_port` — controls whether this VPS appears in Prometheus targets
 
 ## Current State
@@ -101,6 +104,7 @@ sigma/
 - [x] Envoy xDS control plane (sigma-agent as gRPC xDS server, config stored in PostgreSQL, hot reload via LDS/CDS)
 - [x] Envoy static config sync (agent parses `envoy.yaml` static_resources, syncs to API with `source=static`, topology shows dynamic vs static routes)
 - [x] Multi-provider DNS management (Cloudflare, Route 53, GoDaddy, Name.com — read-only sync with VPS-IP linking, domain/cert expiry tracking)
+- [x] Cloud account integration (AWS, Alibaba Cloud, DigitalOcean, Linode, Volcengine — store credentials, sync instances to VPS table, track source/origin)
 
 ## Tech Stack
 
