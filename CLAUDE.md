@@ -38,6 +38,7 @@ sigma/
 - **ip_checks** — table for tracking IP reachability from China (API done, probe: `sigma-probe/`)
 - **envoy_routes** — Envoy forwarding routes with `source` column (`dynamic` = managed via API/UI, `static` = synced from envoy.yaml)
 - **cloud_accounts** — cloud provider accounts (AWS, Alibaba Cloud, DigitalOcean, Linode, Volcengine) with `provider_type` and JSONB `config`; manual sync pulls all instances and upserts into VPS table
+- **vps_ip_history** — automatic IP change tracking via PostgreSQL trigger; records every `added`/`removed` IP with label, source, and timestamp
 - **dns_accounts** — DNS provider accounts (Cloudflare, Route 53, GoDaddy, Name.com) with `provider_type` and JSONB `config`
 - **dns_zones** — synced DNS zones per account, with domain/cert expiry tracking
 - **dns_records** — synced DNS records with auto VPS-IP linking and provider-specific `extra` JSONB
@@ -61,12 +62,14 @@ sigma/
 - [x] Prometheus file_sd output: `GET /api/prometheus/targets`
 - [x] Dashboard stats: `GET /api/stats`
 - [x] Port allocation proxy: `POST /api/vps/{id}/allocate-ports` (forwards to agent)
+- [x] IP change history: `GET /api/vps/{id}/ip-history` (auto-tracked via PostgreSQL trigger on `ip_addresses` column)
 - [x] Dockerfile (multi-stage, rust:latest → debian:bookworm-slim)
 
 ### Frontend (sigma-web) — Done:
 - [x] Dashboard: stats cards, charts (by country/status/provider), expiring VPS table
 - [x] VPS list: filterable table (status/purpose/provider/country/tag), agent online/offline indicator, retire/delete actions
 - [x] VPS form: create/edit with dynamic IP list + label selector (color-coded), read-only agent info panel (heartbeat, CPU, RAM, disk, uptime, load avg), port allocation button (find N available ports via agent)
+- [x] VPS detail: IP history timeline (added/removed badges, paginated table)
 - [x] Provider list + create/edit dialog
 - [x] Settings page (API key config in localStorage)
 - [x] Layout with sidebar navigation
@@ -105,6 +108,7 @@ sigma/
 - [x] Envoy static config sync (agent parses `envoy.yaml` static_resources, syncs to API with `source=static`, topology shows dynamic vs static routes)
 - [x] Multi-provider DNS management (Cloudflare, Route 53, GoDaddy, Name.com — read-only sync with VPS-IP linking, domain/cert expiry tracking)
 - [x] Cloud account integration (AWS, Alibaba Cloud, DigitalOcean, Linode, Volcengine — store credentials, sync instances to VPS table, track source/origin)
+- [x] VPS IP change history (PostgreSQL trigger on `ip_addresses` column auto-tracks added/removed IPs across all code paths — manual, agent, cloud sync, import)
 
 ## Tech Stack
 
