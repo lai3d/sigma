@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Pencil, Trash2, Power, BarChart3, Network, Copy, Check, Shield } from 'lucide-react';
-import { useVps, useDeleteVps, useRetireVps, useAllocatePorts } from '@/hooks/useVps';
+import { useVps, useDeleteVps, useRetireVps, useAllocatePorts, useVpsIpHistory } from '@/hooks/useVps';
 import { useProvider } from '@/hooks/useProviders';
 import { useTickets } from '@/hooks/useTickets';
 import { useEnvoyNodes, useBatchCreateEnvoyRoutes } from '@/hooks/useEnvoy';
@@ -45,7 +45,11 @@ export default function VpsDetail() {
   const [allocatedPorts, setAllocatedPorts] = useState<number[] | null>(null);
   const [allocateError, setAllocateError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [ipHistoryPage, setIpHistoryPage] = useState(1);
   const allocatePortsMutation = useAllocatePorts();
+
+  // IP history
+  const { data: ipHistoryResult } = useVpsIpHistory(id || '', { page: ipHistoryPage, per_page: 20 });
 
   // Envoy reserve
   const { data: nodesResult } = useEnvoyNodes({ vps_id: id, status: 'active' });
@@ -477,6 +481,77 @@ export default function VpsDetail() {
           </div>
         )}
       </div>
+
+      {/* IP History */}
+      {ipHistoryResult && ipHistoryResult.total > 0 && (
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">IP History</h3>
+          <div className="bg-white rounded-lg border overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-500 border-b bg-gray-50">
+                  <th className="px-4 py-3 font-medium">Action</th>
+                  <th className="px-4 py-3 font-medium">IP Address</th>
+                  <th className="px-4 py-3 font-medium">Label</th>
+                  <th className="px-4 py-3 font-medium">Source</th>
+                  <th className="px-4 py-3 font-medium">Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ipHistoryResult.data.map((h) => (
+                  <tr key={h.id} className="border-b last:border-0 hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded ${
+                        h.action === 'added'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-red-100 text-red-700'
+                      }`}>
+                        {h.action}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs">{h.ip}</td>
+                    <td className="px-4 py-3">
+                      {h.label ? (
+                        <span className={`px-1 py-0.5 text-[10px] rounded ${ipLabelColor(h.label)}`}>
+                          {ipLabelShort(h.label)}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">{h.source || '-'}</td>
+                    <td className="px-4 py-3 text-gray-500">{timeAgo(h.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {ipHistoryResult.total > 20 && (
+            <div className="flex items-center justify-between mt-3">
+              <span className="text-sm text-gray-500">
+                Page {ipHistoryResult.page} of {Math.ceil(ipHistoryResult.total / 20)}
+                {' '}({ipHistoryResult.total} records)
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIpHistoryPage((p) => Math.max(1, p - 1))}
+                  disabled={ipHistoryPage <= 1}
+                  className="px-3 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setIpHistoryPage((p) => p + 1)}
+                  disabled={ipHistoryPage >= Math.ceil(ipHistoryResult.total / 20)}
+                  className="px-3 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Related Tickets */}
       <div className="mt-6">

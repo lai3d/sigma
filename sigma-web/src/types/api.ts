@@ -547,6 +547,25 @@ export interface UpdateCloudAccount {
   config?: Record<string, unknown>;
 }
 
+// ─── VPS IP History ──────────────────────────────────────
+
+export interface VpsIpHistory {
+  id: string;
+  vps_id: string;
+  action: 'added' | 'removed';
+  ip: string;
+  label: string;
+  source: string;
+  created_at: string;
+}
+
+export interface VpsIpHistoryQuery {
+  action?: string;
+  ip?: string;
+  page?: number;
+  per_page?: number;
+}
+
 export interface CloudSyncResult {
   instances_found: number;
   created: number;

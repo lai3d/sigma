@@ -12,10 +12,10 @@ use uuid::Uuid;
 use crate::auth::{require_role, CurrentUser};
 use crate::errors::{AppError, ErrorResponse};
 #[allow(unused_imports)]
-use crate::models::PaginatedVpsResponse;
+use crate::models::{PaginatedVpsResponse, PaginatedVpsIpHistoryResponse};
 use crate::models::{
     CreateVps, ExportQuery, ImportRequest, ImportResult, IpEntry, PaginatedResponse, UpdateVps,
-    Vps, VpsCsvRow, VpsListQuery,
+    Vps, VpsCsvRow, VpsIpHistory, VpsIpHistoryQuery, VpsListQuery,
 };
 use crate::routes::audit_logs::log_audit;
 use crate::routes::AppState;
@@ -51,6 +51,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/vps/import", axum::routing::post(import))
         .route("/api/vps/{id}", get(get_one).put(update).delete(delete))
         .route("/api/vps/{id}/retire", axum::routing::post(retire))
+        .route("/api/vps/{id}/ip-history", get(ip_history))
         .route("/api/vps/{id}/allocate-ports", axum::routing::post(allocate_ports))
 }
 
@@ -405,6 +406,80 @@ pub async fn retire(
         serde_json::json!({"hostname": row.hostname})).await;
 
     Ok(Json(row))
+}
+
+// ─── IP History ──────────────────────────────────────────
+
+#[utoipa::path(
+    get, path = "/api/vps/{id}/ip-history",
+    tag = "VPS",
+    params(
+        ("id" = Uuid, Path, description = "VPS ID"),
+        VpsIpHistoryQuery,
+    ),
+    responses(
+        (status = 200, body = PaginatedVpsIpHistoryResponse),
+        (status = 404, body = ErrorResponse),
+    )
+)]
+pub async fn ip_history(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Query(q): Query<VpsIpHistoryQuery>,
+) -> Result<Json<PaginatedResponse<VpsIpHistory>>, AppError> {
+    // Verify VPS exists
+    let exists = sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM vps WHERE id = $1)")
+        .bind(id)
+        .fetch_one(&state.db)
+        .await?;
+    if !exists {
+        return Err(AppError::NotFound);
+    }
+
+    let per_page = q.per_page.clamp(1, 100);
+    let page = q.page.max(1);
+    let offset = (page - 1) * per_page;
+
+    let mut where_clause = String::from(" WHERE vps_id = $1");
+    let mut param_idx = 1u32;
+
+    if q.action.is_some() {
+        param_idx += 1;
+        where_clause.push_str(&format!(" AND action = ${}", param_idx));
+    }
+    if q.ip.is_some() {
+        param_idx += 1;
+        where_clause.push_str(&format!(" AND ip = ${}", param_idx));
+    }
+
+    let count_sql = format!("SELECT COUNT(*) FROM vps_ip_history{}", where_clause);
+    let mut count_query = sqlx::query_as::<_, (i64,)>(&count_sql).bind(id);
+    if let Some(ref v) = q.action { count_query = count_query.bind(v); }
+    if let Some(ref v) = q.ip { count_query = count_query.bind(v); }
+    let total = count_query.fetch_one(&state.db).await?.0;
+
+    param_idx += 1;
+    let limit_param = param_idx;
+    param_idx += 1;
+    let offset_param = param_idx;
+
+    let data_sql = format!(
+        "SELECT * FROM vps_ip_history{} ORDER BY created_at DESC LIMIT ${} OFFSET ${}",
+        where_clause, limit_param, offset_param
+    );
+    let mut query = sqlx::query_as::<_, VpsIpHistory>(&data_sql).bind(id);
+    if let Some(ref v) = q.action { query = query.bind(v); }
+    if let Some(ref v) = q.ip { query = query.bind(v); }
+    query = query.bind(per_page).bind(offset);
+
+    let rows = query.fetch_all(&state.db).await?;
+
+    Ok(Json(PaginatedResponse {
+        data: rows,
+        total,
+        page,
+        per_page,
+    }))
 }
 
 // ─── Allocate Ports (proxy to agent) ─────────────────────

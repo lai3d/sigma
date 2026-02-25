@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { Vps, CreateVps, UpdateVps, VpsListQuery, ImportResult, PaginatedResponse } from '@/types/api';
+import type { Vps, CreateVps, UpdateVps, VpsListQuery, VpsIpHistory, VpsIpHistoryQuery, ImportResult, PaginatedResponse } from '@/types/api';
 
 export async function listVps(query?: VpsListQuery & { page?: number; per_page?: number }): Promise<PaginatedResponse<Vps>> {
   const params = new URLSearchParams();
@@ -48,6 +48,19 @@ export async function exportVps(format: 'csv' | 'json'): Promise<Blob> {
 export async function importVps(format: 'csv' | 'json', data: string): Promise<ImportResult> {
   const { data: result } = await apiClient.post('/vps/import', { format, data });
   return result;
+}
+
+export async function getVpsIpHistory(id: string, query?: VpsIpHistoryQuery): Promise<PaginatedResponse<VpsIpHistory>> {
+  const params = new URLSearchParams();
+  if (query) {
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined && value !== '') {
+        params.set(key, String(value));
+      }
+    }
+  }
+  const { data } = await apiClient.get(`/vps/${id}/ip-history?${params.toString()}`);
+  return data;
 }
 
 export async function allocatePorts(id: string, count: number): Promise<{ ports: number[] }> {

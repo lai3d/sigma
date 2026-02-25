@@ -24,6 +24,7 @@ use crate::models::{
     TotpSetupResponse, TotpVerifyRequest, UpdateDnsAccount, UpdateEnvoyNode,
     UpdateEnvoyRoute, UpdateExchangeRate, UpdateProvider, UpdateTicket, UpdateUser, UpdateVps,
     UpdateVpsPurpose, UserResponse, Vps, VpsPurpose,
+    VpsIpHistory, PaginatedVpsIpHistoryResponse,
 };
 
 #[derive(OpenApi)]
@@ -66,6 +67,7 @@ use crate::models::{
         crate::routes::vps::retire,
         crate::routes::vps::export,
         crate::routes::vps::import,
+        crate::routes::vps::ip_history,
         // IP Checks
         crate::routes::ip_checks::list,
         crate::routes::ip_checks::get_one,
@@ -167,6 +169,7 @@ use crate::models::{
         VpsPurpose, CreateVpsPurpose, UpdateVpsPurpose, PaginatedVpsPurposeResponse,
         CloudAccountResponse, CreateCloudAccount, UpdateCloudAccount, CloudSyncResult,
         PaginatedCloudAccountResponse,
+        VpsIpHistory, PaginatedVpsIpHistoryResponse,
     )),
     tags(
         (name = "Auth", description = "Authentication and session management"),

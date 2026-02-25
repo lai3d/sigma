@@ -1156,6 +1156,37 @@ pub struct DnsAccountListQuery {
     pub per_page: i64,
 }
 
+// ─── VPS IP History ──────────────────────────────────────
+
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+pub struct VpsIpHistory {
+    pub id: Uuid,
+    pub vps_id: Uuid,
+    pub action: String,
+    pub ip: String,
+    pub label: String,
+    pub source: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct VpsIpHistoryQuery {
+    pub action: Option<String>,
+    pub ip: Option<String>,
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_per_page")]
+    pub per_page: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct PaginatedVpsIpHistoryResponse {
+    pub data: Vec<VpsIpHistory>,
+    pub total: i64,
+    pub page: i64,
+    pub per_page: i64,
+}
+
 // ─── Cloud Accounts (VPS sync) ──────────────────────────
 
 #[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
