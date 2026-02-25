@@ -109,6 +109,17 @@ export default function VpsList() {
           ))}
         </select>
 
+        <select
+          value={filters.source || ''}
+          onChange={(e) => handleFilterChange({ ...filters, source: e.target.value || undefined })}
+          className="border rounded-md px-3 py-1.5 text-sm bg-white"
+        >
+          <option value="">All Sources</option>
+          <option value="manual">Manual</option>
+          <option value="agent">Agent</option>
+          <option value="cloud-sync">Cloud Sync</option>
+        </select>
+
         <input
           type="text"
           placeholder="Tag"
@@ -156,6 +167,17 @@ export default function VpsList() {
                       </Link>
                       {vps.alias && (
                         <span className="ml-2 text-xs text-gray-400">{vps.alias}</span>
+                      )}
+                      {vps.source && vps.source !== 'manual' && (
+                        <span className={`ml-2 px-1.5 py-0.5 text-[10px] rounded font-medium ${
+                          vps.source === 'cloud-sync'
+                            ? 'bg-purple-100 text-purple-700'
+                            : vps.source === 'agent'
+                              ? 'bg-cyan-100 text-cyan-700'
+                              : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {vps.source === 'cloud-sync' ? 'cloud' : vps.source}
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-3">

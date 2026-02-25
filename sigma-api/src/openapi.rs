@@ -4,6 +4,8 @@ use crate::errors::ErrorResponse;
 #[allow(unused_imports)]
 use crate::models::{
     AgentHeartbeat, AgentRegister, BatchCreateEnvoyRoutes, ChangePasswordRequest,
+    CloudAccountResponse, CloudSyncResult, CreateCloudAccount, UpdateCloudAccount,
+    PaginatedCloudAccountResponse,
     ConvertedTotal, CostMonthlyResponse, CostSummaryResponse, CountStat,
     CreateDnsAccount, CreateEnvoyNode, CreateEnvoyRoute, CreateExchangeRate,
     CreateIpCheck, CreateProvider, CreateTicket, CreateTicketComment, CreateUser, CreateVps,
@@ -120,6 +122,13 @@ use crate::models::{
         crate::routes::dns::sync_account,
         crate::routes::dns::list_zones,
         crate::routes::dns::list_dns_records,
+        // Cloud Accounts
+        crate::routes::cloud::list_accounts,
+        crate::routes::cloud::get_account,
+        crate::routes::cloud::create_account,
+        crate::routes::cloud::update_account,
+        crate::routes::cloud::delete_account,
+        crate::routes::cloud::sync_account,
         // VPS Purposes
         crate::routes::vps_purposes::list,
         crate::routes::vps_purposes::get_one,
@@ -156,6 +165,8 @@ use crate::models::{
         PaginatedDnsAccountResponse, PaginatedDnsZoneResponse,
         PaginatedDnsRecordResponse,
         VpsPurpose, CreateVpsPurpose, UpdateVpsPurpose, PaginatedVpsPurposeResponse,
+        CloudAccountResponse, CreateCloudAccount, UpdateCloudAccount, CloudSyncResult,
+        PaginatedCloudAccountResponse,
     )),
     tags(
         (name = "Auth", description = "Authentication and session management"),
@@ -172,6 +183,7 @@ use crate::models::{
         (name = "Tickets", description = "Issue tracking and ticket management"),
         (name = "Envoy", description = "Envoy xDS control plane — nodes and routes"),
         (name = "DNS", description = "Multi-provider DNS domain management (read-only sync)"),
+        (name = "Cloud Accounts", description = "Cloud provider account management (AWS, Alibaba) with VPS auto-sync"),
         (name = "VPS Purposes", description = "VPS purpose type management"),
     )
 )]

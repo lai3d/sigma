@@ -19,6 +19,7 @@ import TicketForm from '@/pages/TicketForm';
 import EnvoyPage from '@/pages/EnvoyPage';
 import TopologyPage from '@/pages/TopologyPage';
 import DomainsPage from '@/pages/DomainsPage';
+import CloudAccountsPage from '@/pages/CloudAccountsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -55,6 +56,7 @@ export default function App() {
               <Route path="/envoy" element={<EnvoyPage />} />
               <Route path="/topology" element={<TopologyPage />} />
               <Route path="/domains" element={<DomainsPage />} />
+              <Route path="/cloud-accounts" element={<CloudAccountsPage />} />
               <Route path="/users" element={
                 <ProtectedRoute requiredRole="admin"><UserList /></ProtectedRoute>
               } />

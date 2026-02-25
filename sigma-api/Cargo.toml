@@ -28,8 +28,12 @@ jsonwebtoken = "9"
 argon2 = "0.5"
 totp-rs = { version = "5", features = ["qr", "otpauth", "gen_secret"] }
 aws-sdk-route53 = "1"
+aws-sdk-ec2 = "1"
 aws-config = { version = "1", features = ["behavior-version-latest"] }
 aws-credential-types = "1"
+hmac = "0.12"
+sha1 = "0.10"
+base64 = "0.22"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

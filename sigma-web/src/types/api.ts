@@ -169,6 +169,8 @@ export interface Vps {
   node_exporter_port: number;
   extra: Record<string, unknown>;
   notes: string;
+  source: string;
+  cloud_account_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -209,6 +211,7 @@ export interface VpsListQuery {
   purpose?: string;
   tag?: string;
   expiring_within_days?: number;
+  source?: string;
 }
 
 export interface CountStat {
@@ -516,4 +519,37 @@ export interface DnsRecordListQuery {
   has_vps?: boolean;
   page?: number;
   per_page?: number;
+}
+
+// ─── Cloud Accounts (VPS sync) ──────────────────────────────
+
+export type CloudProviderType = 'aws' | 'alibaba';
+
+export interface CloudAccountResponse {
+  id: string;
+  name: string;
+  provider_type: CloudProviderType;
+  masked_config: Record<string, string>;
+  vps_count: number;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateCloudAccount {
+  name: string;
+  provider_type: CloudProviderType;
+  config: Record<string, unknown>;
+}
+
+export interface UpdateCloudAccount {
+  name?: string;
+  config?: Record<string, unknown>;
+}
+
+export interface CloudSyncResult {
+  instances_found: number;
+  created: number;
+  updated: number;
+  retired: number;
 }

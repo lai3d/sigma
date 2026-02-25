@@ -97,6 +97,10 @@ pub struct Vps {
     #[schema(value_type = Object)]
     pub extra: serde_json::Value,
     pub notes: String,
+
+    pub source: String,
+    pub cloud_account_id: Option<Uuid>,
+
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -191,6 +195,7 @@ pub struct VpsListQuery {
     pub purpose: Option<String>,
     pub tag: Option<String>,
     pub expiring_within_days: Option<i32>,
+    pub source: Option<String>,
     #[serde(default = "default_page")]
     pub page: i64,
     #[serde(default = "default_per_page")]
@@ -1148,5 +1153,68 @@ pub struct DnsAccountListQuery {
     #[serde(default = "default_page")]
     pub page: i64,
     #[serde(default = "default_per_page")]
+    pub per_page: i64,
+}
+
+// ─── Cloud Accounts (VPS sync) ──────────────────────────
+
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+pub struct CloudAccount {
+    pub id: Uuid,
+    pub name: String,
+    pub provider_type: String,
+    #[serde(skip_serializing)]
+    pub config: serde_json::Value,
+    pub last_synced_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CloudAccountResponse {
+    pub id: Uuid,
+    pub name: String,
+    pub provider_type: String,
+    pub masked_config: serde_json::Value,
+    pub vps_count: i64,
+    pub last_synced_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateCloudAccount {
+    pub name: String,
+    pub provider_type: String,
+    pub config: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateCloudAccount {
+    pub name: Option<String>,
+    pub config: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CloudSyncResult {
+    pub instances_found: i64,
+    pub created: i64,
+    pub updated: i64,
+    pub retired: i64,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct CloudAccountListQuery {
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_per_page")]
+    pub per_page: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct PaginatedCloudAccountResponse {
+    pub data: Vec<CloudAccountResponse>,
+    pub total: i64,
+    pub page: i64,
     pub per_page: i64,
 }

@@ -2,6 +2,7 @@ pub mod agent;
 pub mod ansible;
 pub mod audit_logs;
 pub mod auth_routes;
+pub mod cloud;
 pub mod dns;
 pub mod costs;
 pub mod envoy;

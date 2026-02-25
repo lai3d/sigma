@@ -29,7 +29,8 @@ const VPS_INSERT_SQL: &str = r#"INSERT INTO vps (
     status, purchase_date, expire_date,
     purpose, vpn_protocol, tags,
     monitoring_enabled, node_exporter_port,
-    extra, notes
+    extra, notes,
+    source, cloud_account_id
 ) VALUES (
     $1, $2, $3,
     $4, $5,
@@ -39,7 +40,8 @@ const VPS_INSERT_SQL: &str = r#"INSERT INTO vps (
     $15, $16, $17,
     $18, $19, $20,
     $21, $22,
-    $23, $24
+    $23, $24,
+    'manual', NULL
 ) RETURNING *"#;
 
 pub fn router() -> Router<AppState> {
@@ -99,6 +101,10 @@ pub async fn list(
             param_idx
         ));
     }
+    if q.source.is_some() {
+        param_idx += 1;
+        where_clause.push_str(&format!(" AND source = ${}", param_idx));
+    }
 
     // Count query
     let count_sql = format!("SELECT COUNT(*) FROM vps{}", where_clause);
@@ -110,6 +116,7 @@ pub async fn list(
     if let Some(ref v) = q.purpose { count_query = count_query.bind(v); }
     if let Some(ref v) = q.tag { count_query = count_query.bind(v); }
     if let Some(v) = q.expiring_within_days { count_query = count_query.bind(v); }
+    if let Some(ref v) = q.source { count_query = count_query.bind(v); }
 
     let total = count_query.fetch_one(&state.db).await?.0;
 
@@ -131,6 +138,7 @@ pub async fn list(
     if let Some(ref v) = q.purpose { query = query.bind(v); }
     if let Some(ref v) = q.tag { query = query.bind(v); }
     if let Some(v) = q.expiring_within_days { query = query.bind(v); }
+    if let Some(ref v) = q.source { query = query.bind(v); }
 
     query = query.bind(per_page).bind(offset);
 

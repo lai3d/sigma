@@ -91,7 +91,8 @@ pub async fn register(
                 status, purchase_date, expire_date,
                 purpose, vpn_protocol, tags,
                 monitoring_enabled, node_exporter_port,
-                extra, notes
+                extra, notes,
+                source
             ) VALUES (
                 $1, $2, NULL,
                 $3, $4,
@@ -101,7 +102,8 @@ pub async fn register(
                 'active', NULL, NULL,
                 '', '', '{}',
                 true, 9100,
-                $5, ''
+                $5, '',
+                'agent'
             ) RETURNING *"#,
         )
         .bind(&input.hostname)
