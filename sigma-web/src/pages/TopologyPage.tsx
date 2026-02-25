@@ -25,7 +25,8 @@ const PURPOSE_COLORS: Record<string, { bg: string; border: string; badge: string
   'vpn-exit':   { bg: 'bg-green-50',  border: 'border-green-300',  badge: 'bg-green-100 text-green-700' },
   'vpn-entry':  { bg: 'bg-orange-50', border: 'border-orange-300', badge: 'bg-orange-100 text-orange-700' },
   'monitor':    { bg: 'bg-purple-50', border: 'border-purple-300', badge: 'bg-purple-100 text-purple-700' },
-  'management': { bg: 'bg-gray-50',   border: 'border-gray-300',   badge: 'bg-gray-100 text-gray-700' },
+  'management':    { bg: 'bg-gray-50',   border: 'border-gray-300',   badge: 'bg-gray-100 text-gray-700' },
+  'core-services': { bg: 'bg-cyan-50',   border: 'border-cyan-300',   badge: 'bg-cyan-100 text-cyan-700' },
 };
 
 const NODE_WIDTH = 200;

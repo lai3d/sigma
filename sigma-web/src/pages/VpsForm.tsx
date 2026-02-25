@@ -487,6 +487,7 @@ export default function VpsForm() {
                 <option value="vpn-entry">VPN Entry</option>
                 <option value="monitor">Monitor</option>
                 <option value="management">Management</option>
+                <option value="core-services">Core Services</option>
               </select>
             </Field>
             <Field label="VPN Protocol">

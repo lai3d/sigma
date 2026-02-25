@@ -43,7 +43,7 @@ sigma/
 
 ### VPS fields of note:
 - `ip_addresses` — JSONB array of `{ip, label}` objects. Labels: `china-telecom`, `china-unicom`, `china-mobile`, `china-cernet`, `overseas`, `internal`, `anycast`
-- `purpose` — enum: vpn-exit, vpn-relay, vpn-entry, monitor, management
+- `purpose` — enum: vpn-exit, vpn-relay, vpn-entry, monitor, management, core-services
 - `tags` — TEXT[] array with GIN index, for flexible categorization (e.g. optimized, premium, gpu)
 - `extra` — JSONB for arbitrary metadata
 - `monitoring_enabled` + `node_exporter_port` — controls whether this VPS appears in Prometheus targets

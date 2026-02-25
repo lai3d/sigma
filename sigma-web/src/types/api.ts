@@ -1,5 +1,5 @@
 export type VpsStatus = 'provisioning' | 'active' | 'retiring' | 'retired';
-export type VpsPurpose = 'vpn-exit' | 'vpn-relay' | 'vpn-entry' | 'monitor' | 'management' | '';
+export type VpsPurpose = 'vpn-exit' | 'vpn-relay' | 'vpn-entry' | 'monitor' | 'management' | 'core-services' | '';
 
 // ─── Auth & Users ────────────────────────────────────────
 
