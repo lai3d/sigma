@@ -44,7 +44,7 @@ sigma-agent/
 | `AGENT_XDS_ENABLED` | `--xds-enabled` | `false` | Enable xDS gRPC server |
 | `AGENT_XDS_PORT` | `--xds-port` | `18000` | xDS gRPC listen port |
 | `AGENT_XDS_POLL_INTERVAL` | `--xds-poll-interval` | `10` | xDS config poll interval (seconds) |
-| `AGENT_ENVOY_CONFIG_PATH` | `--envoy-config-path` | `/etc/envoy/envoy.yaml` | Envoy static config file path |
+| `AGENT_ENVOY_CONFIG_PATH` | `--envoy-config-path` | `/etc/envoy/envoy.yaml` | Comma-separated Envoy config file paths |
 | `AGENT_ENVOY_CONFIG_SYNC` | `--envoy-config-sync` | `false` | Enable static config sync |
 | `AGENT_ENVOY_CONFIG_SYNC_INTERVAL` | `--envoy-config-sync-interval` | `60` | File poll interval (seconds) |
 
@@ -228,12 +228,25 @@ both dynamic (managed via API/UI) and static (from config files) — with clear 
 
 ### How It Works
 
-1. On startup, parses `--envoy-config-path` (default `/etc/envoy/envoy.yaml`)
-2. Extracts listeners + clusters from `static_resources`, skipping `xds_cluster`
-3. POSTs parsed routes to `POST /api/envoy-routes/sync-static` with `source=static`
-4. API upserts by `(envoy_node_id, listen_port)` and deletes stale static routes
-5. Polls file mtime every `--envoy-config-sync-interval` seconds; re-syncs on change
-6. Auto-registers an envoy node (named `static-{hostname}`) if none exists
+1. On startup, parses each path in `--envoy-config-path` (comma-separated, default `/etc/envoy/envoy.yaml`)
+2. Each file gets its own envoy node: `static-{hostname}` for `envoy.yaml`, `static-{hostname}-{stem}` for other names
+3. Extracts listeners + clusters from `static_resources`, skipping `xds_cluster`
+4. POSTs parsed routes to `POST /api/envoy-routes/sync-static` with `source=static`
+5. API upserts by `(envoy_node_id, listen_port)` and deletes stale static routes
+6. Polls each file mtime every `--envoy-config-sync-interval` seconds; re-syncs on change
+
+### Multiple Envoy Instances
+
+To sync multiple Envoy static configs, pass comma-separated paths:
+
+```bash
+AGENT_ENVOY_CONFIG_PATH=/etc/envoy/envoy.yaml,/etc/envoy/envoy-relay.yaml,/etc/envoy/envoy-exit.yaml
+```
+
+Each file creates a separate envoy node in sigma:
+- `/etc/envoy/envoy.yaml` → node `static-myhost`
+- `/etc/envoy/envoy-relay.yaml` → node `static-myhost-envoy-relay`
+- `/etc/envoy/envoy-exit.yaml` → node `static-myhost-envoy-exit`
 
 ### Parsed Fields
 

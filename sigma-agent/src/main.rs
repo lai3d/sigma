@@ -124,27 +124,35 @@ async fn main() -> Result<()> {
         let vps_id = vps_id.expect(
             "VPS registration must succeed before starting envoy config sync",
         );
-        let config_path = config.envoy_config_path.clone();
+        let paths: Vec<String> = config
+            .envoy_config_path
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
         let sync_interval = config.envoy_config_sync_interval;
-        let sync_client = client.clone();
-        let sync_hostname = hostname.clone();
 
         info!(
-            path = %config_path,
+            paths = ?paths,
             interval = sync_interval,
             "Envoy static config sync enabled"
         );
 
-        tokio::spawn(async move {
-            envoy_config_sync_loop(
-                sync_client,
-                vps_id,
-                &sync_hostname,
-                &config_path,
-                sync_interval,
-            )
-            .await;
-        });
+        // Spawn one sync loop per config file
+        for path in paths {
+            let sync_client = client.clone();
+            let sync_hostname = hostname.clone();
+            tokio::spawn(async move {
+                envoy_config_sync_loop(
+                    sync_client,
+                    vps_id,
+                    &sync_hostname,
+                    &path,
+                    sync_interval,
+                )
+                .await;
+            });
+        }
     }
 
     // Heartbeat loop
@@ -207,12 +215,24 @@ async fn envoy_config_sync_loop(
     let path = Path::new(config_path);
     let mut last_mtime: Option<SystemTime> = None;
 
-    // Ensure we have an envoy node for this VPS (reuse xDS auto-register pattern)
-    let node_id = format!("static-{}", hostname);
+    // Derive node_id from filename stem to support multiple config files.
+    // Single default path → "static-{hostname}" (backward compatible)
+    // Multiple paths → "static-{hostname}-{stem}" (e.g. static-myhost-envoy-relay)
+    let stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("envoy");
+    let node_id = if stem == "envoy" {
+        format!("static-{}", hostname)
+    } else {
+        format!("static-{}-{}", hostname, stem)
+    };
+
+    // Ensure we have an envoy node for this VPS
     let envoy_node_id = match get_or_create_envoy_node(&client, vps_id, &node_id).await {
         Ok(id) => id,
         Err(e) => {
-            error!("Failed to get/create envoy node for static sync: {:#}", e);
+            error!(path = %config_path, "Failed to get/create envoy node for static sync: {:#}", e);
             return;
         }
     };
@@ -220,6 +240,7 @@ async fn envoy_config_sync_loop(
     info!(
         node_id = %node_id,
         envoy_node_id = %envoy_node_id,
+        path = %config_path,
         "Envoy static config sync ready"
     );
 
@@ -227,7 +248,7 @@ async fn envoy_config_sync_loop(
     if path.exists() {
         match envoy_config::parse_envoy_config(path) {
             Ok(routes) => {
-                info!(routes = routes.len(), "Parsed envoy static config (initial)");
+                info!(routes = routes.len(), path = %config_path, "Parsed envoy static config (initial)");
                 let body = SyncStaticRoutesRequest {
                     envoy_node_id,
                     routes,
@@ -239,13 +260,14 @@ async fn envoy_config_sync_loop(
                     Ok(resp) => info!(
                         upserted = resp.upserted,
                         deleted = resp.deleted,
+                        path = %config_path,
                         "Static routes synced (initial)"
                     ),
-                    Err(e) => warn!("Failed to sync static routes: {:#}", e),
+                    Err(e) => warn!(path = %config_path, "Failed to sync static routes: {:#}", e),
                 }
                 last_mtime = std::fs::metadata(path).ok().and_then(|m| m.modified().ok());
             }
-            Err(e) => warn!("Failed to parse envoy config: {:#}", e),
+            Err(e) => warn!(path = %config_path, "Failed to parse envoy config: {:#}", e),
         }
     } else {
         warn!(path = %config_path, "Envoy config file not found, will retry");
@@ -267,7 +289,7 @@ async fn envoy_config_sync_loop(
 
         match envoy_config::parse_envoy_config(path) {
             Ok(routes) => {
-                info!(routes = routes.len(), "Envoy config changed, syncing");
+                info!(routes = routes.len(), path = %config_path, "Envoy config changed, syncing");
                 let body = SyncStaticRoutesRequest {
                     envoy_node_id,
                     routes,
@@ -280,14 +302,15 @@ async fn envoy_config_sync_loop(
                         info!(
                             upserted = resp.upserted,
                             deleted = resp.deleted,
+                            path = %config_path,
                             "Static routes synced"
                         );
                         last_mtime = current_mtime;
                     }
-                    Err(e) => warn!("Failed to sync static routes: {:#}", e),
+                    Err(e) => warn!(path = %config_path, "Failed to sync static routes: {:#}", e),
                 }
             }
-            Err(e) => warn!("Failed to parse envoy config: {:#}", e),
+            Err(e) => warn!(path = %config_path, "Failed to parse envoy config: {:#}", e),
         }
     }
 }
