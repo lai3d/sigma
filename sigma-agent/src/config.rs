@@ -55,7 +55,7 @@ pub struct Config {
     #[arg(long, env = "AGENT_XDS_POLL_INTERVAL", default_value = "10")]
     pub xds_poll_interval: u64,
 
-    /// Comma-separated paths to Envoy static config files (each gets its own envoy node)
+    /// Envoy config file paths (comma-separated, supports glob: /etc/envoy/layer4*.yaml)
     #[arg(long, env = "AGENT_ENVOY_CONFIG_PATH", default_value = "/etc/envoy/envoy.yaml")]
     pub envoy_config_path: String,
 
@@ -66,6 +66,10 @@ pub struct Config {
     /// Envoy config file poll interval in seconds
     #[arg(long, env = "AGENT_ENVOY_CONFIG_SYNC_INTERVAL", default_value = "60")]
     pub envoy_config_sync_interval: u64,
+
+    /// Glob pattern to exclude config files (e.g. "*dynamic*")
+    #[arg(long, env = "AGENT_ENVOY_CONFIG_EXCLUDE")]
+    pub envoy_config_exclude: Option<String>,
 }
 
 impl Config {

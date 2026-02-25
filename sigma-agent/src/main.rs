@@ -124,34 +124,34 @@ async fn main() -> Result<()> {
         let vps_id = vps_id.expect(
             "VPS registration must succeed before starting envoy config sync",
         );
-        let paths: Vec<String> = config
-            .envoy_config_path
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
+        let paths = resolve_config_paths(&config.envoy_config_path, config.envoy_config_exclude.as_deref());
         let sync_interval = config.envoy_config_sync_interval;
 
-        info!(
-            paths = ?paths,
-            interval = sync_interval,
-            "Envoy static config sync enabled"
-        );
+        if paths.is_empty() {
+            warn!("Envoy config sync enabled but no files matched: {}", config.envoy_config_path);
+        } else {
+            info!(
+                files = paths.len(),
+                paths = ?paths,
+                interval = sync_interval,
+                "Envoy static config sync enabled"
+            );
 
-        // Spawn one sync loop per config file
-        for path in paths {
-            let sync_client = client.clone();
-            let sync_hostname = hostname.clone();
-            tokio::spawn(async move {
-                envoy_config_sync_loop(
-                    sync_client,
-                    vps_id,
-                    &sync_hostname,
-                    &path,
-                    sync_interval,
-                )
-                .await;
-            });
+            // Spawn one sync loop per config file
+            for path in paths {
+                let sync_client = client.clone();
+                let sync_hostname = hostname.clone();
+                tokio::spawn(async move {
+                    envoy_config_sync_loop(
+                        sync_client,
+                        vps_id,
+                        &sync_hostname,
+                        &path,
+                        sync_interval,
+                    )
+                    .await;
+                });
+            }
         }
     }
 
@@ -199,6 +199,52 @@ async fn heartbeat(client: &SigmaClient, hostname: &str, config: &Config, public
     client
         .post::<_, VpsResponse>("/agent/heartbeat", &body)
         .await
+}
+
+/// Resolve comma-separated paths, expanding glob patterns (e.g. "/etc/envoy/layer4*.yaml").
+/// Applies optional exclude pattern to filter out matched files.
+fn resolve_config_paths(raw: &str, exclude: Option<&str>) -> Vec<String> {
+    let exclude_pattern = exclude.and_then(|e| {
+        glob::Pattern::new(e).ok()
+    });
+
+    let mut result = Vec::new();
+    for entry in raw.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        if entry.contains('*') || entry.contains('?') || entry.contains('[') {
+            // Glob pattern
+            match glob::glob(entry) {
+                Ok(paths) => {
+                    for path in paths.flatten() {
+                        let s = path.display().to_string();
+                        if let Some(ref pat) = exclude_pattern {
+                            if pat.matches(path.file_name().and_then(|f| f.to_str()).unwrap_or("")) {
+                                continue;
+                            }
+                        }
+                        result.push(s);
+                    }
+                }
+                Err(e) => {
+                    warn!(pattern = %entry, "Invalid glob pattern: {}", e);
+                }
+            }
+        } else {
+            // Literal path
+            if let Some(ref pat) = exclude_pattern {
+                let fname = std::path::Path::new(entry)
+                    .file_name()
+                    .and_then(|f| f.to_str())
+                    .unwrap_or("");
+                if pat.matches(fname) {
+                    continue;
+                }
+            }
+            result.push(entry.to_string());
+        }
+    }
+    result.sort();
+    result.dedup();
+    result
 }
 
 async fn envoy_config_sync_loop(

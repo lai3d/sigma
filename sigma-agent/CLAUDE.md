@@ -44,9 +44,10 @@ sigma-agent/
 | `AGENT_XDS_ENABLED` | `--xds-enabled` | `false` | Enable xDS gRPC server |
 | `AGENT_XDS_PORT` | `--xds-port` | `18000` | xDS gRPC listen port |
 | `AGENT_XDS_POLL_INTERVAL` | `--xds-poll-interval` | `10` | xDS config poll interval (seconds) |
-| `AGENT_ENVOY_CONFIG_PATH` | `--envoy-config-path` | `/etc/envoy/envoy.yaml` | Comma-separated Envoy config file paths |
+| `AGENT_ENVOY_CONFIG_PATH` | `--envoy-config-path` | `/etc/envoy/envoy.yaml` | Config paths (comma-separated, supports glob) |
 | `AGENT_ENVOY_CONFIG_SYNC` | `--envoy-config-sync` | `false` | Enable static config sync |
 | `AGENT_ENVOY_CONFIG_SYNC_INTERVAL` | `--envoy-config-sync-interval` | `60` | File poll interval (seconds) |
+| `AGENT_ENVOY_CONFIG_EXCLUDE` | `--envoy-config-exclude` | (none) | Glob pattern to exclude files (e.g. `*dynamic*`) |
 
 ## IP Discovery
 
@@ -237,16 +238,27 @@ both dynamic (managed via API/UI) and static (from config files) — with clear 
 
 ### Multiple Envoy Instances
 
-To sync multiple Envoy static configs, pass comma-separated paths:
+Supports glob patterns for many Envoy static config files. Use `--envoy-config-exclude`
+to skip the dynamic (xDS-managed) Envoy config:
 
 ```bash
-AGENT_ENVOY_CONFIG_PATH=/etc/envoy/envoy.yaml,/etc/envoy/envoy-relay.yaml,/etc/envoy/envoy-exit.yaml
+AGENT_ENVOY_CONFIG_PATH=/envoy-configs/layer4*.yaml
+AGENT_ENVOY_CONFIG_EXCLUDE=*dynamic*
 ```
 
-Each file creates a separate envoy node in sigma:
-- `/etc/envoy/envoy.yaml` → node `static-myhost`
-- `/etc/envoy/envoy-relay.yaml` → node `static-myhost-envoy-relay`
-- `/etc/envoy/envoy-exit.yaml` → node `static-myhost-envoy-exit`
+Each matched file creates a separate envoy node in sigma:
+- `layer4.yaml` → node `static-myhost-layer4`
+- `layer4-01.yaml` → node `static-myhost-layer4-01`
+- `layer4-shield-01.yaml` → node `static-myhost-layer4-shield-01`
+- `layer4-dynamic.yaml` → excluded by `*dynamic*` pattern
+
+Also supports comma-separated literal paths:
+```bash
+AGENT_ENVOY_CONFIG_PATH=/etc/envoy/envoy.yaml,/etc/envoy/envoy-relay.yaml
+```
+
+Infrastructure clusters (`xds_cluster`, `sigma_xds`, `*_xds`) are automatically
+skipped during parsing.
 
 ### Parsed Fields
 

@@ -132,8 +132,8 @@ pub fn parse_envoy_config(path: &Path) -> Result<Vec<StaticRouteEntry>> {
             None => continue,
         };
 
-        // Skip infrastructure clusters
-        if name == "xds_cluster" {
+        // Skip infrastructure clusters (xDS bootstrap)
+        if name == "xds_cluster" || name.ends_with("_xds") || name == "sigma_xds" {
             continue;
         }
 
@@ -174,8 +174,8 @@ pub fn parse_envoy_config(path: &Path) -> Result<Vec<StaticRouteEntry>> {
             None => continue,
         };
 
-        // Skip if this references the xds_cluster
-        if cluster_name == "xds_cluster" {
+        // Skip if this references an xDS infrastructure cluster
+        if cluster_name == "xds_cluster" || cluster_name.ends_with("_xds") || cluster_name == "sigma_xds" {
             continue;
         }
 

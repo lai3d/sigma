@@ -91,9 +91,13 @@ services:
       AGENT_ENVOY_CONFIG_PATH: ${AGENT_ENVOY_CONFIG_PATH:-/etc/envoy/envoy.yaml}
       AGENT_ENVOY_CONFIG_SYNC: ${AGENT_ENVOY_CONFIG_SYNC:-false}
       AGENT_ENVOY_CONFIG_SYNC_INTERVAL: ${AGENT_ENVOY_CONFIG_SYNC_INTERVAL:-60}
+      AGENT_ENVOY_CONFIG_EXCLUDE: ${AGENT_ENVOY_CONFIG_EXCLUDE:-}
     # volumes:
     #   - /etc/hostname:/etc/host_hostname:ro
-    #   - /etc/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro  # Mount for static config sync
+    #   - ./envoy:/envoy-configs:ro  # Mount envoy configs for static sync
+    # Example multi-file glob:
+    #   AGENT_ENVOY_CONFIG_PATH: /envoy-configs/layer4*.yaml
+    #   AGENT_ENVOY_CONFIG_EXCLUDE: "*dynamic*"
     depends_on:
       - api
     restart: unless-stopped
