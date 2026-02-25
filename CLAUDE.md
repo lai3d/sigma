@@ -36,6 +36,7 @@ sigma/
 - **Provider** — cloud platform vendor (e.g. any VPS hosting company)
 - **VPS** — individual server instance with lifecycle: provisioning → active → retiring → retired
 - **ip_checks** — table for tracking IP reachability from China (API done, probe: `sigma-probe/`)
+- **envoy_routes** — Envoy forwarding routes with `source` column (`dynamic` = managed via API/UI, `static` = synced from envoy.yaml)
 - **dns_accounts** — DNS provider accounts (Cloudflare, Route 53, GoDaddy, Name.com) with `provider_type` and JSONB `config`
 - **dns_zones** — synced DNS zones per account, with domain/cert expiry tracking
 - **dns_records** — synced DNS records with auto VPS-IP linking and provider-specific `extra` JSONB
@@ -98,6 +99,7 @@ sigma/
 - [x] Agent port allocation (`POST /ports/allocate` on agent, proxied via API)
 - [x] Grafana dashboard for port scan metrics (`grafana/dashboards/port-scan.json`)
 - [x] Envoy xDS control plane (sigma-agent as gRPC xDS server, config stored in PostgreSQL, hot reload via LDS/CDS)
+- [x] Envoy static config sync (agent parses `envoy.yaml` static_resources, syncs to API with `source=static`, topology shows dynamic vs static routes)
 - [x] Multi-provider DNS management (Cloudflare, Route 53, GoDaddy, Name.com — read-only sync with VPS-IP linking, domain/cert expiry tracking)
 
 ## Tech Stack

@@ -216,6 +216,7 @@ mod tests {
             cluster_type: "logical_dns".to_string(),
             connect_timeout_secs: 5,
             proxy_protocol: 0,
+            source: "dynamic".to_string(),
             status: "active".to_string(),
             created_at: "2025-01-01T00:00:00Z".to_string(),
             updated_at: "2025-01-01T00:00:00Z".to_string(),

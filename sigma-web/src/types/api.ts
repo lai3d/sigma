@@ -338,6 +338,7 @@ export interface EnvoyRoute {
   cluster_type: string;
   connect_timeout_secs: number;
   proxy_protocol: number;
+  source: string;
   status: string;
   created_at: string;
   updated_at: string;
@@ -395,6 +396,7 @@ export interface TopologyRouteInfo {
   backend_host: string | null;
   backend_port: number | null;
   proxy_protocol: number;
+  source: string;
 }
 
 export interface TopologyEdge {

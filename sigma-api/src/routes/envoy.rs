@@ -12,8 +12,9 @@ use std::collections::{HashMap, HashSet};
 use crate::models::{
     BatchCreateEnvoyRoutes, CreateEnvoyNode, CreateEnvoyRoute, EnvoyNode, EnvoyNodeListQuery,
     EnvoyRoute, EnvoyRouteListQuery, IpEntry, PaginatedEnvoyNodeResponse,
-    PaginatedEnvoyRouteResponse, PaginatedResponse, TopologyEdge, TopologyNode,
-    TopologyResponse, TopologyRouteInfo, UpdateEnvoyNode, UpdateEnvoyRoute,
+    PaginatedEnvoyRouteResponse, PaginatedResponse, SyncStaticRoutes, SyncStaticRoutesResponse,
+    TopologyEdge, TopologyNode, TopologyResponse, TopologyRouteInfo, UpdateEnvoyNode,
+    UpdateEnvoyRoute,
 };
 use crate::routes::audit_logs::log_audit;
 use crate::routes::AppState;
@@ -27,6 +28,7 @@ pub fn router() -> Router<AppState> {
         )
         .route("/api/envoy-routes", get(list_routes).post(create_route))
         .route("/api/envoy-routes/batch", axum::routing::post(batch_create_routes))
+        .route("/api/envoy-routes/sync-static", axum::routing::post(sync_static_routes))
         .route(
             "/api/envoy-routes/{id}",
             get(get_route).put(update_route).delete(delete_route),
@@ -317,6 +319,10 @@ pub async fn list_routes(
         param_idx += 1;
         where_clause.push_str(&format!(" AND status = ${param_idx}"));
     }
+    if q.source.is_some() {
+        param_idx += 1;
+        where_clause.push_str(&format!(" AND source = ${param_idx}"));
+    }
 
     // Count
     let count_sql = format!("SELECT COUNT(*) FROM envoy_routes{where_clause}");
@@ -325,6 +331,9 @@ pub async fn list_routes(
         count_query = count_query.bind(v);
     }
     if let Some(ref v) = q.status {
+        count_query = count_query.bind(v);
+    }
+    if let Some(ref v) = q.source {
         count_query = count_query.bind(v);
     }
     let total = count_query.fetch_one(&state.db).await?.0;
@@ -343,6 +352,9 @@ pub async fn list_routes(
         query = query.bind(v);
     }
     if let Some(ref v) = q.status {
+        query = query.bind(v);
+    }
+    if let Some(ref v) = q.source {
         query = query.bind(v);
     }
     query = query.bind(per_page).bind(offset);
@@ -660,6 +672,114 @@ pub async fn batch_create_routes(
     Ok(Json(created))
 }
 
+// ─── Static Route Sync ───────────────────────────────
+
+#[utoipa::path(
+    post,
+    path = "/api/envoy-routes/sync-static",
+    tag = "Envoy",
+    request_body = SyncStaticRoutes,
+    responses(
+        (status = 200, body = SyncStaticRoutesResponse),
+        (status = 400),
+    )
+)]
+pub async fn sync_static_routes(
+    State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
+    Json(input): Json<SyncStaticRoutes>,
+) -> Result<Json<SyncStaticRoutesResponse>, AppError> {
+    require_role(&user, &["admin", "operator"])?;
+
+    // Validate envoy_node_id exists
+    sqlx::query_as::<_, (Uuid,)>("SELECT id FROM envoy_nodes WHERE id = $1")
+        .bind(input.envoy_node_id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| {
+            AppError::BadRequest(format!("Envoy node {} not found", input.envoy_node_id))
+        })?;
+
+    let mut conn = state.db.acquire().await?;
+    let mut upserted = 0usize;
+
+    // Collect incoming listen_ports for stale cleanup
+    let incoming_ports: Vec<i32> = input.routes.iter().map(|r| r.listen_port).collect();
+
+    // Upsert each route with source='static' (match by envoy_node_id + listen_port)
+    for route in &input.routes {
+        sqlx::query(
+            r#"INSERT INTO envoy_routes (envoy_node_id, name, listen_port, backend_host, backend_port,
+                   cluster_type, connect_timeout_secs, proxy_protocol, source, status)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'static', 'active')
+               ON CONFLICT (envoy_node_id, listen_port) WHERE source = 'static'
+               DO UPDATE SET
+                   name = EXCLUDED.name,
+                   backend_host = EXCLUDED.backend_host,
+                   backend_port = EXCLUDED.backend_port,
+                   cluster_type = EXCLUDED.cluster_type,
+                   connect_timeout_secs = EXCLUDED.connect_timeout_secs,
+                   proxy_protocol = EXCLUDED.proxy_protocol,
+                   updated_at = now()"#,
+        )
+        .bind(input.envoy_node_id)
+        .bind(&route.name)
+        .bind(route.listen_port)
+        .bind(&route.backend_host)
+        .bind(route.backend_port)
+        .bind(&route.cluster_type)
+        .bind(route.connect_timeout_secs)
+        .bind(route.proxy_protocol)
+        .execute(&mut *conn)
+        .await?;
+        upserted += 1;
+    }
+
+    // Delete stale static routes for this node (source='static' and listen_port NOT in incoming list)
+    let deleted = if incoming_ports.is_empty() {
+        // If no routes sent, delete ALL static routes for this node
+        let result = sqlx::query(
+            "DELETE FROM envoy_routes WHERE envoy_node_id = $1 AND source = 'static'",
+        )
+        .bind(input.envoy_node_id)
+        .execute(&mut *conn)
+        .await?;
+        result.rows_affected() as usize
+    } else {
+        let result = sqlx::query(
+            "DELETE FROM envoy_routes WHERE envoy_node_id = $1 AND source = 'static' AND listen_port != ALL($2)",
+        )
+        .bind(input.envoy_node_id)
+        .bind(&incoming_ports)
+        .execute(&mut *conn)
+        .await?;
+        result.rows_affected() as usize
+    };
+
+    // Bump config_version on the node
+    sqlx::query("UPDATE envoy_nodes SET config_version = config_version + 1, updated_at = now() WHERE id = $1")
+        .bind(input.envoy_node_id)
+        .execute(&mut *conn)
+        .await?;
+
+    log_audit(
+        &state.db,
+        &user,
+        "sync_static",
+        "envoy_route",
+        None,
+        serde_json::json!({
+            "envoy_node_id": input.envoy_node_id.to_string(),
+            "upserted": upserted,
+            "deleted": deleted,
+            "ports": incoming_ports,
+        }),
+    )
+    .await;
+
+    Ok(Json(SyncStaticRoutesResponse { upserted, deleted }))
+}
+
 // ─── Topology ────────────────────────────────────────────
 
 #[derive(sqlx::FromRow)]
@@ -669,6 +789,7 @@ struct RouteWithSource {
     backend_host: Option<String>,
     backend_port: Option<i32>,
     proxy_protocol: i32,
+    route_source: String,
     source_vps_id: Uuid,
 }
 
@@ -691,6 +812,7 @@ pub async fn get_topology(
              r.backend_host,
              r.backend_port,
              r.proxy_protocol,
+             r.source AS route_source,
              n.vps_id AS source_vps_id
            FROM envoy_routes r
            JOIN envoy_nodes n ON n.id = r.envoy_node_id
@@ -750,6 +872,7 @@ pub async fn get_topology(
             backend_host: r.backend_host.clone(),
             backend_port: r.backend_port,
             proxy_protocol: r.proxy_protocol,
+            source: r.route_source.clone(),
         });
     }
 

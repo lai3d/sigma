@@ -827,6 +827,7 @@ pub struct EnvoyRoute {
     pub cluster_type: String,
     pub connect_timeout_secs: i32,
     pub proxy_protocol: i32,
+    pub source: String,
     pub status: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -865,6 +866,7 @@ pub struct UpdateEnvoyRoute {
 pub struct EnvoyRouteListQuery {
     pub envoy_node_id: Option<Uuid>,
     pub status: Option<String>,
+    pub source: Option<String>,
     #[serde(default = "default_page")]
     pub page: i64,
     #[serde(default = "default_per_page")]
@@ -877,6 +879,34 @@ pub struct PaginatedEnvoyRouteResponse {
     pub total: i64,
     pub page: i64,
     pub per_page: i64,
+}
+
+// ─── Static Route Sync ───────────────────────────────
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct SyncStaticRoutes {
+    pub envoy_node_id: Uuid,
+    pub routes: Vec<StaticRouteEntry>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct StaticRouteEntry {
+    pub name: String,
+    pub listen_port: i32,
+    pub backend_host: Option<String>,
+    pub backend_port: Option<i32>,
+    #[serde(default = "default_cluster_type")]
+    pub cluster_type: String,
+    #[serde(default = "default_connect_timeout")]
+    pub connect_timeout_secs: i32,
+    #[serde(default)]
+    pub proxy_protocol: i32,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct SyncStaticRoutesResponse {
+    pub upserted: usize,
+    pub deleted: usize,
 }
 
 // ─── Batch Operations ────────────────────────────────────
@@ -907,6 +937,7 @@ pub struct TopologyRouteInfo {
     pub backend_host: Option<String>,
     pub backend_port: Option<i32>,
     pub proxy_protocol: i32,
+    pub source: String,
 }
 
 #[derive(Debug, Serialize, ToSchema)]

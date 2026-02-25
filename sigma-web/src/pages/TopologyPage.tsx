@@ -115,12 +115,22 @@ function getLayoutedElements(nodes: Node[], edges: Edge[]): { nodes: Node[]; edg
 // ─── Edge Label ──────────────────────────────────────────
 
 function formatEdgeLabel(routes: TopologyRouteInfo[]): string {
+  const hasStatic = routes.some((r) => r.source === 'static');
+  const hasDynamic = routes.some((r) => r.source === 'dynamic');
+  const sourceTag = hasStatic && hasDynamic ? ' [mixed]' : hasStatic ? ' [static]' : '';
+
   if (routes.length === 1) {
     const r = routes[0];
-    return `:${r.listen_port} \u2192 :${r.backend_port ?? '?'}`;
+    return `:${r.listen_port} \u2192 :${r.backend_port ?? '?'}${sourceTag}`;
   }
   const ports = routes.map((r) => r.listen_port).sort((a, b) => a - b);
-  return `${routes.length} routes (:${ports[0]}\u2013:${ports[ports.length - 1]})`;
+  return `${routes.length} routes (:${ports[0]}\u2013:${ports[ports.length - 1]})${sourceTag}`;
+}
+
+function getEdgeColor(routes: TopologyRouteInfo[]): string {
+  const allStatic = routes.every((r) => r.source === 'static');
+  if (allStatic) return '#9ca3af'; // gray for static
+  return '#6b7280'; // default
 }
 
 // ─── Transform API → React Flow ──────────────────────────
@@ -165,14 +175,16 @@ function buildFlowElements(apiNodes: TopologyNode[], apiEdges: TopologyEdge[]) {
       }
     }
 
+    const edgeColor = getEdgeColor(e.routes);
+    const allStatic = e.routes.every((r) => r.source === 'static');
     flowEdges.push({
       id: `e-${i}`,
       source: e.source_vps_id,
       target: targetId,
       label: formatEdgeLabel(e.routes),
       markerEnd: { type: MarkerType.ArrowClosed },
-      style: { stroke: '#6b7280', strokeWidth: 1.5 },
-      labelStyle: { fontSize: 11, fill: '#374151' },
+      style: { stroke: edgeColor, strokeWidth: 1.5, strokeDasharray: allStatic ? '5 3' : undefined },
+      labelStyle: { fontSize: 11, fill: allStatic ? '#9ca3af' : '#374151' },
     });
   }
 
@@ -243,6 +255,9 @@ export default function TopologyPage() {
           </span>
           <span className="flex items-center gap-1">
             <span className="w-3 h-3 rounded border-2 border-dashed border-red-300 bg-red-100" /> External
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-6 border-t-2 border-dashed border-gray-400" /> Static
           </span>
         </div>
       </div>

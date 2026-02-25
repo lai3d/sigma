@@ -1,5 +1,6 @@
 mod client;
 mod config;
+mod envoy_config;
 mod metrics;
 mod models;
 mod port_scan;
@@ -118,6 +119,34 @@ async fn main() -> Result<()> {
         });
     }
 
+    // Conditionally start envoy static config sync
+    if config.envoy_config_sync {
+        let vps_id = vps_id.expect(
+            "VPS registration must succeed before starting envoy config sync",
+        );
+        let config_path = config.envoy_config_path.clone();
+        let sync_interval = config.envoy_config_sync_interval;
+        let sync_client = client.clone();
+        let sync_hostname = hostname.clone();
+
+        info!(
+            path = %config_path,
+            interval = sync_interval,
+            "Envoy static config sync enabled"
+        );
+
+        tokio::spawn(async move {
+            envoy_config_sync_loop(
+                sync_client,
+                vps_id,
+                &sync_hostname,
+                &config_path,
+                sync_interval,
+            )
+            .await;
+        });
+    }
+
     // Heartbeat loop
     loop {
         tokio::time::sleep(Duration::from_secs(config.interval)).await;
@@ -162,4 +191,136 @@ async fn heartbeat(client: &SigmaClient, hostname: &str, config: &Config, public
     client
         .post::<_, VpsResponse>("/agent/heartbeat", &body)
         .await
+}
+
+async fn envoy_config_sync_loop(
+    client: Arc<SigmaClient>,
+    vps_id: uuid::Uuid,
+    hostname: &str,
+    config_path: &str,
+    interval_secs: u64,
+) {
+    use crate::models::{SyncStaticRoutesRequest, SyncStaticRoutesResponse};
+    use std::path::Path;
+    use std::time::SystemTime;
+
+    let path = Path::new(config_path);
+    let mut last_mtime: Option<SystemTime> = None;
+
+    // Ensure we have an envoy node for this VPS (reuse xDS auto-register pattern)
+    let node_id = format!("static-{}", hostname);
+    let envoy_node_id = match get_or_create_envoy_node(&client, vps_id, &node_id).await {
+        Ok(id) => id,
+        Err(e) => {
+            error!("Failed to get/create envoy node for static sync: {:#}", e);
+            return;
+        }
+    };
+
+    info!(
+        node_id = %node_id,
+        envoy_node_id = %envoy_node_id,
+        "Envoy static config sync ready"
+    );
+
+    // Sync immediately on startup
+    if path.exists() {
+        match envoy_config::parse_envoy_config(path) {
+            Ok(routes) => {
+                info!(routes = routes.len(), "Parsed envoy static config (initial)");
+                let body = SyncStaticRoutesRequest {
+                    envoy_node_id,
+                    routes,
+                };
+                match client
+                    .post::<_, SyncStaticRoutesResponse>("/envoy-routes/sync-static", &body)
+                    .await
+                {
+                    Ok(resp) => info!(
+                        upserted = resp.upserted,
+                        deleted = resp.deleted,
+                        "Static routes synced (initial)"
+                    ),
+                    Err(e) => warn!("Failed to sync static routes: {:#}", e),
+                }
+                last_mtime = std::fs::metadata(path).ok().and_then(|m| m.modified().ok());
+            }
+            Err(e) => warn!("Failed to parse envoy config: {:#}", e),
+        }
+    } else {
+        warn!(path = %config_path, "Envoy config file not found, will retry");
+    }
+
+    // Poll loop
+    loop {
+        tokio::time::sleep(Duration::from_secs(interval_secs)).await;
+
+        if !path.exists() {
+            continue;
+        }
+
+        // Check mtime
+        let current_mtime = std::fs::metadata(path).ok().and_then(|m| m.modified().ok());
+        if current_mtime == last_mtime && last_mtime.is_some() {
+            continue; // File unchanged
+        }
+
+        match envoy_config::parse_envoy_config(path) {
+            Ok(routes) => {
+                info!(routes = routes.len(), "Envoy config changed, syncing");
+                let body = SyncStaticRoutesRequest {
+                    envoy_node_id,
+                    routes,
+                };
+                match client
+                    .post::<_, SyncStaticRoutesResponse>("/envoy-routes/sync-static", &body)
+                    .await
+                {
+                    Ok(resp) => {
+                        info!(
+                            upserted = resp.upserted,
+                            deleted = resp.deleted,
+                            "Static routes synced"
+                        );
+                        last_mtime = current_mtime;
+                    }
+                    Err(e) => warn!("Failed to sync static routes: {:#}", e),
+                }
+            }
+            Err(e) => warn!("Failed to parse envoy config: {:#}", e),
+        }
+    }
+}
+
+async fn get_or_create_envoy_node(
+    client: &SigmaClient,
+    vps_id: uuid::Uuid,
+    node_id: &str,
+) -> Result<uuid::Uuid> {
+    use crate::models::{CreateEnvoyNode, EnvoyNode, PaginatedResponse};
+
+    // Check if a node already exists for this VPS
+    let nodes: PaginatedResponse<EnvoyNode> = client
+        .get(&format!(
+            "/envoy-nodes?vps_id={}&status=active&per_page=100",
+            vps_id
+        ))
+        .await?;
+
+    // Look for a node with matching node_id
+    for node in &nodes.data {
+        if node.node_id == node_id {
+            return Ok(node.id);
+        }
+    }
+
+    // Create a new node
+    let body = CreateEnvoyNode {
+        vps_id,
+        node_id: node_id.to_string(),
+        description: "Auto-registered for static config sync".to_string(),
+    };
+
+    let node: EnvoyNode = client.post("/envoy-nodes", &body).await?;
+    Ok(node.id)
 }

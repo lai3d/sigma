@@ -73,7 +73,32 @@ pub struct EnvoyRoute {
     pub cluster_type: String,
     pub connect_timeout_secs: i32,
     pub proxy_protocol: i32,
+    pub source: String,
     pub status: String,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SyncStaticRoutesRequest {
+    pub envoy_node_id: uuid::Uuid,
+    pub routes: Vec<StaticRouteEntry>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct StaticRouteEntry {
+    pub name: String,
+    pub listen_port: i32,
+    pub backend_host: Option<String>,
+    pub backend_port: Option<i32>,
+    pub cluster_type: String,
+    pub connect_timeout_secs: i32,
+    pub proxy_protocol: i32,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct SyncStaticRoutesResponse {
+    pub upserted: usize,
+    pub deleted: usize,
 }

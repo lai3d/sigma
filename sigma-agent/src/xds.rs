@@ -112,7 +112,7 @@ impl XdsServer {
             let routes: PaginatedResponse<EnvoyRoute> = self
                 .client
                 .get(&format!(
-                    "/envoy-routes?envoy_node_id={}&status=active&per_page=100",
+                    "/envoy-routes?envoy_node_id={}&status=active&source=dynamic&per_page=100",
                     node.id
                 ))
                 .await?;

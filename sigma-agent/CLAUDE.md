@@ -16,13 +16,14 @@ sigma-agent/
 ├── Dockerfile
 ├── CLAUDE.md
 └── src/
-    ├── main.rs            # Entry point: register + heartbeat loop + spawn scan/metrics/xds
+    ├── main.rs            # Entry point: register + heartbeat loop + spawn scan/metrics/xds/config-sync
     ├── config.rs          # Configuration: env vars + CLI flags (clap)
     ├── client.rs          # HTTP client (GET + POST with X-Api-Key auth)
     ├── models.rs          # API request/response types
     ├── system.rs          # Linux system info collection (/proc, statvfs)
     ├── port_scan.rs       # Port scanning: TcpListener::bind test + ss parsing
     ├── metrics.rs         # Prometheus metrics HTTP server (/metrics)
+    ├── envoy_config.rs    # Parse envoy.yaml static_resources → static route entries
     ├── xds.rs             # gRPC ADS server: config polling, push to Envoy clients
     └── xds_resources.rs   # Builds xDS Cluster + Listener protos from envoy routes
 ```
@@ -43,6 +44,9 @@ sigma-agent/
 | `AGENT_XDS_ENABLED` | `--xds-enabled` | `false` | Enable xDS gRPC server |
 | `AGENT_XDS_PORT` | `--xds-port` | `18000` | xDS gRPC listen port |
 | `AGENT_XDS_POLL_INTERVAL` | `--xds-poll-interval` | `10` | xDS config poll interval (seconds) |
+| `AGENT_ENVOY_CONFIG_PATH` | `--envoy-config-path` | `/etc/envoy/envoy.yaml` | Envoy static config file path |
+| `AGENT_ENVOY_CONFIG_SYNC` | `--envoy-config-sync` | `false` | Enable static config sync |
+| `AGENT_ENVOY_CONFIG_SYNC_INTERVAL` | `--envoy-config-sync-interval` | `60` | File poll interval (seconds) |
 
 ## IP Discovery
 
@@ -64,7 +68,8 @@ sigma-agent/
 - POST /api/agent/register — initial registration with full system info + IPs
 - POST /api/agent/heartbeat — periodic update with system info
 - GET /api/envoy-nodes?vps_id=...&status=active — fetch envoy nodes for this VPS (xDS)
-- GET /api/envoy-routes?envoy_node_id=...&status=active — fetch routes for a node (xDS)
+- GET /api/envoy-routes?envoy_node_id=...&status=active&source=dynamic — fetch dynamic routes for a node (xDS)
+- POST /api/envoy-routes/sync-static — sync static routes parsed from envoy.yaml
 
 ## Build & Run
 
@@ -215,6 +220,36 @@ static_resources:
             http2_protocol_options: {}
 ```
 
+## Envoy Static Config Sync
+
+When `--envoy-config-sync` is enabled, the agent parses the local `envoy.yaml` file and syncs
+any `static_resources` routes to sigma-api. This lets operators see **all** routes in the UI —
+both dynamic (managed via API/UI) and static (from config files) — with clear `source` labels.
+
+### How It Works
+
+1. On startup, parses `--envoy-config-path` (default `/etc/envoy/envoy.yaml`)
+2. Extracts listeners + clusters from `static_resources`, skipping `xds_cluster`
+3. POSTs parsed routes to `POST /api/envoy-routes/sync-static` with `source=static`
+4. API upserts by `(envoy_node_id, listen_port)` and deletes stale static routes
+5. Polls file mtime every `--envoy-config-sync-interval` seconds; re-syncs on change
+6. Auto-registers an envoy node (named `static-{hostname}`) if none exists
+
+### Parsed Fields
+
+From each listener + its referenced cluster:
+- `listen_port` — from `listeners[].address.socket_address.port_value`
+- `cluster` name — from `envoy.filters.network.tcp_proxy` filter config
+- `backend_host`/`backend_port` — from `clusters[].load_assignment` endpoints
+- `cluster_type` — mapped from STRICT_DNS/STATIC/LOGICAL_DNS to lowercase
+- `connect_timeout_secs` — parsed from duration string (e.g. "5s")
+- `proxy_protocol` — detected from transport_socket config (0/1/2)
+
+### xDS Isolation
+
+The xDS poll loop adds `&source=dynamic` to its route query, so static routes are never
+pushed back to Envoy via xDS (Envoy already has them in its config file).
+
 ## Dependencies
 
 - Reuses sigma-probe HTTP client pattern (SigmaClient with X-Api-Key auth)
@@ -222,3 +257,4 @@ static_resources:
 - Linux-only for system info collection (reads /proc filesystem)
 - `iproute2` package required in Docker image (provides `ss` command for port scan)
 - xDS: `tonic` 0.12, `prost` 0.13, `xds-api` 0.2 (pre-compiled Envoy proto bindings)
+- Static config sync: `serde_yaml` 0.9 (parse envoy.yaml)

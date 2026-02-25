@@ -54,6 +54,18 @@ pub struct Config {
     /// xDS config poll interval in seconds
     #[arg(long, env = "AGENT_XDS_POLL_INTERVAL", default_value = "10")]
     pub xds_poll_interval: u64,
+
+    /// Path to Envoy static config file
+    #[arg(long, env = "AGENT_ENVOY_CONFIG_PATH", default_value = "/etc/envoy/envoy.yaml")]
+    pub envoy_config_path: String,
+
+    /// Enable static config sync (parse envoy.yaml and POST to API)
+    #[arg(long, env = "AGENT_ENVOY_CONFIG_SYNC", default_value = "false")]
+    pub envoy_config_sync: bool,
+
+    /// Envoy config file poll interval in seconds
+    #[arg(long, env = "AGENT_ENVOY_CONFIG_SYNC_INTERVAL", default_value = "60")]
+    pub envoy_config_sync_interval: u64,
 }
 
 impl Config {
