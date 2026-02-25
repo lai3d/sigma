@@ -6,8 +6,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Upgrade npm to match lockfile format, then install
-RUN npm install -g npm@latest && npm ci
+# Install dependencies
+RUN npm install --no-audit --no-fund
 
 # Copy source code
 COPY . .
