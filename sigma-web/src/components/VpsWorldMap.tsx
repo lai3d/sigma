@@ -1,9 +1,8 @@
-import { useState, useRef, memo } from 'react';
-import {
-  ComposableMap,
-  Geographies,
-  Geography,
-} from 'react-simple-maps';
+import { useState, useRef, useEffect, memo, useCallback } from 'react';
+import { geoNaturalEarth1, geoPath } from 'd3-geo';
+import { feature } from 'topojson-client';
+import type { Topology, GeometryCollection } from 'topojson-specification';
+import type { FeatureCollection, Feature, Geometry } from 'geojson';
 import { COUNTRIES } from '@/lib/countries';
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
@@ -46,17 +45,57 @@ function getCountryName(alpha2: string): string {
   return CODE_TO_NAME[alpha2] || alpha2;
 }
 
+interface CountryFeature extends Feature<Geometry> {
+  id: string;
+}
+
 interface Props {
   countryData: { name: string; value: number }[];
 }
 
+const WIDTH = 960;
+const HEIGHT = 480;
+
+const projection = geoNaturalEarth1()
+  .scale(160)
+  .translate([WIDTH / 2, HEIGHT / 2]);
+const pathGenerator = geoPath(projection);
+
+// Cache fetched topology
+let cachedFeatures: CountryFeature[] | null = null;
+let fetchPromise: Promise<CountryFeature[]> | null = null;
+
+function fetchFeatures(): Promise<CountryFeature[]> {
+  if (cachedFeatures) return Promise.resolve(cachedFeatures);
+  if (fetchPromise) return fetchPromise;
+  fetchPromise = fetch(GEO_URL)
+    .then((res) => res.json())
+    .then((topo: Topology) => {
+      const fc = feature(
+        topo,
+        topo.objects.countries as GeometryCollection
+      ) as FeatureCollection<Geometry>;
+      cachedFeatures = fc.features as CountryFeature[];
+      return cachedFeatures;
+    });
+  return fetchPromise;
+}
+
 function VpsWorldMap({ countryData }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [features, setFeatures] = useState<CountryFeature[]>(cachedFeatures || []);
+  const [hoverId, setHoverId] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<{
     content: string;
     x: number;
     y: number;
   } | null>(null);
+
+  useEffect(() => {
+    if (features.length === 0) {
+      fetchFeatures().then(setFeatures);
+    }
+  }, [features.length]);
 
   // Build lookup: alpha2 → count
   const countMap: Record<string, number> = {};
@@ -66,68 +105,81 @@ function VpsWorldMap({ countryData }: Props) {
 
   const maxCount = Math.max(...countryData.map((d) => d.value), 1);
 
-  const getColor = (alpha2: string): string => {
-    const count = countMap[alpha2] || 0;
-    if (count === 0) return '#f3f4f6';
-    // Square root scale for better visual spread
-    const t = Math.sqrt(count / maxCount);
-    // Interpolate: #dbeafe (blue-100) → #1e40af (blue-800)
-    const r = Math.round(219 + t * (30 - 219));
-    const g = Math.round(234 + t * (64 - 234));
-    const b = Math.round(254 + t * (175 - 254));
-    return `rgb(${r}, ${g}, ${b})`;
-  };
+  const getColor = useCallback(
+    (alpha2: string): string => {
+      const count = countMap[alpha2] || 0;
+      if (count === 0) return '#f3f4f6';
+      const t = Math.sqrt(count / maxCount);
+      const r = Math.round(219 + t * (30 - 219));
+      const g = Math.round(234 + t * (64 - 234));
+      const b = Math.round(254 + t * (175 - 254));
+      return `rgb(${r}, ${g}, ${b})`;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [maxCount, countryData]
+  );
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent, feat: CountryFeature) => {
+      if (!containerRef.current) return;
+      const alpha2 = NUM_TO_A2[feat.id] || '';
+      if (!alpha2) return;
+      const count = countMap[alpha2] || 0;
+      const rect = containerRef.current.getBoundingClientRect();
+      const name = getCountryName(alpha2);
+      setHoverId(feat.id);
+      setTooltip({
+        content:
+          count > 0
+            ? `${name} (${alpha2}): ${count} VPS`
+            : `${name} (${alpha2})`,
+        x: e.clientX - rect.left + 14,
+        y: e.clientY - rect.top - 8,
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [countMap]
+  );
+
+  const handleMouseLeave = useCallback(() => {
+    setHoverId(null);
+    setTooltip(null);
+  }, []);
+
+  if (features.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
+        Loading map...
+      </div>
+    );
+  }
 
   return (
     <div ref={containerRef} className="relative">
-      <ComposableMap
-        projection="geoNaturalEarth1"
-        projectionConfig={{ scale: 155 }}
-        height={420}
-        style={{ width: '100%', height: 'auto' }}
+      <svg
+        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+        className="w-full h-auto"
+        style={{ maxHeight: 420 }}
       >
-        <Geographies geography={GEO_URL}>
-          {({ geographies }) =>
-            geographies.map((geo) => {
-              const alpha2 = NUM_TO_A2[geo.id] || '';
-              const count = countMap[alpha2] || 0;
-              return (
-                <Geography
-                  key={geo.rsmKey}
-                  geography={geo}
-                  fill={getColor(alpha2)}
-                  stroke="#d1d5db"
-                  strokeWidth={0.4}
-                  style={{
-                    default: { outline: 'none', transition: 'fill 0.15s' },
-                    hover: {
-                      outline: 'none',
-                      fill: count > 0 ? '#2563eb' : '#e5e7eb',
-                      stroke: '#9ca3af',
-                      strokeWidth: 0.8,
-                    },
-                    pressed: { outline: 'none' },
-                  }}
-                  onMouseMove={(e) => {
-                    if (!containerRef.current || !alpha2) return;
-                    const rect = containerRef.current.getBoundingClientRect();
-                    const name = getCountryName(alpha2);
-                    setTooltip({
-                      content:
-                        count > 0
-                          ? `${name} (${alpha2}): ${count} VPS`
-                          : `${name} (${alpha2})`,
-                      x: e.clientX - rect.left + 14,
-                      y: e.clientY - rect.top - 8,
-                    });
-                  }}
-                  onMouseLeave={() => setTooltip(null)}
-                />
-              );
-            })
-          }
-        </Geographies>
-      </ComposableMap>
+        {features.map((feat) => {
+          const alpha2 = NUM_TO_A2[feat.id] || '';
+          const count = countMap[alpha2] || 0;
+          const isHovered = hoverId === feat.id;
+          const d = pathGenerator(feat) || '';
+          return (
+            <path
+              key={feat.id}
+              d={d}
+              fill={isHovered ? (count > 0 ? '#2563eb' : '#e5e7eb') : getColor(alpha2)}
+              stroke={isHovered ? '#9ca3af' : '#d1d5db'}
+              strokeWidth={isHovered ? 0.8 : 0.4}
+              style={{ transition: 'fill 0.15s' }}
+              onMouseMove={(e) => handleMouseMove(e, feat)}
+              onMouseLeave={handleMouseLeave}
+            />
+          );
+        })}
+      </svg>
 
       {/* Tooltip */}
       {tooltip && (
