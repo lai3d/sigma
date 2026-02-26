@@ -126,35 +126,35 @@ async fn parse_ss_output() -> HashMap<u16, String> {
     map
 }
 
-/// Scan ports in the given range, returning aggregated results
+/// Scan ports in the given range, returning aggregated results.
+///
+/// `used_by_source` counts ALL listening ports per process (system-wide from `ss`),
+/// while `available`/`total_ports` reflect the configured scan range only.
 async fn scan_ports(start: u16, end: u16) -> PortScanResult {
     let start_time = Instant::now();
     let ss_map = parse_ss_output().await;
 
     let total_ports = (end as u32) - (start as u32) + 1;
 
-    // Run bind tests in a blocking task to avoid blocking the async runtime
-    let ss_map_clone = ss_map.clone();
-    let (available, used_by_source) = spawn_blocking(move || {
-        let mut available = 0u32;
-        let mut used_by_source: HashMap<String, u32> = HashMap::new();
+    // Count ALL listening ports by process (system-wide, from ss output)
+    let mut used_by_source: HashMap<String, u32> = HashMap::new();
+    for name in ss_map.values() {
+        let source = classify_process(name);
+        *used_by_source.entry(source.to_string()).or_insert(0) += 1;
+    }
 
+    // Run bind tests in a blocking task to count available ports within scan range
+    let available = spawn_blocking(move || {
+        let mut available = 0u32;
         for port in start..=end {
             if try_bind(port) {
                 available += 1;
-            } else {
-                let source = match ss_map_clone.get(&port) {
-                    Some(name) => classify_process(name),
-                    None => "unknown",
-                };
-                *used_by_source.entry(source.to_string()).or_insert(0) += 1;
             }
         }
-
-        (available, used_by_source)
+        available
     })
     .await
-    .unwrap_or((total_ports, HashMap::new()));
+    .unwrap_or(total_ports);
 
     PortScanResult {
         total_ports,

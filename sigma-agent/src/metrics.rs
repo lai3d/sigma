@@ -71,10 +71,10 @@ pub fn render_metrics(result: &PortScanResult, hostname: &str) -> String {
 
     writeln!(out).unwrap();
 
-    // sigma_ports_used (per source)
+    // sigma_ports_used (per source — system-wide from ss output)
     writeln!(
         out,
-        "# HELP sigma_ports_used Number of used ports by source process"
+        "# HELP sigma_ports_used Number of listening ports by source process (system-wide)"
     )
     .unwrap();
     writeln!(out, "# TYPE sigma_ports_used gauge").unwrap();
