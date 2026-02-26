@@ -4,8 +4,9 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import * as authApi from '@/api/auth';
 import { useVpsPurposes, useCreateVpsPurpose, useUpdateVpsPurpose, useDeleteVpsPurpose } from '@/hooks/useVpsPurposes';
+import { useIpLabels, useCreateIpLabel, useUpdateIpLabel, useDeleteIpLabel } from '@/hooks/useIpLabels';
 import { AVAILABLE_COLORS, getPurposeColor } from '@/lib/purposeColors';
-import type { TotpSetupResponse, VpsPurposeRecord } from '@/types/api';
+import type { TotpSetupResponse, VpsPurposeRecord, IpLabelRecord } from '@/types/api';
 
 export default function SettingsPage() {
   const { user, updateUser } = useAuth();
@@ -36,6 +37,18 @@ export default function SettingsPage() {
   const [purposeForm, setPurposeForm] = useState({ name: '', label: '', color: 'gray', sort_order: 0 });
   const [purposeError, setPurposeError] = useState('');
   const [confirmDeletePurpose, setConfirmDeletePurpose] = useState<VpsPurposeRecord | null>(null);
+
+  // IP Labels state
+  const { data: ipLabelsResult } = useIpLabels({ per_page: 100 });
+  const ipLabels = ipLabelsResult?.data ?? [];
+  const createIpLabel = useCreateIpLabel();
+  const updateIpLabel = useUpdateIpLabel();
+  const deleteIpLabel = useDeleteIpLabel();
+  const [editingIpLabel, setEditingIpLabel] = useState<string | null>(null);
+  const [addingIpLabel, setAddingIpLabel] = useState(false);
+  const [ipLabelForm, setIpLabelForm] = useState({ name: '', label: '', short: '', color: 'gray', sort_order: 0 });
+  const [ipLabelError, setIpLabelError] = useState('');
+  const [confirmDeleteIpLabel, setConfirmDeleteIpLabel] = useState<IpLabelRecord | null>(null);
 
   useEffect(() => {
     setApiKey(localStorage.getItem('sigma_api_key') || '');
@@ -488,6 +501,266 @@ export default function SettingsPage() {
                 </button>
                 <button
                   onClick={() => setConfirmDeletePurpose(null)}
+                  className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* IP Labels Card */}
+      {canMutate && (
+        <div className="mt-4 max-w-2xl bg-white rounded-lg border p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-gray-700">
+              <Tags size={18} />
+              <h3 className="text-sm font-semibold">IP Labels</h3>
+            </div>
+            {!addingIpLabel && (
+              <button
+                onClick={() => {
+                  setIpLabelForm({ name: '', label: '', short: '', color: 'gray', sort_order: ipLabels.length + 1 });
+                  setAddingIpLabel(true);
+                  setEditingIpLabel(null);
+                  setIpLabelError('');
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              >
+                <Plus size={14} /> Add Label
+              </button>
+            )}
+          </div>
+
+          {ipLabelError && (
+            <div className="p-3 text-sm text-red-700 bg-red-50 rounded-md">{ipLabelError}</div>
+          )}
+
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-gray-500 border-b">
+                <th className="py-2 pr-2 font-medium">Name</th>
+                <th className="py-2 pr-2 font-medium">Label</th>
+                <th className="py-2 pr-2 font-medium">Short</th>
+                <th className="py-2 pr-2 font-medium">Color</th>
+                <th className="py-2 pr-2 font-medium">Order</th>
+                <th className="py-2 font-medium w-20"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {ipLabels.map((il) => (
+                editingIpLabel === il.id ? (
+                  <tr key={il.id} className="border-b">
+                    <td className="py-2 pr-2">
+                      <input
+                        value={ipLabelForm.name}
+                        onChange={(e) => setIpLabelForm({ ...ipLabelForm, name: e.target.value })}
+                        className="input w-full text-sm"
+                      />
+                    </td>
+                    <td className="py-2 pr-2">
+                      <input
+                        value={ipLabelForm.label}
+                        onChange={(e) => setIpLabelForm({ ...ipLabelForm, label: e.target.value })}
+                        className="input w-full text-sm"
+                      />
+                    </td>
+                    <td className="py-2 pr-2">
+                      <input
+                        value={ipLabelForm.short}
+                        onChange={(e) => setIpLabelForm({ ...ipLabelForm, short: e.target.value })}
+                        className="input w-16 text-sm"
+                      />
+                    </td>
+                    <td className="py-2 pr-2">
+                      <select
+                        value={ipLabelForm.color}
+                        onChange={(e) => setIpLabelForm({ ...ipLabelForm, color: e.target.value })}
+                        className="input text-sm"
+                      >
+                        {AVAILABLE_COLORS.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-2 pr-2">
+                      <input
+                        type="number"
+                        value={ipLabelForm.sort_order}
+                        onChange={(e) => setIpLabelForm({ ...ipLabelForm, sort_order: Number(e.target.value) })}
+                        className="input w-16 text-sm"
+                      />
+                    </td>
+                    <td className="py-2">
+                      <div className="flex gap-1">
+                        <button
+                          onClick={async () => {
+                            setIpLabelError('');
+                            try {
+                              await updateIpLabel.mutateAsync({ id: il.id, data: ipLabelForm });
+                              setEditingIpLabel(null);
+                            } catch (err: unknown) {
+                              const msg = err instanceof Error ? err.message : 'Failed to update';
+                              setIpLabelError(msg);
+                            }
+                          }}
+                          className="px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setEditingIpLabel(null)}
+                          className="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={il.id} className="border-b hover:bg-gray-50">
+                    <td className="py-2 pr-2 font-mono text-xs">{il.name}</td>
+                    <td className="py-2 pr-2">{il.label}</td>
+                    <td className="py-2 pr-2 font-mono text-xs">{il.short}</td>
+                    <td className="py-2 pr-2">
+                      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium ${getPurposeColor(il.color).badge}`}>
+                        <span className={`w-2 h-2 rounded-full ${getPurposeColor(il.color).bg} border ${getPurposeColor(il.color).border}`} />
+                        {il.color}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-2 text-gray-500">{il.sort_order}</td>
+                    <td className="py-2">
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => {
+                            setIpLabelForm({ name: il.name, label: il.label, short: il.short, color: il.color, sort_order: il.sort_order });
+                            setEditingIpLabel(il.id);
+                            setAddingIpLabel(false);
+                            setIpLabelError('');
+                          }}
+                          className="p-1 text-gray-400 hover:text-blue-600"
+                          title="Edit"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteIpLabel(il)}
+                          className="p-1 text-gray-400 hover:text-red-600"
+                          title="Delete"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              ))}
+              {addingIpLabel && (
+                <tr className="border-b">
+                  <td className="py-2 pr-2">
+                    <input
+                      value={ipLabelForm.name}
+                      onChange={(e) => setIpLabelForm({ ...ipLabelForm, name: e.target.value })}
+                      className="input w-full text-sm"
+                      placeholder="e.g. china-bgp"
+                    />
+                  </td>
+                  <td className="py-2 pr-2">
+                    <input
+                      value={ipLabelForm.label}
+                      onChange={(e) => setIpLabelForm({ ...ipLabelForm, label: e.target.value })}
+                      className="input w-full text-sm"
+                      placeholder="e.g. BGP"
+                    />
+                  </td>
+                  <td className="py-2 pr-2">
+                    <input
+                      value={ipLabelForm.short}
+                      onChange={(e) => setIpLabelForm({ ...ipLabelForm, short: e.target.value })}
+                      className="input w-16 text-sm"
+                      placeholder="e.g. BGP"
+                    />
+                  </td>
+                  <td className="py-2 pr-2">
+                    <select
+                      value={ipLabelForm.color}
+                      onChange={(e) => setIpLabelForm({ ...ipLabelForm, color: e.target.value })}
+                      className="input text-sm"
+                    >
+                      {AVAILABLE_COLORS.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="py-2 pr-2">
+                    <input
+                      type="number"
+                      value={ipLabelForm.sort_order}
+                      onChange={(e) => setIpLabelForm({ ...ipLabelForm, sort_order: Number(e.target.value) })}
+                      className="input w-16 text-sm"
+                    />
+                  </td>
+                  <td className="py-2">
+                    <div className="flex gap-1">
+                      <button
+                        onClick={async () => {
+                          setIpLabelError('');
+                          if (!ipLabelForm.name.trim() || !ipLabelForm.label.trim()) {
+                            setIpLabelError('Name and label are required');
+                            return;
+                          }
+                          try {
+                            await createIpLabel.mutateAsync(ipLabelForm);
+                            setAddingIpLabel(false);
+                          } catch (err: unknown) {
+                            const msg = err instanceof Error ? err.message : 'Failed to create';
+                            setIpLabelError(msg);
+                          }
+                        }}
+                        className="px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+                      >
+                        Add
+                      </button>
+                      <button
+                        onClick={() => setAddingIpLabel(false)}
+                        className="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+
+          {confirmDeleteIpLabel && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-sm text-red-700">
+                Delete label <strong>{confirmDeleteIpLabel.label}</strong> ({confirmDeleteIpLabel.name})?
+                This will fail if any VPS IPs use it.
+              </p>
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={async () => {
+                    setIpLabelError('');
+                    try {
+                      await deleteIpLabel.mutateAsync(confirmDeleteIpLabel.id);
+                      setConfirmDeleteIpLabel(null);
+                    } catch (err: unknown) {
+                      const msg = err instanceof Error ? err.message : 'Failed to delete';
+                      setIpLabelError(msg);
+                      setConfirmDeleteIpLabel(null);
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded hover:bg-red-700"
+                >
+                  Delete
+                </button>
+                <button
+                  onClick={() => setConfirmDeleteIpLabel(null)}
                   className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
                 >
                   Cancel

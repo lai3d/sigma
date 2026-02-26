@@ -5,21 +5,11 @@ import { BarChart3 } from 'lucide-react';
 import { useVps, useCreateVps, useUpdateVps } from '@/hooks/useVps';
 import { useProviders } from '@/hooks/useProviders';
 import { useVpsPurposes } from '@/hooks/useVpsPurposes';
+import { useIpLabels } from '@/hooks/useIpLabels';
 import { ipLabelColor, timeAgo, formatUptime } from '@/lib/utils';
 import type { IpEntry } from '@/types/api';
 import { COUNTRIES } from '@/lib/countries';
 import { PROJECTS } from '@/lib/projects';
-
-const IP_LABELS = [
-  { value: '', display: '-' },
-  { value: 'china-telecom', display: '电信' },
-  { value: 'china-unicom', display: '联通' },
-  { value: 'china-mobile', display: '移动' },
-  { value: 'china-cernet', display: '教育网' },
-  { value: 'overseas', display: '海外' },
-  { value: 'internal', display: '内网' },
-  { value: 'anycast', display: 'Anycast' },
-] as const;
 
 interface FormData {
   hostname: string;
@@ -56,6 +46,8 @@ export default function VpsForm() {
   const providers = providersResult?.data;
   const { data: purposesResult } = useVpsPurposes({ per_page: 100 });
   const purposes = purposesResult?.data;
+  const { data: ipLabelsResult } = useIpLabels({ per_page: 100 });
+  const ipLabels = ipLabelsResult?.data;
   const createMutation = useCreateVps();
   const updateMutation = useUpdateVps();
 
@@ -378,9 +370,10 @@ export default function VpsForm() {
                         entry.label ? ipLabelColor(entry.label) + ' border-transparent' : 'border-gray-300 text-gray-400'
                       }`}
                     >
-                      {IP_LABELS.map((l) => (
-                        <option key={l.value} value={l.value}>
-                          {l.display}
+                      <option value="">-</option>
+                      {ipLabels?.map((l) => (
+                        <option key={l.name} value={l.name}>
+                          {l.label}
                         </option>
                       ))}
                     </select>

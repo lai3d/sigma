@@ -25,6 +25,7 @@ use crate::models::{
     UpdateEnvoyRoute, UpdateExchangeRate, UpdateProvider, UpdateTicket, UpdateUser, UpdateVps,
     UpdateVpsPurpose, UserResponse, Vps, VpsPurpose,
     VpsIpHistory, PaginatedVpsIpHistoryResponse,
+    IpLabel, CreateIpLabel, UpdateIpLabel, PaginatedIpLabelResponse,
 };
 
 #[derive(OpenApi)]
@@ -68,6 +69,12 @@ use crate::models::{
         crate::routes::vps::export,
         crate::routes::vps::import,
         crate::routes::vps::ip_history,
+        // IP Labels
+        crate::routes::ip_labels::list,
+        crate::routes::ip_labels::get_one,
+        crate::routes::ip_labels::create,
+        crate::routes::ip_labels::update,
+        crate::routes::ip_labels::delete,
         // IP Checks
         crate::routes::ip_checks::list,
         crate::routes::ip_checks::get_one,
@@ -170,6 +177,7 @@ use crate::models::{
         CloudAccountResponse, CreateCloudAccount, UpdateCloudAccount, CloudSyncResult,
         PaginatedCloudAccountResponse,
         VpsIpHistory, PaginatedVpsIpHistoryResponse,
+        IpLabel, CreateIpLabel, UpdateIpLabel, PaginatedIpLabelResponse,
     )),
     tags(
         (name = "Auth", description = "Authentication and session management"),
@@ -188,6 +196,7 @@ use crate::models::{
         (name = "DNS", description = "Multi-provider DNS domain management (read-only sync)"),
         (name = "Cloud Accounts", description = "Cloud provider account management (AWS, Alibaba) with VPS auto-sync"),
         (name = "VPS Purposes", description = "VPS purpose type management"),
+        (name = "IP Labels", description = "IP address label management"),
     )
 )]
 pub struct ApiDoc;

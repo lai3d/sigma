@@ -8,6 +8,7 @@ pub mod costs;
 pub mod envoy;
 pub mod exchange_rates;
 pub mod ip_checks;
+pub mod ip_labels;
 pub mod prometheus;
 pub mod providers;
 pub mod rate_limit;

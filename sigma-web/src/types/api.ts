@@ -566,6 +566,35 @@ export interface VpsIpHistoryQuery {
   per_page?: number;
 }
 
+// ─── IP Labels ───────────────────────────────────────────
+
+export interface IpLabelRecord {
+  id: string;
+  name: string;
+  label: string;
+  short: string;
+  color: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateIpLabel {
+  name: string;
+  label: string;
+  short?: string;
+  color?: string;
+  sort_order?: number;
+}
+
+export interface UpdateIpLabel {
+  name?: string;
+  label?: string;
+  short?: string;
+  color?: string;
+  sort_order?: number;
+}
+
 export interface CloudSyncResult {
   instances_found: number;
   created: number;

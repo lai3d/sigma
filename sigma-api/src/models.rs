@@ -1015,6 +1015,57 @@ pub struct PaginatedVpsPurposeResponse {
     pub per_page: i64,
 }
 
+// ─── IP Labels ───────────────────────────────────────────
+
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+pub struct IpLabel {
+    pub id: Uuid,
+    pub name: String,
+    pub label: String,
+    pub short: String,
+    pub color: String,
+    pub sort_order: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateIpLabel {
+    pub name: String,
+    pub label: String,
+    #[serde(default)]
+    pub short: String,
+    #[serde(default = "default_color")]
+    pub color: String,
+    #[serde(default)]
+    pub sort_order: i32,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateIpLabel {
+    pub name: Option<String>,
+    pub label: Option<String>,
+    pub short: Option<String>,
+    pub color: Option<String>,
+    pub sort_order: Option<i32>,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct IpLabelListQuery {
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_per_page")]
+    pub per_page: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct PaginatedIpLabelResponse {
+    pub data: Vec<IpLabel>,
+    pub total: i64,
+    pub page: i64,
+    pub per_page: i64,
+}
+
 // ─── Defaults ────────────────────────────────────────────
 
 fn default_ssh_port() -> i32 { 22 }
