@@ -58,7 +58,12 @@ pub async fn register(
             alias
         };
 
-        sqlx::query_as::<_, Vps>(
+        let mut tx = state.db.begin().await?;
+        sqlx::query("SET LOCAL app.change_source = 'agent'")
+            .execute(&mut *tx)
+            .await?;
+
+        let row = sqlx::query_as::<_, Vps>(
             r#"UPDATE vps SET
                 alias = $2,
                 ip_addresses = $3,
@@ -73,14 +78,18 @@ pub async fn register(
         .bind(&ip_json)
         .bind(input.ssh_port)
         .bind(&extra)
-        .fetch_one(&state.db)
-        .await?
+        .fetch_one(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        row
     } else {
         let extra = serde_json::json!({
             "system_info": input.system_info,
             "last_heartbeat": now,
         });
 
+        // New VPS from agent — source='agent', trigger falls back to NEW.source
         sqlx::query_as::<_, Vps>(
             r#"INSERT INTO vps (
                 hostname, alias, provider_id,
@@ -156,14 +165,22 @@ pub async fn heartbeat(
         let ip_json = serde_json::to_value(&input.ip_addresses)
             .map_err(|e| AppError::BadRequest(format!("Invalid ip_addresses: {}", e)))?;
 
-        sqlx::query_as::<_, Vps>(
+        let mut tx = state.db.begin().await?;
+        sqlx::query("SET LOCAL app.change_source = 'agent'")
+            .execute(&mut *tx)
+            .await?;
+
+        let row = sqlx::query_as::<_, Vps>(
             "UPDATE vps SET ip_addresses = $2, extra = $3 WHERE id = $1 RETURNING *",
         )
         .bind(existing.id)
         .bind(&ip_json)
         .bind(&extra)
-        .fetch_one(&state.db)
-        .await?
+        .fetch_one(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        row
     } else {
         sqlx::query_as::<_, Vps>("UPDATE vps SET extra = $2 WHERE id = $1 RETURNING *")
             .bind(existing.id)
