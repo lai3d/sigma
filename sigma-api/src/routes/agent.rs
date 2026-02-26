@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use axum::{extract::State, routing::post, Json, Router};
 
 use crate::errors::{AppError, ErrorResponse};
@@ -8,6 +10,31 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/agent/register", post(register))
         .route("/api/agent/heartbeat", post(heartbeat))
+}
+
+/// Merge agent-discovered IPs with existing VPS labels.
+/// For IPs that already exist in the VPS record, keep the operator-set label.
+/// For new IPs, use the agent's auto-detected label.
+fn merge_ip_labels(agent_ips: &[IpEntry], existing_ips: &[IpEntry]) -> Vec<IpEntry> {
+    let label_map: HashMap<&str, &str> = existing_ips
+        .iter()
+        .filter(|e| !e.label.is_empty())
+        .map(|e| (e.ip.as_str(), e.label.as_str()))
+        .collect();
+
+    agent_ips
+        .iter()
+        .map(|entry| {
+            if let Some(&existing_label) = label_map.get(entry.ip.as_str()) {
+                IpEntry {
+                    ip: entry.ip.clone(),
+                    label: existing_label.to_string(),
+                }
+            } else {
+                entry.clone()
+            }
+        })
+        .collect()
 }
 
 #[utoipa::path(
@@ -28,9 +55,6 @@ pub async fn register(
     }
 
     validate_ips(&input.ip_addresses)?;
-
-    let ip_json = serde_json::to_value(&input.ip_addresses)
-        .map_err(|e| AppError::BadRequest(format!("Invalid ip_addresses: {}", e)))?;
 
     let existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE hostname = $1")
         .bind(&input.hostname)
@@ -58,6 +82,11 @@ pub async fn register(
             alias
         };
 
+        // Merge: preserve existing labels for known IPs
+        let merged_ips = merge_ip_labels(&input.ip_addresses, &existing.ip_addresses.0);
+        let ip_json = serde_json::to_value(&merged_ips)
+            .map_err(|e| AppError::BadRequest(format!("Invalid ip_addresses: {}", e)))?;
+
         let mut tx = state.db.begin().await?;
         sqlx::query("SET LOCAL app.change_source = 'agent'")
             .execute(&mut *tx)
@@ -84,6 +113,9 @@ pub async fn register(
         tx.commit().await?;
         row
     } else {
+        let ip_json = serde_json::to_value(&input.ip_addresses)
+            .map_err(|e| AppError::BadRequest(format!("Invalid ip_addresses: {}", e)))?;
+
         let extra = serde_json::json!({
             "system_info": input.system_info,
             "last_heartbeat": now,
@@ -162,7 +194,10 @@ pub async fn heartbeat(
 
     let row = if !input.ip_addresses.is_empty() {
         validate_ips(&input.ip_addresses)?;
-        let ip_json = serde_json::to_value(&input.ip_addresses)
+
+        // Merge: preserve existing labels for known IPs
+        let merged_ips = merge_ip_labels(&input.ip_addresses, &existing.ip_addresses.0);
+        let ip_json = serde_json::to_value(&merged_ips)
             .map_err(|e| AppError::BadRequest(format!("Invalid ip_addresses: {}", e)))?;
 
         let mut tx = state.db.begin().await?;
