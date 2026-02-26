@@ -1,7 +1,8 @@
 import { useStats } from '@/hooks/useStats';
 import { formatDate, daysUntil } from '@/lib/utils';
-import { Server, Activity, Building2, AlertTriangle } from 'lucide-react';
+import { Server, Activity, Building2, AlertTriangle, Globe } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
+import VpsWorldMap from '@/components/VpsWorldMap';
 import {
   BarChart,
   Bar,
@@ -63,6 +64,17 @@ export default function Dashboard() {
           color="purple"
         />
       </div>
+
+      {/* World Map */}
+      {countryData.length > 0 && (
+        <div className="mt-8 bg-white rounded-lg border p-5">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+            <Globe size={16} className="text-blue-500" />
+            VPS Distribution
+          </h3>
+          <VpsWorldMap countryData={countryData} />
+        </div>
+      )}
 
       {/* Charts */}
       <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
