@@ -447,6 +447,8 @@ pub struct AgentRegister {
 pub struct AgentHeartbeat {
     pub hostname: String,
     #[serde(default)]
+    pub ip_addresses: Vec<IpEntry>,
+    #[serde(default)]
     #[schema(value_type = Object)]
     pub system_info: serde_json::Value,
 }

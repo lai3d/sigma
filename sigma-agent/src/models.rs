@@ -22,6 +22,7 @@ pub struct AgentRegister {
 #[derive(Debug, Serialize)]
 pub struct AgentHeartbeat {
     pub hostname: String,
+    pub ip_addresses: Vec<IpEntry>,
     pub system_info: serde_json::Value,
 }
 

@@ -151,11 +151,26 @@ pub async fn heartbeat(
         );
     }
 
-    let row = sqlx::query_as::<_, Vps>("UPDATE vps SET extra = $2 WHERE id = $1 RETURNING *")
+    let row = if !input.ip_addresses.is_empty() {
+        validate_ips(&input.ip_addresses)?;
+        let ip_json = serde_json::to_value(&input.ip_addresses)
+            .map_err(|e| AppError::BadRequest(format!("Invalid ip_addresses: {}", e)))?;
+
+        sqlx::query_as::<_, Vps>(
+            "UPDATE vps SET ip_addresses = $2, extra = $3 WHERE id = $1 RETURNING *",
+        )
         .bind(existing.id)
+        .bind(&ip_json)
         .bind(&extra)
         .fetch_one(&state.db)
-        .await?;
+        .await?
+    } else {
+        sqlx::query_as::<_, Vps>("UPDATE vps SET extra = $2 WHERE id = $1 RETURNING *")
+            .bind(existing.id)
+            .bind(&extra)
+            .fetch_one(&state.db)
+            .await?
+    };
 
     Ok(Json(row))
 }

@@ -190,9 +190,11 @@ async fn register(client: &SigmaClient, hostname: &str, config: &Config, public_
 
 async fn heartbeat(client: &SigmaClient, hostname: &str, config: &Config, public_ip: Option<&str>) -> Result<VpsResponse> {
     let system_info = system::collect_system_info(config.metrics_port, public_ip);
+    let ip_addresses = system::discover_ips().await;
 
     let body = AgentHeartbeat {
         hostname: hostname.to_string(),
+        ip_addresses,
         system_info,
     };
 
