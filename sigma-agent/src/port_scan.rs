@@ -13,6 +13,8 @@ pub struct PortScanResult {
     pub total_ports: u32,
     pub available: u32,
     pub used_by_source: HashMap<String, u32>,
+    /// Breakdown of actual process names classified as "other" (for diagnostics)
+    pub other_detail: HashMap<String, u32>,
     pub scan_duration: Duration,
 }
 
@@ -22,6 +24,7 @@ impl Default for PortScanResult {
             total_ports: 0,
             available: 0,
             used_by_source: HashMap::new(),
+            other_detail: HashMap::new(),
             scan_duration: Duration::ZERO,
         }
     }
@@ -138,9 +141,13 @@ async fn scan_ports(start: u16, end: u16) -> PortScanResult {
 
     // Count ALL listening ports by process (system-wide, from ss output)
     let mut used_by_source: HashMap<String, u32> = HashMap::new();
+    let mut other_detail: HashMap<String, u32> = HashMap::new();
     for name in ss_map.values() {
         let source = classify_process(name);
         *used_by_source.entry(source.to_string()).or_insert(0) += 1;
+        if source == "other" {
+            *other_detail.entry(name.clone()).or_insert(0) += 1;
+        }
     }
 
     // Run bind tests in a blocking task to count available ports within scan range
@@ -160,6 +167,7 @@ async fn scan_ports(start: u16, end: u16) -> PortScanResult {
         total_ports,
         available,
         used_by_source,
+        other_detail,
         scan_duration: start_time.elapsed(),
     }
 }
@@ -177,6 +185,16 @@ pub async fn scan_loop(shared: SharedScanResult, start: u16, end: u16, interval:
             duration_ms = result.scan_duration.as_millis() as u64,
             "Port scan complete"
         );
+
+        // Log detailed breakdown of "other" processes for diagnostics
+        if let Some(&other_count) = result.used_by_source.get("other") {
+            if other_count > 0 {
+                info!(
+                    breakdown = ?result.other_detail,
+                    "Port scan: 'other' process breakdown"
+                );
+            }
+        }
 
         *shared.write().await = result;
 

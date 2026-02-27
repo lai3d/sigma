@@ -104,6 +104,25 @@ pub fn render_metrics(result: &PortScanResult, hostname: &str) -> String {
 
     writeln!(out).unwrap();
 
+    // sigma_ports_other_detail (breakdown of "other" processes)
+    if !result.other_detail.is_empty() {
+        writeln!(
+            out,
+            "# HELP sigma_ports_other_detail Listening port count by actual process name (unclassified)"
+        )
+        .unwrap();
+        writeln!(out, "# TYPE sigma_ports_other_detail gauge").unwrap();
+        for (process, count) in &result.other_detail {
+            writeln!(
+                out,
+                "sigma_ports_other_detail{{hostname=\"{}\",process=\"{}\"}} {}",
+                hostname, process, count
+            )
+            .unwrap();
+        }
+        writeln!(out).unwrap();
+    }
+
     // sigma_port_scan_duration_seconds
     writeln!(
         out,
@@ -241,6 +260,7 @@ mod tests {
             total_ports: 20001,
             available: 19927,
             used_by_source: used,
+            other_detail: HashMap::new(),
             scan_duration: Duration::from_millis(287),
         };
         let output = render_metrics(&result, "relay-01");
@@ -278,6 +298,7 @@ mod tests {
             total_ports: 100,
             available: 95,
             used_by_source: used,
+            other_detail: HashMap::new(),
             scan_duration: Duration::from_secs(1),
         };
         let output = render_metrics(&result, "h");

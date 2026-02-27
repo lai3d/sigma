@@ -43,6 +43,11 @@ async fn main() -> Result<()> {
         "sigma-agent starting"
     );
 
+    // Check for root privileges (needed for ss -p process attribution)
+    if unsafe { libc::geteuid() } != 0 {
+        warn!("Agent not running as root — port scan process attribution (ss -p) may be incomplete");
+    }
+
     // Shared port scan result
     let scan_result: SharedScanResult = Arc::new(RwLock::new(PortScanResult::default()));
 
