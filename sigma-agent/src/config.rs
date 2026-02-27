@@ -70,6 +70,10 @@ pub struct Config {
     /// Glob pattern to exclude config files (e.g. "*dynamic*")
     #[arg(long, env = "AGENT_ENVOY_CONFIG_EXCLUDE")]
     pub envoy_config_exclude: Option<String>,
+
+    /// Host /proc path (mount host /proc into container for process attribution)
+    #[arg(long, env = "AGENT_HOST_PROC", default_value = "/proc")]
+    pub host_proc: String,
 }
 
 impl Config {

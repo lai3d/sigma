@@ -133,10 +133,12 @@ async fn parse_ss_output() -> HashMap<u16, String> {
 
 /// Parse /proc/net/tcp and /proc/net/tcp6 for listening sockets (state 0A).
 /// Returns HashMap<inode, port>.
-fn parse_proc_net_tcp() -> HashMap<u64, u16> {
+fn parse_proc_net_tcp(proc_path: &str) -> HashMap<u64, u16> {
     let mut inode_to_port = HashMap::new();
 
-    for path in &["/proc/net/tcp", "/proc/net/tcp6"] {
+    let tcp_path = format!("{}/net/tcp", proc_path);
+    let tcp6_path = format!("{}/net/tcp6", proc_path);
+    for path in &[tcp_path.as_str(), tcp6_path.as_str()] {
         let content = match std::fs::read_to_string(path) {
             Ok(c) => c,
             Err(_) => continue,
@@ -178,10 +180,10 @@ fn parse_proc_net_tcp() -> HashMap<u64, u16> {
 
 /// Walk /proc/<pid>/fd/ to map socket inodes → process names.
 /// Returns HashMap<inode, process_name>.
-fn scan_proc_fds(listening_inodes: &HashMap<u64, u16>) -> HashMap<u64, String> {
+fn scan_proc_fds(proc_path: &str, listening_inodes: &HashMap<u64, u16>) -> HashMap<u64, String> {
     let mut inode_to_process: HashMap<u64, String> = HashMap::new();
 
-    let proc_dir = match std::fs::read_dir("/proc") {
+    let proc_dir = match std::fs::read_dir(proc_path) {
         Ok(d) => d,
         Err(e) => {
             warn!(error = %e, "Cannot read /proc");
@@ -240,13 +242,15 @@ fn scan_proc_fds(listening_inodes: &HashMap<u64, u16>) -> HashMap<u64, String> {
 
 /// Build port → process name mapping by reading /proc directly.
 /// This bypasses `ss -p` and works even when ss can't resolve process names.
-fn build_proc_port_map() -> HashMap<u16, String> {
-    let inode_to_port = parse_proc_net_tcp();
+/// When `proc_path` points to a host-mounted /proc (e.g. /host/proc), this
+/// works around Docker's procfs restrictions.
+fn build_proc_port_map(proc_path: &str) -> HashMap<u16, String> {
+    let inode_to_port = parse_proc_net_tcp(proc_path);
     if inode_to_port.is_empty() {
         return HashMap::new();
     }
 
-    let inode_to_process = scan_proc_fds(&inode_to_port);
+    let inode_to_process = scan_proc_fds(proc_path, &inode_to_port);
 
     let mut port_to_process = HashMap::new();
     for (inode, port) in &inode_to_port {
@@ -269,7 +273,7 @@ fn build_proc_port_map() -> HashMap<u16, String> {
 // ─── Main scan logic ─────────────────────────────────────────────────────
 
 /// Build a comprehensive port → process map using ss + /proc fallback.
-async fn build_port_map() -> HashMap<u16, String> {
+async fn build_port_map(proc_path: &str) -> HashMap<u16, String> {
     let mut map = parse_ss_output().await;
 
     // Count how many ports ss couldn't resolve
@@ -277,7 +281,8 @@ async fn build_port_map() -> HashMap<u16, String> {
 
     if unknown_count > 0 {
         // Use /proc as fallback for ports where ss -p failed
-        let proc_map = spawn_blocking(build_proc_port_map)
+        let pp = proc_path.to_string();
+        let proc_map = spawn_blocking(move || build_proc_port_map(&pp))
             .await
             .unwrap_or_default();
 
@@ -322,9 +327,9 @@ async fn build_port_map() -> HashMap<u16, String> {
 ///
 /// `used_by_source` counts ALL listening ports per process (system-wide),
 /// while `available`/`total_ports` reflect the configured scan range only.
-async fn scan_ports(start: u16, end: u16) -> PortScanResult {
+async fn scan_ports(start: u16, end: u16, proc_path: &str) -> PortScanResult {
     let start_time = Instant::now();
-    let port_map = build_port_map().await;
+    let port_map = build_port_map(proc_path).await;
 
     let total_ports = (end as u32) - (start as u32) + 1;
 
@@ -367,9 +372,9 @@ async fn scan_ports(start: u16, end: u16) -> PortScanResult {
 }
 
 /// Background loop: scan ports every `interval` seconds and store results
-pub async fn scan_loop(shared: SharedScanResult, start: u16, end: u16, interval: u64) {
+pub async fn scan_loop(shared: SharedScanResult, start: u16, end: u16, interval: u64, proc_path: String) {
     loop {
-        let result = scan_ports(start, end).await;
+        let result = scan_ports(start, end, &proc_path).await;
 
         let used: u32 = result.used_by_source.values().sum();
         info!(

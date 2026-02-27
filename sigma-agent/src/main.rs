@@ -54,11 +54,15 @@ async fn main() -> Result<()> {
     // Conditionally start port scanning
     let port_range = if config.port_scan {
         let (start, end) = config.parse_port_scan_range()?;
+        let proc_path = config.host_proc.clone();
+        if proc_path != "/proc" {
+            info!(proc_path = %proc_path, "Using host-mounted /proc for process attribution");
+        }
         info!(range = %config.port_scan_range, interval = config.port_scan_interval, "Port scanning enabled");
         let shared = scan_result.clone();
         let interval = config.port_scan_interval;
         tokio::spawn(async move {
-            port_scan::scan_loop(shared, start, end, interval).await;
+            port_scan::scan_loop(shared, start, end, interval, proc_path).await;
         });
         Some((start, end))
     } else {
