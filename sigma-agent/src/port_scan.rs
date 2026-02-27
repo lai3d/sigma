@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use tokio::process::Command;
 use tokio::sync::RwLock;
 use tokio::task::spawn_blocking;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 #[derive(Debug, Clone)]
 pub struct PortScanResult {
@@ -259,10 +259,11 @@ fn build_proc_port_map(proc_path: &str) -> HashMap<u16, String> {
         }
     }
 
-    debug!(
-        listening = inode_to_port.len(),
+    info!(
+        proc_path,
+        listening_inodes = inode_to_port.len(),
         resolved = port_to_process.len(),
-        "proc port scan: resolved {}/{} listening ports",
+        "/proc fallback: resolved {}/{} listening ports",
         port_to_process.len(),
         inode_to_port.len()
     );
