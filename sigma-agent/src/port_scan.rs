@@ -143,7 +143,13 @@ async fn scan_ports(start: u16, end: u16) -> PortScanResult {
     let mut used_by_source: HashMap<String, u32> = HashMap::new();
     let mut other_detail: HashMap<String, u32> = HashMap::new();
     for name in ss_map.values() {
-        let source = classify_process(name);
+        // "unknown" means ss couldn't show process info (usually a permission issue)
+        // — keep it as "unknown" rather than reclassifying through classify_process
+        let source = if name == "unknown" {
+            "unknown"
+        } else {
+            classify_process(name)
+        };
         *used_by_source.entry(source.to_string()).or_insert(0) += 1;
         if source == "other" {
             *other_detail.entry(name.clone()).or_insert(0) += 1;
