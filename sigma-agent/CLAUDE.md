@@ -91,12 +91,21 @@ docker run -d --name sigma-agent \
 When `--port-scan` is enabled, the agent periodically scans the configured port range using
 `TcpListener::bind("0.0.0.0", port)` to detect occupied ports (catches TIME_WAIT etc. that
 `ss` may miss). It also runs `ss -tulnp` to attribute occupied ports to their owning process
-(envoy, sshd, nginx, node_exporter, other, unknown).
+(envoy, sshd, nginx, node_exporter, xray, other, unknown).
+
+Process attribution uses a three-tier strategy:
+1. `ss -tulnp` — standard, works if container has direct `/proc` access
+2. `nsenter -t 1 -m -- ss -tulnp` — runs ss in host mount namespace (needs `SYS_ADMIN` or `privileged`)
+3. Direct `/proc/<pid>/fd/` scanning — works with host-mounted `/proc` (needs `SYS_PTRACE`)
+
+Classification is case-insensitive: both `xray` and `XrayR` map to the `xray` category.
 
 Results are exposed via a Prometheus-compatible `/metrics` endpoint on `--metrics-port`:
 - `sigma_ports_total` — total ports in scan range
 - `sigma_ports_available` — free ports
-- `sigma_ports_used{source="..."}` — used ports by process category
+- `sigma_ports_in_use` — occupied ports in scan range (LISTEN + TIME_WAIT + other states; `total - available`)
+- `sigma_ports_used{source="..."}` — LISTEN ports by process category (system-wide)
+- `sigma_ports_other_detail{process="..."}` — breakdown of "other" category by actual process name
 - `sigma_port_scan_duration_seconds` — scan timing
 
 Known sources are always emitted (even at 0) for stable Grafana time series.
@@ -124,9 +133,18 @@ The agent requires host-level access for accurate port scanning and process attr
 agent:
   network_mode: host    # Scan host ports, not container's own
   pid: host             # See process names across containers
-  cap_add:
-    - SYS_PTRACE        # Required for ss -p to read /proc/<pid>/fd
+  privileged: true      # Full /proc/<pid>/fd access for process attribution
+  volumes:
+    - /proc:/host/proc:ro  # Host proc mount (fallback for process resolution)
+  environment:
+    AGENT_HOST_PROC: /host/proc
 ```
+
+**Why `privileged: true`**: Docker's default seccomp/AppArmor profiles block reading
+`/proc/<pid>/fd/` for host processes even with `SYS_PTRACE`. Without it, most ports show
+as "unknown". The `privileged` flag removes these restrictions so `ss -tulnp` can fully
+resolve process names. Alternative (less permissive): `cap_add: [SYS_PTRACE, SYS_ADMIN]`
+with `security_opt: [apparmor:unconfined]`.
 
 **Docker Desktop limitation**: The `allocate-ports` API proxy won't work locally because
 containers on bridge network can't reach the agent on host network. This works in production
@@ -135,10 +153,10 @@ where API and agent run on different machines connected via public IPs.
 ## Grafana Dashboard
 
 A pre-built dashboard is available at `grafana/dashboards/port-scan.json` with:
-- Stat cards (total/available/used ports, utilization %, scan duration)
-- Time series charts (port availability, usage by process over time)
-- Pie chart (port usage breakdown by source)
-- Host summary table (multi-host overview)
+- Stat cards (total/available/in-use ports, envoy count, utilization %, scan duration)
+- Time series charts (available vs in-use over time, LISTEN ports by source)
+- Donut chart (LISTEN port breakdown by source)
+- Host summary table (total/available/in-use/envoy/xray/nginx per host, usage % gauge)
 
 ## Envoy xDS Control Plane
 
