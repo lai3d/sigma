@@ -129,6 +129,45 @@ async fn parse_ss_output() -> HashMap<u16, String> {
     map
 }
 
+/// Run `nsenter -t 1 -m -- ss -tulnp` to get process info from host mount namespace.
+/// Inside PID 1's mount namespace, /proc/<pid>/fd/ is the real host procfs without
+/// Docker's restrictions, so ss -p can resolve process names.
+/// Returns None if nsenter fails (e.g. missing SYS_ADMIN capability).
+async fn parse_ss_via_nsenter() -> Option<HashMap<u16, String>> {
+    let output = match Command::new("nsenter")
+        .args(["-t", "1", "-m", "--", "ss", "-tulnp"])
+        .output()
+        .await
+    {
+        Ok(o) if o.status.success() => o,
+        Ok(o) => {
+            let stderr = String::from_utf8_lossy(&o.stderr);
+            info!(
+                stderr = %stderr.trim(),
+                "nsenter ss failed (need SYS_ADMIN cap for full process attribution)"
+            );
+            return None;
+        }
+        Err(_) => return None,
+    };
+
+    let mut map = HashMap::new();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    for line in stdout.lines().skip(1) {
+        if let Some((port, process)) = parse_ss_line(line) {
+            map.insert(port, process);
+        }
+    }
+
+    info!(
+        ports = map.len(),
+        unknown = map.values().filter(|v| v.as_str() == "unknown").count(),
+        "nsenter ss -tulnp resolved"
+    );
+
+    Some(map)
+}
+
 // ─── /proc-based port→process resolution ─────────────────────────────────
 
 /// Parse /proc/net/tcp and /proc/net/tcp6 for listening sockets (state 0A).
@@ -182,6 +221,9 @@ fn parse_proc_net_tcp(proc_path: &str) -> HashMap<u64, u16> {
 /// Returns HashMap<inode, process_name>.
 fn scan_proc_fds(proc_path: &str, listening_inodes: &HashMap<u64, u16>) -> HashMap<u64, String> {
     let mut inode_to_process: HashMap<u64, String> = HashMap::new();
+    let mut fd_errors: HashMap<String, u32> = HashMap::new();
+    let mut pids_scanned = 0u32;
+    let mut pids_accessible = 0u32;
 
     let proc_dir = match std::fs::read_dir(proc_path) {
         Ok(d) => d,
@@ -200,6 +242,7 @@ fn scan_proc_fds(proc_path: &str, listening_inodes: &HashMap<u64, u16>) -> HashM
             continue;
         }
 
+        pids_scanned += 1;
         let pid_path = entry.path();
 
         // Read process name from /proc/<pid>/comm
@@ -212,8 +255,15 @@ fn scan_proc_fds(proc_path: &str, listening_inodes: &HashMap<u64, u16>) -> HashM
         // Read fd directory
         let fd_path = pid_path.join("fd");
         let fd_dir = match std::fs::read_dir(&fd_path) {
-            Ok(d) => d,
-            Err(_) => continue, // Permission denied — skip this PID
+            Ok(d) => {
+                pids_accessible += 1;
+                d
+            }
+            Err(e) => {
+                let kind = format!("{}", e.kind());
+                *fd_errors.entry(kind).or_insert(0) += 1;
+                continue;
+            }
         };
 
         for fd_entry in fd_dir.flatten() {
@@ -235,6 +285,16 @@ fn scan_proc_fds(proc_path: &str, listening_inodes: &HashMap<u64, u16>) -> HashM
                 }
             }
         }
+    }
+
+    if !fd_errors.is_empty() {
+        info!(
+            pids_scanned,
+            pids_accessible,
+            errors = ?fd_errors,
+            "/proc fd scan: {} PIDs accessible out of {} (errors: {:?})",
+            pids_accessible, pids_scanned, fd_errors
+        );
     }
 
     inode_to_process
@@ -273,7 +333,35 @@ fn build_proc_port_map(proc_path: &str) -> HashMap<u16, String> {
 
 // ─── Main scan logic ─────────────────────────────────────────────────────
 
-/// Build a comprehensive port → process map using ss + /proc fallback.
+/// Merge a fallback port map into the primary map, replacing "unknown" entries.
+/// Returns the number of newly resolved ports.
+fn merge_port_map(map: &mut HashMap<u16, String>, fallback: &HashMap<u16, String>) -> u32 {
+    let mut resolved = 0u32;
+    for (port, process) in fallback {
+        if process == "unknown" {
+            continue; // Fallback also doesn't know — skip
+        }
+        match map.get(port) {
+            Some(existing) if existing == "unknown" => {
+                map.insert(*port, process.clone());
+                resolved += 1;
+            }
+            None => {
+                map.insert(*port, process.clone());
+                resolved += 1;
+            }
+            _ => {} // Already have a good process name — keep it
+        }
+    }
+    resolved
+}
+
+/// Build a comprehensive port → process map using ss + nsenter + /proc fallback.
+///
+/// Strategy (tries each in order, stops when no unknowns remain):
+/// 1. `ss -tulnp` — standard, works if container has direct /proc access
+/// 2. `nsenter -t 1 -m -- ss -tulnp` — runs ss in host mount namespace (needs SYS_ADMIN)
+/// 3. Direct /proc/<pid>/fd/ scanning — works with host-mounted /proc (needs SYS_PTRACE)
 async fn build_port_map(proc_path: &str) -> HashMap<u16, String> {
     let mut map = parse_ss_output().await;
 
@@ -281,43 +369,36 @@ async fn build_port_map(proc_path: &str) -> HashMap<u16, String> {
     let unknown_count = map.values().filter(|v| v.as_str() == "unknown").count();
 
     if unknown_count > 0 {
-        // Use /proc as fallback for ports where ss -p failed
-        let pp = proc_path.to_string();
-        let proc_map = spawn_blocking(move || build_proc_port_map(&pp))
-            .await
-            .unwrap_or_default();
-
-        let mut resolved = 0u32;
-        for (port, process) in &proc_map {
-            match map.get(port) {
-                Some(existing) if existing == "unknown" => {
-                    // ss found the port but couldn't get process — use /proc result
-                    map.insert(*port, process.clone());
-                    resolved += 1;
-                }
-                None => {
-                    // /proc found a port ss didn't see at all
-                    map.insert(*port, process.clone());
-                    resolved += 1;
-                }
-                _ => {} // ss already has a good process name — keep it
+        // Strategy 2: try nsenter to run ss in host mount namespace
+        if let Some(nsenter_map) = parse_ss_via_nsenter().await {
+            let resolved = merge_port_map(&mut map, &nsenter_map);
+            if resolved > 0 {
+                info!(resolved, "Resolved ports via nsenter ss");
             }
         }
 
-        if resolved > 0 {
-            info!(
-                resolved,
-                remaining_unknown = unknown_count as u32 - resolved,
-                "Resolved ports via /proc fallback"
-            );
-        }
-
+        // Check if we still have unknowns
         let still_unknown = map.values().filter(|v| v.as_str() == "unknown").count();
+
         if still_unknown > 0 {
-            warn!(
-                count = still_unknown,
-                "Ports with unknown process (ss -p and /proc both failed — check permissions)"
-            );
+            // Strategy 3: direct /proc fallback
+            let pp = proc_path.to_string();
+            let proc_map = spawn_blocking(move || build_proc_port_map(&pp))
+                .await
+                .unwrap_or_default();
+
+            let resolved = merge_port_map(&mut map, &proc_map);
+            if resolved > 0 {
+                info!(resolved, "Resolved ports via /proc fallback");
+            }
+
+            let final_unknown = map.values().filter(|v| v.as_str() == "unknown").count();
+            if final_unknown > 0 {
+                warn!(
+                    count = final_unknown,
+                    "Ports with unknown process — add SYS_ADMIN cap or privileged mode for full attribution"
+                );
+            }
         }
     }
 
