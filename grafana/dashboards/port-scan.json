@@ -57,17 +57,18 @@
         "defaults": {
           "color": { "mode": "thresholds" },
           "thresholds": { "steps": [
-            { "color": "blue", "value": null }
+            { "color": "orange", "value": null },
+            { "color": "red", "value": 5000 }
           ]},
           "unit": "none"
         }
       },
       "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
       "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "title": "Envoy Ports",
+      "title": "In Use",
       "type": "stat",
       "targets": [{
-        "expr": "sigma_ports_used{hostname=~\"$hostname\", source=\"envoy\"}",
+        "expr": "sigma_ports_in_use{hostname=~\"$hostname\"}",
         "legendFormat": "{{ hostname }}"
       }]
     },
@@ -77,17 +78,17 @@
         "defaults": {
           "color": { "mode": "thresholds" },
           "thresholds": { "steps": [
-            { "color": "orange", "value": null }
+            { "color": "blue", "value": null }
           ]},
           "unit": "none"
         }
       },
       "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
       "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "title": "Unknown (Connections)",
+      "title": "Envoy Ports",
       "type": "stat",
       "targets": [{
-        "expr": "sigma_ports_used{hostname=~\"$hostname\", source=\"unknown\"}",
+        "expr": "sigma_ports_used{hostname=~\"$hostname\", source=\"envoy\"}",
         "legendFormat": "{{ hostname }}"
       }]
     },
@@ -156,14 +157,14 @@
             "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
           },
           {
-            "matcher": { "id": "byName", "options": "Used" },
+            "matcher": { "id": "byName", "options": "In Use" },
             "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
           }
         ]
       },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
-      "title": "Available vs Used Ports",
+      "title": "Available vs In Use",
       "type": "timeseries",
       "targets": [
         {
@@ -171,8 +172,8 @@
           "legendFormat": "Available"
         },
         {
-          "expr": "sigma_ports_total{hostname=~\"$hostname\"} - sigma_ports_available{hostname=~\"$hostname\"}",
-          "legendFormat": "Used"
+          "expr": "sigma_ports_in_use{hostname=~\"$hostname\"}",
+          "legendFormat": "In Use"
         }
       ]
     },
@@ -190,16 +191,17 @@
         },
         "overrides": [
           { "matcher": { "id": "byName", "options": "envoy" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "unknown" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
           { "matcher": { "id": "byName", "options": "nginx" }, "properties": [{ "id": "color", "value": { "fixedColor": "dark-green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "xray" }, "properties": [{ "id": "color", "value": { "fixedColor": "semi-dark-red", "mode": "fixed" } }] },
           { "matcher": { "id": "byName", "options": "sshd" }, "properties": [{ "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "node_exporter" }, "properties": [{ "id": "color", "value": { "fixedColor": "dark-orange", "mode": "fixed" } }] },
           { "matcher": { "id": "byName", "options": "other" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "node_exporter" }, "properties": [{ "id": "color", "value": { "fixedColor": "dark-orange", "mode": "fixed" } }] }
+          { "matcher": { "id": "byName", "options": "unknown" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] }
         ]
       },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
-      "title": "Used Ports by Source",
+      "title": "LISTEN Ports by Source",
       "type": "timeseries",
       "targets": [{
         "expr": "sigma_ports_used{hostname=~\"$hostname\"}",
@@ -221,10 +223,12 @@
         },
         "overrides": [
           { "matcher": { "id": "byName", "options": "envoy" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "unknown" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
           { "matcher": { "id": "byName", "options": "nginx" }, "properties": [{ "id": "color", "value": { "fixedColor": "dark-green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "xray" }, "properties": [{ "id": "color", "value": { "fixedColor": "semi-dark-red", "mode": "fixed" } }] },
           { "matcher": { "id": "byName", "options": "sshd" }, "properties": [{ "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "other" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] }
+          { "matcher": { "id": "byName", "options": "node_exporter" }, "properties": [{ "id": "color", "value": { "fixedColor": "dark-orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "other" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "unknown" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] }
         ]
       },
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 15 },
@@ -234,7 +238,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"] },
         "tooltip": { "mode": "single" }
       },
-      "title": "Port Usage Breakdown",
+      "title": "LISTEN Port Breakdown",
       "type": "piechart",
       "targets": [{
         "expr": "sigma_ports_used{hostname=~\"$hostname\"} > 0",
@@ -318,23 +322,27 @@
       "targets": [
         { "expr": "sigma_ports_total", "legendFormat": "", "instant": true, "format": "table", "refId": "A" },
         { "expr": "sigma_ports_available", "legendFormat": "", "instant": true, "format": "table", "refId": "B" },
-        { "expr": "sigma_ports_used{source=\"envoy\"}", "legendFormat": "", "instant": true, "format": "table", "refId": "C" },
-        { "expr": "sigma_ports_used{source=\"unknown\"}", "legendFormat": "", "instant": true, "format": "table", "refId": "D" },
-        { "expr": "1 - (sigma_ports_available / sigma_ports_total)", "legendFormat": "", "instant": true, "format": "table", "refId": "E" },
-        { "expr": "sigma_port_scan_duration_seconds", "legendFormat": "", "instant": true, "format": "table", "refId": "F" }
+        { "expr": "sigma_ports_in_use", "legendFormat": "", "instant": true, "format": "table", "refId": "C" },
+        { "expr": "sigma_ports_used{source=\"envoy\"}", "legendFormat": "", "instant": true, "format": "table", "refId": "D" },
+        { "expr": "sigma_ports_used{source=\"xray\"}", "legendFormat": "", "instant": true, "format": "table", "refId": "E" },
+        { "expr": "sigma_ports_used{source=\"nginx\"}", "legendFormat": "", "instant": true, "format": "table", "refId": "F" },
+        { "expr": "1 - (sigma_ports_available / sigma_ports_total)", "legendFormat": "", "instant": true, "format": "table", "refId": "G" },
+        { "expr": "sigma_port_scan_duration_seconds", "legendFormat": "", "instant": true, "format": "table", "refId": "H" }
       ],
       "transformations": [
         { "id": "seriesToColumns", "options": { "byField": "hostname" } },
         { "id": "organize", "options": {
-          "excludeByName": { "Time 1": true, "Time 2": true, "Time 3": true, "Time 4": true, "Time 5": true, "Time 6": true, "source 1": true, "source 2": true },
+          "excludeByName": { "Time 1": true, "Time 2": true, "Time 3": true, "Time 4": true, "Time 5": true, "Time 6": true, "Time 7": true, "Time 8": true, "source 1": true, "source 2": true, "source 3": true },
           "renameByName": {
             "hostname": "Hostname",
             "Value #A": "Total",
             "Value #B": "Available",
-            "Value #C": "Envoy",
-            "Value #D": "Unknown",
-            "Value #E": "Usage %",
-            "Value #F": "Scan (s)"
+            "Value #C": "In Use",
+            "Value #D": "Envoy",
+            "Value #E": "Xray",
+            "Value #F": "Nginx",
+            "Value #G": "Usage %",
+            "Value #H": "Scan (s)"
           }
         }}
       ]
