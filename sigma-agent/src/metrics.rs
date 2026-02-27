@@ -59,7 +59,7 @@ pub fn render_metrics(result: &PortScanResult, hostname: &str) -> String {
     // sigma_ports_available
     writeln!(
         out,
-        "# HELP sigma_ports_available Number of available (free) ports"
+        "# HELP sigma_ports_available Number of available (free) ports in scan range"
     )
     .unwrap();
     writeln!(out, "# TYPE sigma_ports_available gauge").unwrap();
@@ -67,6 +67,23 @@ pub fn render_metrics(result: &PortScanResult, hostname: &str) -> String {
         out,
         "sigma_ports_available{{hostname=\"{}\"}} {}",
         hostname, result.available
+    )
+    .unwrap();
+
+    writeln!(out).unwrap();
+
+    // sigma_ports_in_use (total - available, includes TIME_WAIT etc.)
+    let in_use = result.total_ports.saturating_sub(result.available);
+    writeln!(
+        out,
+        "# HELP sigma_ports_in_use Occupied ports in scan range (LISTEN + TIME_WAIT + other states)"
+    )
+    .unwrap();
+    writeln!(out, "# TYPE sigma_ports_in_use gauge").unwrap();
+    writeln!(
+        out,
+        "sigma_ports_in_use{{hostname=\"{}\"}} {}",
+        hostname, in_use
     )
     .unwrap();
 
