@@ -19,6 +19,7 @@ const KNOWN_SOURCES: &[&str] = &[
     "sshd",
     "nginx",
     "node_exporter",
+    "xray",
     "other",
     "unknown",
 ];

@@ -33,12 +33,13 @@ impl Default for PortScanResult {
 pub type SharedScanResult = Arc<RwLock<PortScanResult>>;
 
 /// Known process categories
-const KNOWN_PROCESSES: &[&str] = &["envoy", "sshd", "nginx", "node_exporter"];
+const KNOWN_PROCESSES: &[&str] = &["envoy", "sshd", "nginx", "node_exporter", "xray"];
 
 /// Classify a process name into a known category or "other"
 fn classify_process(name: &str) -> &'static str {
+    let lower = name.to_ascii_lowercase();
     for &known in KNOWN_PROCESSES {
-        if name.contains(known) {
+        if lower.contains(known) {
             return known;
         }
     }
@@ -575,6 +576,8 @@ mod tests {
         assert_eq!(classify_process("nginx"), "nginx");
         assert_eq!(classify_process("node_exporter"), "node_exporter");
         assert_eq!(classify_process("/usr/bin/envoy"), "envoy");
+        assert_eq!(classify_process("xray"), "xray");
+        assert_eq!(classify_process("XrayR"), "xray");
         assert_eq!(classify_process("python3"), "other");
         assert_eq!(classify_process("java"), "other");
     }
