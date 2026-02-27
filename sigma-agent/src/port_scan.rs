@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use tokio::process::Command;
 use tokio::sync::RwLock;
 use tokio::task::spawn_blocking;
-use tracing::info;
+use tracing::{debug, info, warn};
 
 #[derive(Debug, Clone)]
 pub struct PortScanResult {
@@ -129,22 +129,210 @@ async fn parse_ss_output() -> HashMap<u16, String> {
     map
 }
 
+// ─── /proc-based port→process resolution ─────────────────────────────────
+
+/// Parse /proc/net/tcp and /proc/net/tcp6 for listening sockets (state 0A).
+/// Returns HashMap<inode, port>.
+fn parse_proc_net_tcp() -> HashMap<u64, u16> {
+    let mut inode_to_port = HashMap::new();
+
+    for path in &["/proc/net/tcp", "/proc/net/tcp6"] {
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        for line in content.lines().skip(1) {
+            let fields: Vec<&str> = line.split_whitespace().collect();
+            if fields.len() < 10 {
+                continue;
+            }
+
+            // st field (index 3) must be "0A" (TCP LISTEN)
+            if fields[3] != "0A" {
+                continue;
+            }
+
+            // Parse port from local_address (hex: ADDR:PORT)
+            let local_addr = fields[1];
+            let port_hex = match local_addr.rsplit(':').next() {
+                Some(h) => h,
+                None => continue,
+            };
+            let port = match u16::from_str_radix(port_hex, 16) {
+                Ok(p) => p,
+                Err(_) => continue,
+            };
+
+            // Parse inode (index 9)
+            if let Ok(inode) = fields[9].parse::<u64>() {
+                if inode != 0 {
+                    inode_to_port.insert(inode, port);
+                }
+            }
+        }
+    }
+
+    inode_to_port
+}
+
+/// Walk /proc/<pid>/fd/ to map socket inodes → process names.
+/// Returns HashMap<inode, process_name>.
+fn scan_proc_fds(listening_inodes: &HashMap<u64, u16>) -> HashMap<u64, String> {
+    let mut inode_to_process: HashMap<u64, String> = HashMap::new();
+
+    let proc_dir = match std::fs::read_dir("/proc") {
+        Ok(d) => d,
+        Err(e) => {
+            warn!(error = %e, "Cannot read /proc");
+            return inode_to_process;
+        }
+    };
+
+    for entry in proc_dir.flatten() {
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+
+        // Only numeric directories (PIDs)
+        if !name_str.chars().all(|c| c.is_ascii_digit()) {
+            continue;
+        }
+
+        let pid_path = entry.path();
+
+        // Read process name from /proc/<pid>/comm
+        let comm_path = pid_path.join("comm");
+        let comm = match std::fs::read_to_string(&comm_path) {
+            Ok(c) => c.trim().to_string(),
+            Err(_) => continue,
+        };
+
+        // Read fd directory
+        let fd_path = pid_path.join("fd");
+        let fd_dir = match std::fs::read_dir(&fd_path) {
+            Ok(d) => d,
+            Err(_) => continue, // Permission denied — skip this PID
+        };
+
+        for fd_entry in fd_dir.flatten() {
+            if let Ok(link) = std::fs::read_link(fd_entry.path()) {
+                let link_str = link.to_string_lossy();
+                // Format: socket:[12345]
+                if let Some(inode_str) = link_str
+                    .strip_prefix("socket:[")
+                    .and_then(|s| s.strip_suffix(']'))
+                {
+                    if let Ok(inode) = inode_str.parse::<u64>() {
+                        // Only record if this inode is a listening socket we care about
+                        if listening_inodes.contains_key(&inode) {
+                            inode_to_process
+                                .entry(inode)
+                                .or_insert_with(|| comm.clone());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    inode_to_process
+}
+
+/// Build port → process name mapping by reading /proc directly.
+/// This bypasses `ss -p` and works even when ss can't resolve process names.
+fn build_proc_port_map() -> HashMap<u16, String> {
+    let inode_to_port = parse_proc_net_tcp();
+    if inode_to_port.is_empty() {
+        return HashMap::new();
+    }
+
+    let inode_to_process = scan_proc_fds(&inode_to_port);
+
+    let mut port_to_process = HashMap::new();
+    for (inode, port) in &inode_to_port {
+        if let Some(process) = inode_to_process.get(inode) {
+            port_to_process.insert(*port, process.clone());
+        }
+    }
+
+    debug!(
+        listening = inode_to_port.len(),
+        resolved = port_to_process.len(),
+        "proc port scan: resolved {}/{} listening ports",
+        port_to_process.len(),
+        inode_to_port.len()
+    );
+
+    port_to_process
+}
+
+// ─── Main scan logic ─────────────────────────────────────────────────────
+
+/// Build a comprehensive port → process map using ss + /proc fallback.
+async fn build_port_map() -> HashMap<u16, String> {
+    let mut map = parse_ss_output().await;
+
+    // Count how many ports ss couldn't resolve
+    let unknown_count = map.values().filter(|v| v.as_str() == "unknown").count();
+
+    if unknown_count > 0 {
+        // Use /proc as fallback for ports where ss -p failed
+        let proc_map = spawn_blocking(build_proc_port_map)
+            .await
+            .unwrap_or_default();
+
+        let mut resolved = 0u32;
+        for (port, process) in &proc_map {
+            match map.get(port) {
+                Some(existing) if existing == "unknown" => {
+                    // ss found the port but couldn't get process — use /proc result
+                    map.insert(*port, process.clone());
+                    resolved += 1;
+                }
+                None => {
+                    // /proc found a port ss didn't see at all
+                    map.insert(*port, process.clone());
+                    resolved += 1;
+                }
+                _ => {} // ss already has a good process name — keep it
+            }
+        }
+
+        if resolved > 0 {
+            info!(
+                resolved,
+                remaining_unknown = unknown_count as u32 - resolved,
+                "Resolved ports via /proc fallback"
+            );
+        }
+
+        let still_unknown = map.values().filter(|v| v.as_str() == "unknown").count();
+        if still_unknown > 0 {
+            warn!(
+                count = still_unknown,
+                "Ports with unknown process (ss -p and /proc both failed — check permissions)"
+            );
+        }
+    }
+
+    map
+}
+
 /// Scan ports in the given range, returning aggregated results.
 ///
-/// `used_by_source` counts ALL listening ports per process (system-wide from `ss`),
+/// `used_by_source` counts ALL listening ports per process (system-wide),
 /// while `available`/`total_ports` reflect the configured scan range only.
 async fn scan_ports(start: u16, end: u16) -> PortScanResult {
     let start_time = Instant::now();
-    let ss_map = parse_ss_output().await;
+    let port_map = build_port_map().await;
 
     let total_ports = (end as u32) - (start as u32) + 1;
 
-    // Count ALL listening ports by process (system-wide, from ss output)
+    // Count ALL listening ports by process (system-wide)
     let mut used_by_source: HashMap<String, u32> = HashMap::new();
     let mut other_detail: HashMap<String, u32> = HashMap::new();
-    for name in ss_map.values() {
-        // "unknown" means ss couldn't show process info (usually a permission issue)
-        // — keep it as "unknown" rather than reclassifying through classify_process
+    for name in port_map.values() {
+        // "unknown" means neither ss nor /proc could resolve the process
         let source = if name == "unknown" {
             "unknown"
         } else {
@@ -302,5 +490,13 @@ mod tests {
         assert_eq!(classify_process("/usr/bin/envoy"), "envoy");
         assert_eq!(classify_process("python3"), "other");
         assert_eq!(classify_process("java"), "other");
+    }
+
+    #[test]
+    fn test_parse_proc_net_tcp_line() {
+        // Verify hex port parsing logic
+        assert_eq!(u16::from_str_radix("0050", 16).unwrap(), 80);
+        assert_eq!(u16::from_str_radix("5968", 16).unwrap(), 22888);
+        assert_eq!(u16::from_str_radix("0016", 16).unwrap(), 22);
     }
 }
