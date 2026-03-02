@@ -120,32 +120,69 @@ EOF
 # See: https://argocd-image-updater.readthedocs.io/
 ```
 
-### PostgreSQL HA (CloudNativePG)
+### PostgreSQL Options
 
-Production uses CloudNativePG operator for a 3-instance PostgreSQL HA cluster (1 primary + 2 replicas) with automatic failover.
+Two PostgreSQL deployment modes are available. Choose one:
 
-**Install the operator:**
+#### Option A: Standalone PostgreSQL (default)
+
+Single-pod Deployment via `k8s/postgres.yaml`. Simple, no extra operators needed. Good for dev/staging or small-scale production.
+
+```bash
+# Included in default k8s/ manifests, no extra steps needed.
+# DATABASE_URL in secret.yaml already points to postgres-service.
+kubectl apply -f k8s/postgres.yaml
+```
+
+#### Option B: CloudNativePG HA Cluster
+
+3-instance HA cluster (1 primary + 2 replicas) via CloudNativePG operator. Automatic failover, read replicas, PgBouncer pooling. Recommended for production.
+
+**Files:** `k8s/cnpg-secret.yaml`, `k8s/cnpg-cluster.yaml`, `k8s/cnpg-pooler.yaml`
+
+**Step 1 — Install the operator:**
 
 ```bash
 helm repo add cnpg https://cloudnative-pg.github.io/charts
 helm install cnpg cnpg/cloudnative-pg -n cnpg-system --create-namespace
 ```
 
-**Deploy the database cluster:**
+**Step 2 — Deploy the cluster:**
 
 ```bash
-# 1. Update credentials
 vi k8s/cnpg-secret.yaml   # Set a strong password
-
-# 2. Apply secret + cluster
 kubectl apply -f k8s/cnpg-secret.yaml
 kubectl apply -f k8s/cnpg-cluster.yaml
 
-# 3. Wait for cluster to be healthy (~2-3 minutes)
+# Wait for cluster to be healthy (~2-3 minutes)
 kubectl get cluster sigma-db -n sigma -w
 
-# 4. (Optional) Deploy PgBouncer connection pooler
+# (Optional) Deploy PgBouncer connection pooler
 kubectl apply -f k8s/cnpg-pooler.yaml
+```
+
+**Step 3 — Point API to the HA cluster:**
+
+Update `DATABASE_URL` in `k8s/secret.yaml`:
+
+```diff
+- DATABASE_URL: "postgres://sigma:CHANGE_ME@postgres-service:5432/sigma"
++ DATABASE_URL: "postgres://sigma:CHANGE_ME@sigma-db-rw:5432/sigma"
+```
+
+Optionally add an initContainer to `k8s/api-deployment.yaml` to wait for DB readiness:
+
+```yaml
+initContainers:
+- name: wait-for-db
+  image: busybox:1.36
+  command: ['sh', '-c', 'until nc -z sigma-db-rw 5432; do sleep 2; done']
+```
+
+**Step 4 — Remove standalone PostgreSQL (if previously deployed):**
+
+```bash
+kubectl delete -f k8s/postgres.yaml
 ```
 
 **Services created automatically by CloudNativePG:**
@@ -164,28 +201,28 @@ kubectl get pods -n sigma -l cnpg.io/cluster=sigma-db  # 3 pods running
 kubectl get svc -n sigma | grep sigma-db            # rw/ro/r services
 ```
 
-**Migration from single-pod PostgreSQL:**
+**Migration from standalone to HA:**
 
 ```bash
 # 1. Scale API to 0
 kubectl scale deployment sigma-api -n sigma --replicas=0
 
-# 2. Dump from old database
+# 2. Dump from standalone database
 kubectl exec -n sigma deploy/postgres -- pg_dump -U sigma sigma > backup.sql
 
 # 3. Restore into CloudNativePG cluster
 kubectl get pods -n sigma -l cnpg.io/cluster=sigma-db,role=primary -o name | \
   xargs -I{} kubectl exec -n sigma -i {} -- psql -U sigma sigma < backup.sql
 
-# 4. Apply updated secret + api-deployment (DATABASE_URL now points to sigma-db-rw)
+# 4. Update DATABASE_URL in secret.yaml to sigma-db-rw, then apply
 kubectl apply -f k8s/secret.yaml
 kubectl apply -f k8s/api-deployment.yaml
 
 # 5. Scale API back up
 kubectl scale deployment sigma-api -n sigma --replicas=2
 
-# 6. Verify, then delete old postgres resources
-kubectl delete -f k8s/postgres.yaml  # (already removed from repo)
+# 6. Remove standalone postgres
+kubectl delete -f k8s/postgres.yaml
 ```
 
 ### Pre-deploy Checklist
