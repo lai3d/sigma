@@ -43,6 +43,7 @@ pub fn router() -> Router<AppState> {
             axum::routing::post(sync_zone),
         )
         .route("/api/dns-zones", get(list_zones))
+        .route("/api/dns-zones/{id}", get(get_zone))
         .route("/api/dns-records", get(list_dns_records))
 }
 
@@ -464,6 +465,31 @@ pub async fn sync_zone(
 }
 
 // ─── Zones ────────────────────────────────────────────────
+
+#[utoipa::path(
+    get,
+    path = "/api/dns-zones/{id}",
+    tag = "DNS",
+    params(("id" = Uuid, Path, description = "Zone ID")),
+    responses(
+        (status = 200, body = DnsZone),
+        (status = 404),
+    )
+)]
+pub async fn get_zone(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<DnsZone>, AppError> {
+    let zone = sqlx::query_as::<_, DnsZone>(
+        "SELECT * FROM dns_zones WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    Ok(Json(zone))
+}
 
 #[utoipa::path(
     get,

@@ -62,6 +62,13 @@ export function useSyncDnsZone() {
   });
 }
 
+export function useDnsZone(id: string) {
+  return useQuery({
+    queryKey: ['dns-zones', id],
+    queryFn: () => api.getZone(id),
+  });
+}
+
 export function useDnsZones(query?: DnsZoneListQuery) {
   return useQuery({
     queryKey: ['dns-zones', query],

@@ -308,7 +308,11 @@ function ZonesTab() {
             <tbody>
               {result.data.map((zone) => (
                 <tr key={zone.id} className="border-b last:border-0 hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900">{zone.zone_name}</td>
+                  <td className="px-4 py-3 font-medium">
+                    <Link to={`/domains/zones/${zone.id}`} className="text-blue-600 hover:text-blue-800">
+                      {zone.zone_name}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                       zone.status === 'active'

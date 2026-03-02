@@ -48,6 +48,11 @@ export async function syncZone(id: string): Promise<DnsSyncResult> {
   return data;
 }
 
+export async function getZone(id: string): Promise<DnsZone> {
+  const { data } = await apiClient.get(`/dns-zones/${id}`);
+  return data;
+}
+
 export async function listZones(query?: DnsZoneListQuery): Promise<PaginatedResponse<DnsZone>> {
   const params = new URLSearchParams();
   if (query?.account_id) params.set('account_id', query.account_id);
