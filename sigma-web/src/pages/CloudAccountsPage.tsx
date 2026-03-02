@@ -37,6 +37,7 @@ export default function CloudAccountsPage() {
     id: string;
     name: string;
     provider_type: CloudProviderType;
+    masked_config?: Record<string, unknown>;
   } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
@@ -157,6 +158,7 @@ export default function CloudAccountsPage() {
                             id: acc.id,
                             name: acc.name,
                             provider_type: acc.provider_type,
+                            masked_config: acc.masked_config,
                           })
                         }
                         className="p-1.5 text-gray-500 hover:text-gray-700"

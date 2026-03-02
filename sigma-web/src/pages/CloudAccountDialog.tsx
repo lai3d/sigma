@@ -7,7 +7,7 @@ import {
 import type { CloudProviderType } from '@/types/api';
 
 interface Props {
-  account?: { id: string; name: string; provider_type: CloudProviderType } | null;
+  account?: { id: string; name: string; provider_type: CloudProviderType; masked_config?: Record<string, unknown> } | null;
   onClose: () => void;
 }
 
@@ -114,20 +114,23 @@ export default function CloudAccountDialog({ account, onClose }: Props) {
 
   useEffect(() => {
     if (account) {
+      const regions = Array.isArray(account.masked_config?.regions)
+        ? (account.masked_config.regions as string[]).join(', ')
+        : '';
       reset({
         name: account.name,
         provider_type: account.provider_type,
         aws_access_key_id: '',
         aws_secret_access_key: '',
-        aws_regions: 'us-east-1',
+        aws_regions: account.provider_type === 'aws' && regions ? regions : 'us-east-1',
         ali_access_key_id: '',
         ali_access_key_secret: '',
-        ali_regions: 'cn-hangzhou',
+        ali_regions: account.provider_type === 'alibaba' && regions ? regions : 'cn-hangzhou',
         do_api_token: '',
         linode_api_token: '',
         volc_access_key_id: '',
         volc_secret_access_key: '',
-        volc_regions: 'cn-beijing',
+        volc_regions: account.provider_type === 'volcengine' && regions ? regions : 'cn-beijing',
       });
     }
   }, [account, reset]);
