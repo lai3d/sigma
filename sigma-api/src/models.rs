@@ -1274,6 +1274,15 @@ pub struct PaginatedDnsRecordHistoryResponse {
     pub per_page: i64,
 }
 
+// ─── System Settings ─────────────────────────────────────
+
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+pub struct SystemSetting {
+    pub key: String,
+    pub value: String,
+    pub updated_at: DateTime<Utc>,
+}
+
 // ─── Cloud Accounts (VPS sync) ──────────────────────────
 
 #[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]

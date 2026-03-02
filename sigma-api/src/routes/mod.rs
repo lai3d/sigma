@@ -12,6 +12,7 @@ pub mod ip_labels;
 pub mod prometheus;
 pub mod providers;
 pub mod rate_limit;
+pub mod settings;
 pub mod stats;
 pub mod tickets;
 pub mod users;

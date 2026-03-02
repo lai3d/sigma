@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Key, User, Shield, BarChart3, Tags, Pencil, Trash2, Plus } from 'lucide-react';
+import { Key, User, Shield, BarChart3, Tags, Pencil, Trash2, Plus, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import * as authApi from '@/api/auth';
 import { useVpsPurposes, useCreateVpsPurpose, useUpdateVpsPurpose, useDeleteVpsPurpose } from '@/hooks/useVpsPurposes';
 import { useIpLabels, useCreateIpLabel, useUpdateIpLabel, useDeleteIpLabel } from '@/hooks/useIpLabels';
+import { useSettings, useUpdateSettings } from '@/hooks/useSettings';
 import { AVAILABLE_COLORS, getPurposeColor } from '@/lib/purposeColors';
 import type { TotpSetupResponse, VpsPurposeRecord, IpLabelRecord } from '@/types/api';
 
@@ -49,6 +50,20 @@ export default function SettingsPage() {
   const [ipLabelForm, setIpLabelForm] = useState({ name: '', label: '', short: '', color: 'gray', sort_order: 0 });
   const [ipLabelError, setIpLabelError] = useState('');
   const [confirmDeleteIpLabel, setConfirmDeleteIpLabel] = useState<IpLabelRecord | null>(null);
+
+  // DNS Sync settings (admin only)
+  const { data: systemSettings } = useSettings();
+  const updateSettings = useUpdateSettings();
+  const [dnsSyncSaved, setDnsSyncSaved] = useState(false);
+
+  const DNS_SYNC_OPTIONS = [
+    { label: '15 minutes', value: '900' },
+    { label: '30 minutes', value: '1800' },
+    { label: '1 hour', value: '3600' },
+    { label: '2 hours', value: '7200' },
+    { label: '6 hours', value: '21600' },
+    { label: 'Disabled', value: '0' },
+  ];
 
   useEffect(() => {
     setApiKey(localStorage.getItem('sigma_api_key') || '');
@@ -768,6 +783,41 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* DNS Sync Card (admin only) */}
+      {user?.role === 'admin' && (
+        <div className="mt-4 max-w-lg bg-white rounded-lg border p-5 space-y-4">
+          <div className="flex items-center gap-2 text-gray-700">
+            <RefreshCw size={18} />
+            <h3 className="text-sm font-semibold">DNS Background Sync</h3>
+          </div>
+          <p className="text-sm text-gray-500">
+            How often the server automatically syncs DNS records from all configured accounts.
+            Changes take effect on the next sync cycle.
+          </p>
+          <select
+            value={systemSettings?.dns_sync_interval_secs ?? '3600'}
+            onChange={async (e) => {
+              try {
+                await updateSettings.mutateAsync({ dns_sync_interval_secs: e.target.value });
+                setDnsSyncSaved(true);
+                setTimeout(() => setDnsSyncSaved(false), 2000);
+              } catch { /* mutation error handled by React Query */ }
+            }}
+            className="input w-full"
+            disabled={updateSettings.isPending}
+          >
+            {DNS_SYNC_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          <div className="flex items-center gap-3">
+            {updateSettings.isPending && <span className="text-sm text-gray-500">Saving...</span>}
+            {dnsSyncSaved && <span className="text-sm text-green-600">Saved!</span>}
+            {updateSettings.isError && <span className="text-sm text-red-600">Failed to save</span>}
+          </div>
         </div>
       )}
 

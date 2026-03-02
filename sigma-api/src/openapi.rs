@@ -5,7 +5,7 @@ use crate::errors::ErrorResponse;
 use crate::models::{
     AgentHeartbeat, AgentRegister, BatchCreateEnvoyRoutes, ChangePasswordRequest,
     CloudAccountResponse, CloudSyncResult, CreateCloudAccount, UpdateCloudAccount,
-    PaginatedCloudAccountResponse,
+    PaginatedCloudAccountResponse, SystemSetting,
     ConvertedTotal, CostMonthlyResponse, CostSummaryResponse, CountStat,
     CreateDnsAccount, CreateEnvoyNode, CreateEnvoyRoute, CreateExchangeRate,
     CreateIpCheck, CreateProvider, CreateTicket, CreateTicketComment, CreateUser, CreateVps,
@@ -140,6 +140,9 @@ use crate::models::{
         crate::routes::cloud::update_account,
         crate::routes::cloud::delete_account,
         crate::routes::cloud::sync_account,
+        // Settings
+        crate::routes::settings::list,
+        crate::routes::settings::update,
         // VPS Purposes
         crate::routes::vps_purposes::list,
         crate::routes::vps_purposes::get_one,
@@ -180,6 +183,7 @@ use crate::models::{
         PaginatedCloudAccountResponse,
         VpsIpHistory, PaginatedVpsIpHistoryResponse,
         IpLabel, CreateIpLabel, UpdateIpLabel, PaginatedIpLabelResponse,
+        SystemSetting,
     )),
     tags(
         (name = "Auth", description = "Authentication and session management"),
@@ -199,6 +203,7 @@ use crate::models::{
         (name = "Cloud Accounts", description = "Cloud provider account management (AWS, Alibaba) with VPS auto-sync"),
         (name = "VPS Purposes", description = "VPS purpose type management"),
         (name = "IP Labels", description = "IP address label management"),
+        (name = "Settings", description = "System-wide runtime settings"),
     )
 )]
 pub struct ApiDoc;
