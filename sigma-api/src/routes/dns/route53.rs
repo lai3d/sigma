@@ -70,38 +70,206 @@ fn mask_key(key: &str) -> String {
     }
 }
 
-/// Full sync: fetch all hosted zones and record sets from Route 53.
-pub async fn sync(state: &AppState, account: &DnsAccount) -> Result<DnsSyncResult, AppError> {
-    let access_key_id = account
-        .config
+fn build_r53_client(config: &serde_json::Value) -> Result<(String, String, String), AppError> {
+    let access_key_id = config
         .get("access_key_id")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| AppError::Internal("Missing access_key_id in config".into()))?;
-    let secret_access_key = account
-        .config
+        .ok_or_else(|| AppError::Internal("Missing access_key_id in config".into()))?
+        .to_string();
+    let secret_access_key = config
         .get("secret_access_key")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| AppError::Internal("Missing secret_access_key in config".into()))?;
-    let region = account
-        .config
+        .ok_or_else(|| AppError::Internal("Missing secret_access_key in config".into()))?
+        .to_string();
+    let region = config
         .get("region")
         .and_then(|v| v.as_str())
-        .unwrap_or("us-east-1");
+        .unwrap_or("us-east-1")
+        .to_string();
+    Ok((access_key_id, secret_access_key, region))
+}
 
+async fn make_r53_client(config: &serde_json::Value) -> Result<aws_sdk_route53::Client, AppError> {
+    let (access_key_id, secret_access_key, region) = build_r53_client(config)?;
     let creds = aws_credential_types::Credentials::new(
-        access_key_id,
-        secret_access_key,
+        &access_key_id,
+        &secret_access_key,
         None,
         None,
         "sigma-dns",
     );
     let sdk_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
         .credentials_provider(creds)
-        .region(aws_config::Region::new(region.to_string()))
+        .region(aws_config::Region::new(region))
         .load()
         .await;
+    Ok(aws_sdk_route53::Client::new(&sdk_config))
+}
 
-    let client = aws_sdk_route53::Client::new(&sdk_config);
+/// Sync a single zone by its Route 53 hosted zone ID.
+pub async fn sync_single_zone(
+    state: &AppState,
+    account: &DnsAccount,
+    zone_r53_id: &str,
+    _zone_name: &str,
+) -> Result<DnsSyncResult, AppError> {
+    let client = make_r53_client(&account.config).await?;
+
+    // Build IP→VPS map
+    let vps_rows: Vec<(Uuid, serde_json::Value)> =
+        sqlx::query_as("SELECT id, ip_addresses FROM vps WHERE status != 'retired'")
+            .fetch_all(&state.db)
+            .await?;
+
+    let mut ip_to_vps: std::collections::HashMap<String, Uuid> =
+        std::collections::HashMap::new();
+    for (vps_id, ips_json) in &vps_rows {
+        if let Ok(ips) = serde_json::from_value::<Vec<IpEntry>>(ips_json.clone()) {
+            for entry in ips {
+                ip_to_vps.insert(entry.ip.clone(), *vps_id);
+            }
+        }
+    }
+
+    let now = chrono::Utc::now();
+
+    // Fetch zone name from R53
+    let zone_resp = client
+        .get_hosted_zone()
+        .id(zone_r53_id)
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(format!("Route 53 get zone error: {e}")))?;
+
+    let zone_name = zone_resp
+        .hosted_zone
+        .as_ref()
+        .map(|z| z.name.as_str().trim_end_matches('.').to_string())
+        .unwrap_or_default();
+
+    // Upsert zone
+    let zone_uuid: (Uuid,) = sqlx::query_as(
+        r#"INSERT INTO dns_zones (account_id, zone_id, zone_name, status, synced_at)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (account_id, zone_id)
+           DO UPDATE SET zone_name = $3, status = $4, synced_at = $5, updated_at = now()
+           RETURNING id"#,
+    )
+    .bind(account.id)
+    .bind(zone_r53_id)
+    .bind(&zone_name)
+    .bind("active")
+    .bind(now)
+    .fetch_one(&state.db)
+    .await?;
+
+    // Fetch all record sets
+    let mut seen_record_ids: Vec<String> = Vec::new();
+    let mut total_records: i64 = 0;
+    let mut total_linked: i64 = 0;
+    let mut start_record_name: Option<String> = None;
+    let mut start_record_type: Option<aws_sdk_route53::types::RrType> = None;
+
+    loop {
+        let mut req = client
+            .list_resource_record_sets()
+            .hosted_zone_id(zone_r53_id)
+            .max_items(300);
+        if let Some(ref name) = start_record_name {
+            req = req.start_record_name(name);
+        }
+        if let Some(ref rtype) = start_record_type {
+            req = req.start_record_type(rtype.clone());
+        }
+
+        let resp = req.send().await;
+
+        if let Ok(resp) = resp {
+            for rrset in &resp.resource_record_sets {
+                let record_type = rrset.r#type.as_str().to_string();
+                let name = rrset.name.as_str().trim_end_matches('.');
+
+                if let Some(ref records) = rrset.resource_records {
+                    for (i, rr) in records.iter().enumerate() {
+                        let content = rr.value.as_str();
+                        let record_id = format!("{name}:{record_type}:{i}");
+                        seen_record_ids.push(record_id.clone());
+
+                        let vps_id = if record_type == "A" || record_type == "AAAA" {
+                            ip_to_vps.get(content).copied()
+                        } else {
+                            None
+                        };
+
+                        if vps_id.is_some() {
+                            total_linked += 1;
+                        }
+
+                        let ttl = rrset.ttl.unwrap_or(300) as i32;
+
+                        sqlx::query(
+                            r#"INSERT INTO dns_records (zone_uuid, record_id, record_type, name, content, ttl, extra, vps_id, synced_at)
+                               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                               ON CONFLICT (zone_uuid, record_id)
+                               DO UPDATE SET record_type = $3, name = $4, content = $5, ttl = $6, extra = $7, vps_id = $8, synced_at = $9, updated_at = now()"#,
+                        )
+                        .bind(zone_uuid.0)
+                        .bind(&record_id)
+                        .bind(&record_type)
+                        .bind(name)
+                        .bind(content)
+                        .bind(ttl)
+                        .bind(serde_json::json!({}))
+                        .bind(vps_id)
+                        .bind(now)
+                        .execute(&state.db)
+                        .await?;
+
+                        total_records += 1;
+                    }
+                }
+            }
+
+            if resp.is_truncated {
+                start_record_name = resp.next_record_name;
+                start_record_type = resp.next_record_type;
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+
+    // Delete stale records
+    let total_deleted = if !seen_record_ids.is_empty() {
+        sqlx::query(
+            "DELETE FROM dns_records WHERE zone_uuid = $1 AND record_id != ALL($2)",
+        )
+        .bind(zone_uuid.0)
+        .bind(&seen_record_ids)
+        .execute(&state.db)
+        .await?
+        .rows_affected() as i64
+    } else {
+        sqlx::query("DELETE FROM dns_records WHERE zone_uuid = $1")
+            .bind(zone_uuid.0)
+            .execute(&state.db)
+            .await?
+            .rows_affected() as i64
+    };
+
+    Ok(DnsSyncResult {
+        zones_count: 1,
+        records_count: total_records,
+        records_linked: total_linked,
+        records_deleted: total_deleted,
+    })
+}
+
+/// Full sync: fetch all hosted zones and record sets from Route 53.
+pub async fn sync(state: &AppState, account: &DnsAccount) -> Result<DnsSyncResult, AppError> {
+    let client = make_r53_client(&account.config).await?;
 
     // Fetch all hosted zones
     let mut all_zones = Vec::new();

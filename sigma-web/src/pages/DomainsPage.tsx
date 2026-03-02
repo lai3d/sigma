@@ -5,6 +5,7 @@ import {
   useDnsAccounts,
   useDeleteDnsAccount,
   useSyncDnsAccount,
+  useSyncDnsZone,
   useDnsZones,
   useDnsRecords,
 } from '@/hooks/useDns';
@@ -245,6 +246,23 @@ function ZonesTab() {
     page,
     per_page: 25,
   });
+  const syncMutation = useSyncDnsZone();
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [syncResult, setSyncResult] = useState<DnsSyncResult | null>(null);
+
+  async function handleSyncZone(id: string) {
+    setSyncingId(id);
+    setSyncResult(null);
+    try {
+      const result = await syncMutation.mutateAsync(id);
+      setSyncResult(result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Sync failed';
+      alert(msg);
+    } finally {
+      setSyncingId(null);
+    }
+  }
 
   return (
     <>
@@ -261,6 +279,15 @@ function ZonesTab() {
         </select>
       </div>
 
+      {syncResult && (
+        <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-800">
+          Sync complete: {syncResult.records_count} records, {syncResult.records_linked} linked to VPS, {syncResult.records_deleted} deleted
+          <button onClick={() => setSyncResult(null)} className="ml-3 text-green-600 hover:text-green-800 font-medium">
+            Dismiss
+          </button>
+        </div>
+      )}
+
       <div className="mt-4 bg-white rounded-lg border overflow-x-auto">
         {isLoading ? (
           <div className="p-8 text-center text-gray-500">Loading...</div>
@@ -275,6 +302,7 @@ function ZonesTab() {
                 <th className="px-4 py-3 font-medium">Domain Expires</th>
                 <th className="px-4 py-3 font-medium">Cert Expires</th>
                 <th className="px-4 py-3 font-medium">Last Synced</th>
+                <th className="px-4 py-3 font-medium w-16">Sync</th>
               </tr>
             </thead>
             <tbody>
@@ -294,6 +322,16 @@ function ZonesTab() {
                   <td className="px-4 py-3"><ExpiryCell date={zone.cert_expires_at} /></td>
                   <td className="px-4 py-3 text-gray-500 text-xs">
                     {new Date(zone.synced_at).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => handleSyncZone(zone.id)}
+                      disabled={syncingId === zone.id}
+                      className="p-1.5 text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                      title="Sync this zone"
+                    >
+                      <RefreshCw size={15} className={syncingId === zone.id ? 'animate-spin' : ''} />
+                    </button>
                   </td>
                 </tr>
               ))}

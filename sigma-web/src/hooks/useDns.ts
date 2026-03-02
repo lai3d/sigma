@@ -51,6 +51,17 @@ export function useSyncDnsAccount() {
   });
 }
 
+export function useSyncDnsZone() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.syncZone(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['dns-zones'] });
+      qc.invalidateQueries({ queryKey: ['dns-records'] });
+    },
+  });
+}
+
 export function useDnsZones(query?: DnsZoneListQuery) {
   return useQuery({
     queryKey: ['dns-zones', query],

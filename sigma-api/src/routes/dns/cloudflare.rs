@@ -213,6 +213,71 @@ pub async fn sync(state: &AppState, account: &DnsAccount) -> Result<DnsSyncResul
     })
 }
 
+/// Sync a single zone by its Cloudflare zone ID.
+pub async fn sync_single_zone(
+    state: &AppState,
+    account: &DnsAccount,
+    zone_cf_id: &str,
+    _zone_name: &str,
+) -> Result<DnsSyncResult, AppError> {
+    let client = &state.http_client;
+    let token = account
+        .config
+        .get("api_token")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| AppError::Internal("Missing api_token in account config".into()))?;
+
+    // Fetch zone info from CF to get the account ref (needed for registrar API)
+    let resp = client
+        .get(format!(
+            "https://api.cloudflare.com/client/v4/zones/{zone_cf_id}"
+        ))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(format!("CF API error: {e}")))?;
+
+    let body = resp
+        .json::<CfResponse<CfZone>>()
+        .await
+        .map_err(|e| AppError::Internal(format!("CF parse error: {e}")))?;
+
+    if !body.success {
+        return Err(AppError::Internal("CF API returned success=false".into()));
+    }
+
+    let zone = body.result;
+
+    // Build IP→VPS map
+    let vps_rows: Vec<(Uuid, serde_json::Value)> =
+        sqlx::query_as("SELECT id, ip_addresses FROM vps WHERE status != 'retired'")
+            .fetch_all(&state.db)
+            .await?;
+
+    let mut ip_to_vps: std::collections::HashMap<String, Uuid> =
+        std::collections::HashMap::new();
+    for (vps_id, ips_json) in &vps_rows {
+        if let Ok(ips) = serde_json::from_value::<Vec<IpEntry>>(ips_json.clone()) {
+            for entry in ips {
+                ip_to_vps.insert(entry.ip.clone(), *vps_id);
+            }
+        }
+    }
+
+    let now = Utc::now();
+    let zr = sync_zone(
+        &state.db, client, token, &ip_to_vps, account.id, &zone, now,
+    )
+    .await?;
+
+    Ok(DnsSyncResult {
+        zones_count: 1,
+        records_count: zr.records,
+        records_linked: zr.linked,
+        records_deleted: zr.deleted,
+    })
+}
+
 struct ZoneSyncResult {
     records: i64,
     linked: i64,

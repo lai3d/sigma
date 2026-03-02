@@ -16,7 +16,8 @@ use crate::errors::AppError;
 use crate::models::{
     CreateDnsAccount, DnsAccount, DnsAccountListQuery, DnsAccountResponse, DnsRecord,
     DnsRecordListQuery, DnsSyncResult, DnsZone, DnsZoneListQuery, PaginatedDnsAccountResponse,
-    PaginatedDnsRecordResponse, PaginatedDnsZoneResponse, PaginatedResponse, UpdateDnsAccount,
+    PaginatedDnsRecordResponse, PaginatedDnsZoneResponse, PaginatedResponse,
+    UpdateDnsAccount,
 };
 use crate::routes::audit_logs::log_audit;
 use crate::routes::AppState;
@@ -36,6 +37,10 @@ pub fn router() -> Router<AppState> {
         .route(
             "/api/dns-accounts/{id}/sync",
             axum::routing::post(sync_account),
+        )
+        .route(
+            "/api/dns-zones/{id}/sync",
+            axum::routing::post(sync_zone),
         )
         .route("/api/dns-zones", get(list_zones))
         .route("/api/dns-records", get(list_dns_records))
@@ -78,6 +83,24 @@ async fn sync_provider(
         "route53" => route53::sync(state, account).await,
         "godaddy" => godaddy::sync(state, account).await,
         "namecom" => namecom::sync(state, account).await,
+        _ => Err(AppError::BadRequest(format!(
+            "Unknown provider type: {}",
+            account.provider_type
+        ))),
+    }
+}
+
+async fn sync_provider_zone(
+    state: &AppState,
+    account: &DnsAccount,
+    zone_id: &str,
+    zone_name: &str,
+) -> Result<DnsSyncResult, AppError> {
+    match account.provider_type.as_str() {
+        "cloudflare" => cloudflare::sync_single_zone(state, account, zone_id, zone_name).await,
+        "route53" => route53::sync_single_zone(state, account, zone_id, zone_name).await,
+        "godaddy" => godaddy::sync_single_zone(state, account, zone_id, zone_name).await,
+        "namecom" => namecom::sync_single_zone(state, account, zone_id, zone_name).await,
         _ => Err(AppError::BadRequest(format!(
             "Unknown provider type: {}",
             account.provider_type
@@ -374,6 +397,63 @@ pub async fn sync_account(
         serde_json::json!({
             "provider_type": acc.provider_type,
             "zones": result.zones_count,
+            "records": result.records_count,
+            "linked": result.records_linked,
+        }),
+    )
+    .await;
+
+    Ok(Json(result))
+}
+
+// ─── Zone Sync ───────────────────────────────────────────
+
+#[utoipa::path(
+    post,
+    path = "/api/dns-zones/{id}/sync",
+    tag = "DNS",
+    params(("id" = Uuid, Path, description = "Zone ID (our internal UUID)")),
+    responses(
+        (status = 200, body = DnsSyncResult),
+        (status = 404),
+    )
+)]
+pub async fn sync_zone(
+    State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<DnsSyncResult>, AppError> {
+    require_role(&user, &["admin", "operator"])?;
+
+    // Fetch zone from our DB
+    let zone = sqlx::query_as::<_, DnsZone>(
+        "SELECT * FROM dns_zones WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    // Fetch parent account
+    let acc = sqlx::query_as::<_, DnsAccount>(
+        "SELECT * FROM dns_accounts WHERE id = $1",
+    )
+    .bind(zone.account_id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    let result = sync_provider_zone(&state, &acc, &zone.zone_id, &zone.zone_name).await?;
+
+    log_audit(
+        &state.db,
+        &user,
+        "sync",
+        "dns_zone",
+        Some(&id.to_string()),
+        serde_json::json!({
+            "zone_name": zone.zone_name,
+            "provider_type": acc.provider_type,
             "records": result.records_count,
             "linked": result.records_linked,
         }),
