@@ -1,0 +1,39 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: sigma-db
+  namespace: sigma
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.6
+  instances: 3
+
+  postgresql:
+    parameters:
+      max_connections: "200"
+      shared_buffers: "256MB"
+      effective_cache_size: "512MB"
+      log_statement: "ddl"
+      log_min_duration_statement: "1000"
+    pg_hba:
+      - host sigma sigma all md5
+
+  bootstrap:
+    initdb:
+      database: sigma
+      owner: sigma
+      secret:
+        name: sigma-db-credentials
+
+  storage:
+    size: 10Gi
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+  monitoring:
+    enablePodMonitor: true

@@ -120,6 +120,74 @@ EOF
 # See: https://argocd-image-updater.readthedocs.io/
 ```
 
+### PostgreSQL HA (CloudNativePG)
+
+Production uses CloudNativePG operator for a 3-instance PostgreSQL HA cluster (1 primary + 2 replicas) with automatic failover.
+
+**Install the operator:**
+
+```bash
+helm repo add cnpg https://cloudnative-pg.github.io/charts
+helm install cnpg cnpg/cloudnative-pg -n cnpg-system --create-namespace
+```
+
+**Deploy the database cluster:**
+
+```bash
+# 1. Update credentials
+vi k8s/cnpg-secret.yaml   # Set a strong password
+
+# 2. Apply secret + cluster
+kubectl apply -f k8s/cnpg-secret.yaml
+kubectl apply -f k8s/cnpg-cluster.yaml
+
+# 3. Wait for cluster to be healthy (~2-3 minutes)
+kubectl get cluster sigma-db -n sigma -w
+
+# 4. (Optional) Deploy PgBouncer connection pooler
+kubectl apply -f k8s/cnpg-pooler.yaml
+```
+
+**Services created automatically by CloudNativePG:**
+
+| Service | Target | Usage |
+|---------|--------|-------|
+| `sigma-db-rw` | Primary (read-write) | API connects here |
+| `sigma-db-ro` | Replicas (read-only) | Future read replicas |
+| `sigma-db-r` | All instances | Monitoring |
+
+**Verify:**
+
+```bash
+kubectl get cluster sigma-db -n sigma              # Status: healthy
+kubectl get pods -n sigma -l cnpg.io/cluster=sigma-db  # 3 pods running
+kubectl get svc -n sigma | grep sigma-db            # rw/ro/r services
+```
+
+**Migration from single-pod PostgreSQL:**
+
+```bash
+# 1. Scale API to 0
+kubectl scale deployment sigma-api -n sigma --replicas=0
+
+# 2. Dump from old database
+kubectl exec -n sigma deploy/postgres -- pg_dump -U sigma sigma > backup.sql
+
+# 3. Restore into CloudNativePG cluster
+kubectl get pods -n sigma -l cnpg.io/cluster=sigma-db,role=primary -o name | \
+  xargs -I{} kubectl exec -n sigma -i {} -- psql -U sigma sigma < backup.sql
+
+# 4. Apply updated secret + api-deployment (DATABASE_URL now points to sigma-db-rw)
+kubectl apply -f k8s/secret.yaml
+kubectl apply -f k8s/api-deployment.yaml
+
+# 5. Scale API back up
+kubectl scale deployment sigma-api -n sigma --replicas=2
+
+# 6. Verify, then delete old postgres resources
+kubectl delete -f k8s/postgres.yaml  # (already removed from repo)
+```
+
 ### Pre-deploy Checklist
 
 ```bash
