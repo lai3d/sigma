@@ -1,5 +1,6 @@
 use sigma_api::auth;
 use sigma_api::config;
+use sigma_api::dns_sync;
 use sigma_api::notifications;
 use sigma_api::openapi;
 use sigma_api::routes;
@@ -76,6 +77,9 @@ async fn main() -> anyhow::Result<()> {
         jwt_expiry_hours: cfg.jwt_expiry_hours,
     };
 
+    // Capture before cfg is moved into notification worker
+    let dns_sync_interval_secs = cfg.dns_sync_interval_secs;
+
     // Spawn notification worker if any channel is configured
     if cfg.telegram_bot_token.is_some() || cfg.webhook_url.is_some() {
         let notify_db = app_state.db.clone();
@@ -83,6 +87,13 @@ async fn main() -> anyhow::Result<()> {
         tokio::spawn(notifications::run(notify_db, notify_redis, http_client, cfg));
     } else {
         tracing::info!("Notification worker disabled (no TELEGRAM_BOT_TOKEN or WEBHOOK_URL set)");
+    }
+
+    // Spawn DNS background sync worker
+    if dns_sync_interval_secs > 0 {
+        tokio::spawn(dns_sync::run(app_state.clone(), dns_sync_interval_secs));
+    } else {
+        tracing::info!("DNS background sync disabled (DNS_SYNC_INTERVAL_SECS=0)");
     }
 
     // Public routes (no auth required)

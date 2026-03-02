@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod config;
 pub mod db;
+pub mod dns_sync;
 pub mod errors;
 pub mod models;
 pub mod notifications;

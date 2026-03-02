@@ -14,6 +14,7 @@ pub struct Config {
     pub notify_interval_secs: u64,
     pub jwt_secret: String,
     pub jwt_expiry_hours: u64,
+    pub dns_sync_interval_secs: u64,
 }
 
 impl Config {
@@ -65,6 +66,10 @@ impl Config {
                 .ok()
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(24),
+            dns_sync_interval_secs: std::env::var("DNS_SYNC_INTERVAL_SECS")
+                .ok()
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(3600),
         }
     }
 }

@@ -79,7 +79,7 @@ fn mask_config(provider_type: &str, config: &serde_json::Value) -> serde_json::V
     }
 }
 
-async fn sync_provider(
+pub async fn sync_provider(
     state: &AppState,
     account: &DnsAccount,
 ) -> Result<DnsSyncResult, AppError> {
