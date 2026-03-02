@@ -5,6 +5,7 @@ import type {
   UpdateDnsAccount,
   DnsZoneListQuery,
   DnsRecordListQuery,
+  DnsRecordHistoryQuery,
 } from '@/types/api';
 
 export function useDnsAccounts(query?: { page?: number; per_page?: number }) {
@@ -80,5 +81,13 @@ export function useDnsRecords(query?: DnsRecordListQuery) {
   return useQuery({
     queryKey: ['dns-records', query],
     queryFn: () => api.listDnsRecords(query),
+  });
+}
+
+export function useDnsRecordHistory(id: string, query?: DnsRecordHistoryQuery) {
+  return useQuery({
+    queryKey: ['dns-record-history', id, query],
+    queryFn: () => api.getDnsRecordHistory(id, query),
+    enabled: !!id,
   });
 }

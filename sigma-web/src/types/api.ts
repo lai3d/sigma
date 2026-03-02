@@ -521,6 +521,28 @@ export interface DnsRecordListQuery {
   per_page?: number;
 }
 
+// ─── DNS Record History ──────────────────────────────────
+
+export interface DnsRecordHistory {
+  id: string;
+  dns_record_id: string;
+  zone_uuid: string;
+  record_id: string;
+  record_type: string;
+  name: string;
+  action: 'created' | 'updated' | 'deleted';
+  old_content: string | null;
+  new_content: string | null;
+  old_extra: Record<string, unknown> | null;
+  new_extra: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface DnsRecordHistoryQuery {
+  page?: number;
+  per_page?: number;
+}
+
 // ─── Cloud Accounts (VPS sync) ──────────────────────────────
 
 export type CloudProviderType = 'aws' | 'alibaba' | 'digitalocean' | 'linode' | 'volcengine';

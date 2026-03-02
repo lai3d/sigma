@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, Cloud, ArrowRight } from 'lucide-react';
-import { useDnsZone, useDnsRecords, useSyncDnsZone, useDnsAccounts } from '@/hooks/useDns';
+import { ArrowLeft, RefreshCw, Cloud, ArrowRight, History, ChevronDown, ChevronRight } from 'lucide-react';
+import { useDnsZone, useDnsRecords, useSyncDnsZone, useDnsAccounts, useDnsRecordHistory } from '@/hooks/useDns';
 import Pagination from '@/components/Pagination';
 import type { DnsSyncResult } from '@/types/api';
 
@@ -51,6 +51,70 @@ function ExpiryCell({ label, date }: { label: string; date: string | null }) {
   );
 }
 
+const ACTION_BADGE: Record<string, string> = {
+  created: 'bg-green-100 text-green-800',
+  updated: 'bg-yellow-100 text-yellow-800',
+  deleted: 'bg-red-100 text-red-800',
+};
+
+function RecordHistory({ recordId }: { recordId: string }) {
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = useDnsRecordHistory(recordId, { page, per_page: 10 });
+
+  if (isLoading) return <div className="px-4 py-3 text-xs text-gray-500">Loading history...</div>;
+  if (!data?.data.length) return <div className="px-4 py-3 text-xs text-gray-400">No history yet</div>;
+
+  return (
+    <div className="px-4 py-3 space-y-2">
+      {data.data.map((h) => (
+        <div key={h.id} className="flex items-start gap-3 text-xs">
+          <span className={`inline-flex items-center px-1.5 py-0.5 rounded font-medium shrink-0 ${ACTION_BADGE[h.action] || 'bg-gray-100 text-gray-600'}`}>
+            {h.action}
+          </span>
+          <div className="flex-1 min-w-0">
+            {h.action === 'updated' && h.old_content !== h.new_content && (
+              <div className="font-mono">
+                <span className="text-red-600 line-through">{h.old_content}</span>
+                <span className="text-gray-400 mx-1">&rarr;</span>
+                <span className="text-green-700">{h.new_content}</span>
+              </div>
+            )}
+            {h.action === 'updated' && h.old_content === h.new_content && (
+              <div className="text-gray-500 italic">extra metadata changed</div>
+            )}
+            {h.action === 'created' && (
+              <span className="font-mono text-green-700">{h.new_content}</span>
+            )}
+            {h.action === 'deleted' && (
+              <span className="font-mono text-red-600 line-through">{h.old_content}</span>
+            )}
+          </div>
+          <span className="text-gray-400 shrink-0">{new Date(h.created_at).toLocaleString()}</span>
+        </div>
+      ))}
+      {data.total > 10 && (
+        <div className="flex items-center gap-2 pt-1">
+          <button
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+            className="text-xs text-blue-600 hover:text-blue-800 disabled:text-gray-300"
+          >
+            Prev
+          </button>
+          <span className="text-xs text-gray-400">{page} / {Math.ceil(data.total / 10)}</span>
+          <button
+            disabled={page * 10 >= data.total}
+            onClick={() => setPage((p) => p + 1)}
+            className="text-xs text-blue-600 hover:text-blue-800 disabled:text-gray-300"
+          >
+            Next
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DnsZoneDetail() {
   const { id } = useParams<{ id: string }>();
   const { data: zone, isLoading } = useDnsZone(id || '');
@@ -58,6 +122,7 @@ export default function DnsZoneDetail() {
 
   const [recordPage, setRecordPage] = useState(1);
   const [typeFilter, setTypeFilter] = useState('');
+  const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
   const { data: recordsResult, isLoading: recordsLoading } = useDnsRecords({
     zone_name: zone?.zone_name,
     record_type: typeFilter || undefined,
@@ -193,6 +258,7 @@ export default function DnsZoneDetail() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-gray-500 border-b bg-gray-50">
+                <th className="px-4 py-3 font-medium w-8"></th>
                 <th className="px-4 py-3 font-medium">Name</th>
                 <th className="px-4 py-3 font-medium">Type</th>
                 <th className="px-4 py-3 font-medium">Content</th>
@@ -204,48 +270,71 @@ export default function DnsZoneDetail() {
             <tbody>
               {recordsResult.data.map((rec) => {
                 const proxied = rec.extra?.proxied === true;
+                const isExpanded = expandedRecord === rec.id;
                 return (
-                  <tr key={rec.id} className="border-b last:border-0 hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-900 max-w-xs truncate">
-                      {rec.name}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        RECORD_TYPE_COLORS[rec.record_type] || 'bg-gray-100 text-gray-600'
-                      }`}>
-                        {rec.record_type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 font-mono text-xs max-w-xs truncate">
-                      {rec.content}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {rec.ttl === 1 ? 'Auto' : rec.ttl}
-                    </td>
-                    <td className="px-4 py-3">
-                      {proxied ? (
-                        <Cloud size={16} className="text-orange-500" />
-                      ) : (
-                        <span className="text-gray-400 text-xs">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {rec.vps_id ? (
-                        <Link
-                          to={`/vps/${rec.vps_id}`}
-                          className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs"
+                  <Fragment key={rec.id}>
+                    <tr className="border-b last:border-0 hover:bg-gray-50">
+                      <td className="px-2 py-3 text-center">
+                        <button
+                          onClick={() => setExpandedRecord(isExpanded ? null : rec.id)}
+                          className="text-gray-400 hover:text-gray-600 p-0.5"
+                          title="Toggle history"
                         >
-                          {rec.vps_hostname || 'VPS'}
-                          {rec.vps_country && (
-                            <span className="text-gray-400">({rec.vps_country})</span>
-                          )}
-                          <ArrowRight size={12} />
-                        </Link>
-                      ) : (
-                        <span className="text-gray-300">&mdash;</span>
-                      )}
-                    </td>
-                  </tr>
+                          {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 font-medium text-gray-900 max-w-xs truncate">
+                        {rec.name}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                          RECORD_TYPE_COLORS[rec.record_type] || 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {rec.record_type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 font-mono text-xs max-w-xs truncate">
+                        {rec.content}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500">
+                        {rec.ttl === 1 ? 'Auto' : rec.ttl}
+                      </td>
+                      <td className="px-4 py-3">
+                        {proxied ? (
+                          <Cloud size={16} className="text-orange-500" />
+                        ) : (
+                          <span className="text-gray-400 text-xs">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {rec.vps_id ? (
+                          <Link
+                            to={`/vps/${rec.vps_id}`}
+                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs"
+                          >
+                            {rec.vps_hostname || 'VPS'}
+                            {rec.vps_country && (
+                              <span className="text-gray-400">({rec.vps_country})</span>
+                            )}
+                            <ArrowRight size={12} />
+                          </Link>
+                        ) : (
+                          <span className="text-gray-300">&mdash;</span>
+                        )}
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr className="border-b last:border-0">
+                        <td colSpan={7} className="bg-gray-50/50">
+                          <div className="flex items-center gap-1.5 px-4 pt-2 text-xs font-medium text-gray-500">
+                            <History size={12} />
+                            Change History
+                          </div>
+                          <RecordHistory recordId={rec.id} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })}
             </tbody>

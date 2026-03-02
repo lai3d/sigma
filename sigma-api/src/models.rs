@@ -1240,6 +1240,40 @@ pub struct PaginatedVpsIpHistoryResponse {
     pub per_page: i64,
 }
 
+// ─── DNS Record History ────────────────────────────────
+
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+pub struct DnsRecordHistory {
+    pub id: Uuid,
+    pub dns_record_id: Uuid,
+    pub zone_uuid: Uuid,
+    pub record_id: String,
+    pub record_type: String,
+    pub name: String,
+    pub action: String,
+    pub old_content: Option<String>,
+    pub new_content: Option<String>,
+    pub old_extra: Option<serde_json::Value>,
+    pub new_extra: Option<serde_json::Value>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct DnsRecordHistoryQuery {
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_per_page")]
+    pub per_page: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct PaginatedDnsRecordHistoryResponse {
+    pub data: Vec<DnsRecordHistory>,
+    pub total: i64,
+    pub page: i64,
+    pub per_page: i64,
+}
+
 // ─── Cloud Accounts (VPS sync) ──────────────────────────
 
 #[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]

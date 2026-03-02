@@ -25,6 +25,7 @@ use crate::models::{
     UpdateEnvoyRoute, UpdateExchangeRate, UpdateProvider, UpdateTicket, UpdateUser, UpdateVps,
     UpdateVpsPurpose, UserResponse, Vps, VpsPurpose,
     VpsIpHistory, PaginatedVpsIpHistoryResponse,
+    DnsRecordHistory, PaginatedDnsRecordHistoryResponse,
     IpLabel, CreateIpLabel, UpdateIpLabel, PaginatedIpLabelResponse,
 };
 
@@ -131,6 +132,7 @@ use crate::models::{
         crate::routes::dns::sync_account,
         crate::routes::dns::list_zones,
         crate::routes::dns::list_dns_records,
+        crate::routes::dns::dns_record_history,
         // Cloud Accounts
         crate::routes::cloud::list_accounts,
         crate::routes::cloud::get_account,
@@ -172,7 +174,7 @@ use crate::models::{
         DnsAccountResponse, CreateDnsAccount, UpdateDnsAccount,
         DnsZone, DnsRecord, DnsSyncResult,
         PaginatedDnsAccountResponse, PaginatedDnsZoneResponse,
-        PaginatedDnsRecordResponse,
+        PaginatedDnsRecordResponse, DnsRecordHistory, PaginatedDnsRecordHistoryResponse,
         VpsPurpose, CreateVpsPurpose, UpdateVpsPurpose, PaginatedVpsPurposeResponse,
         CloudAccountResponse, CreateCloudAccount, UpdateCloudAccount, CloudSyncResult,
         PaginatedCloudAccountResponse,

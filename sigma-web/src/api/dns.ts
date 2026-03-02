@@ -5,9 +5,11 @@ import type {
   UpdateDnsAccount,
   DnsZone,
   DnsRecord,
+  DnsRecordHistory,
   DnsSyncResult,
   DnsZoneListQuery,
   DnsRecordListQuery,
+  DnsRecordHistoryQuery,
   PaginatedResponse,
 } from '@/types/api';
 
@@ -71,5 +73,13 @@ export async function listDnsRecords(query?: DnsRecordListQuery): Promise<Pagina
   if (query?.page) params.set('page', String(query.page));
   if (query?.per_page) params.set('per_page', String(query.per_page));
   const { data } = await apiClient.get(`/dns-records?${params.toString()}`);
+  return data;
+}
+
+export async function getDnsRecordHistory(id: string, query?: DnsRecordHistoryQuery): Promise<PaginatedResponse<DnsRecordHistory>> {
+  const params = new URLSearchParams();
+  if (query?.page) params.set('page', String(query.page));
+  if (query?.per_page) params.set('per_page', String(query.per_page));
+  const { data } = await apiClient.get(`/dns-records/${id}/history?${params.toString()}`);
   return data;
 }

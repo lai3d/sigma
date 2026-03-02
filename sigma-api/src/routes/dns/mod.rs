@@ -15,9 +15,9 @@ use crate::auth::{require_role, CurrentUser};
 use crate::errors::AppError;
 use crate::models::{
     CreateDnsAccount, DnsAccount, DnsAccountListQuery, DnsAccountResponse, DnsRecord,
-    DnsRecordListQuery, DnsSyncResult, DnsZone, DnsZoneListQuery, PaginatedDnsAccountResponse,
-    PaginatedDnsRecordResponse, PaginatedDnsZoneResponse, PaginatedResponse,
-    UpdateDnsAccount,
+    DnsRecordHistory, DnsRecordHistoryQuery, DnsRecordListQuery, DnsSyncResult, DnsZone,
+    DnsZoneListQuery, PaginatedDnsAccountResponse, PaginatedDnsRecordHistoryResponse,
+    PaginatedDnsRecordResponse, PaginatedDnsZoneResponse, PaginatedResponse, UpdateDnsAccount,
 };
 use crate::routes::audit_logs::log_audit;
 use crate::routes::AppState;
@@ -45,6 +45,10 @@ pub fn router() -> Router<AppState> {
         .route("/api/dns-zones", get(list_zones))
         .route("/api/dns-zones/{id}", get(get_zone))
         .route("/api/dns-records", get(list_dns_records))
+        .route(
+            "/api/dns-records/{id}/history",
+            get(dns_record_history),
+        )
 }
 
 // ─── Provider dispatch helpers ───────────────────────────
@@ -631,6 +635,57 @@ pub async fn list_dns_records(
     query = query.bind(per_page).bind(offset);
 
     let rows = query.fetch_all(&state.db).await?;
+
+    Ok(Json(PaginatedResponse {
+        data: rows,
+        total,
+        page,
+        per_page,
+    }))
+}
+
+// ─── DNS Record History ────────────────────────────────
+
+#[utoipa::path(
+    get,
+    path = "/api/dns-records/{id}/history",
+    tag = "DNS",
+    params(
+        ("id" = Uuid, Path, description = "DNS record UUID"),
+        DnsRecordHistoryQuery,
+    ),
+    responses((status = 200, body = PaginatedDnsRecordHistoryResponse))
+)]
+pub async fn dns_record_history(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Query(q): Query<DnsRecordHistoryQuery>,
+) -> Result<Json<PaginatedResponse<DnsRecordHistory>>, AppError> {
+    let per_page = q.per_page.clamp(1, 100);
+    let page = q.page.max(1);
+    let offset = (page - 1) * per_page;
+
+    let total = sqlx::query_as::<_, (i64,)>(
+        "SELECT COUNT(*) FROM dns_record_history WHERE dns_record_id = $1",
+    )
+    .bind(id)
+    .fetch_one(&state.db)
+    .await?
+    .0;
+
+    let rows = sqlx::query_as::<_, DnsRecordHistory>(
+        r#"SELECT id, dns_record_id, zone_uuid, record_id, record_type, name,
+                  action, old_content, new_content, old_extra, new_extra, created_at
+           FROM dns_record_history
+           WHERE dns_record_id = $1
+           ORDER BY created_at DESC
+           LIMIT $2 OFFSET $3"#,
+    )
+    .bind(id)
+    .bind(per_page)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await?;
 
     Ok(Json(PaginatedResponse {
         data: rows,
