@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use futures::stream::{self, StreamExt};
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -162,123 +163,34 @@ pub async fn sync(state: &AppState, account: &DnsAccount) -> Result<DnsSyncResul
     }
 
     let now = Utc::now();
-    let mut seen_zone_ids: Vec<String> = Vec::new();
+    let zones_count = all_zones.len() as i64;
+    let seen_zone_ids: Vec<String> = all_zones.iter().map(|z| z.id.clone()).collect();
+
+    // Process zones concurrently (up to 10 at a time)
+    let zone_results: Vec<Result<ZoneSyncResult, AppError>> = stream::iter(all_zones)
+        .map(|zone| {
+            let db = state.db.clone();
+            let client = client.clone();
+            let token = token.to_string();
+            let ip_to_vps = &ip_to_vps;
+            let account_id = account.id;
+            async move {
+                sync_zone(&db, &client, &token, ip_to_vps, account_id, &zone, now).await
+            }
+        })
+        .buffer_unordered(10)
+        .collect()
+        .await;
+
     let mut total_records: i64 = 0;
     let mut total_linked: i64 = 0;
     let mut total_deleted: i64 = 0;
 
-    for zone in &all_zones {
-        seen_zone_ids.push(zone.id.clone());
-
-        // Upsert zone
-        let zone_uuid: (Uuid,) = sqlx::query_as(
-            r#"INSERT INTO dns_zones (account_id, zone_id, zone_name, status, synced_at)
-               VALUES ($1, $2, $3, $4, $5)
-               ON CONFLICT (account_id, zone_id)
-               DO UPDATE SET zone_name = $3, status = $4, synced_at = $5, updated_at = now()
-               RETURNING id"#,
-        )
-        .bind(account.id)
-        .bind(&zone.id)
-        .bind(&zone.name)
-        .bind(&zone.status)
-        .bind(now)
-        .fetch_one(&state.db)
-        .await?;
-
-        // Fetch DNS records for this zone
-        let dns_resp = client
-            .get(format!(
-                "https://api.cloudflare.com/client/v4/zones/{}/dns_records?per_page=5000",
-                zone.id
-            ))
-            .header("Authorization", format!("Bearer {token}"))
-            .send()
-            .await;
-
-        let mut seen_record_ids: Vec<String> = Vec::new();
-
-        if let Ok(resp) = dns_resp {
-            if let Ok(body) = resp.json::<CfResponse<Vec<CfDnsRecord>>>().await {
-                for rec in body.result {
-                    seen_record_ids.push(rec.id.clone());
-
-                    let vps_id = if rec.record_type == "A" || rec.record_type == "AAAA" {
-                        ip_to_vps.get(&rec.content).copied()
-                    } else {
-                        None
-                    };
-
-                    if vps_id.is_some() {
-                        total_linked += 1;
-                    }
-
-                    let extra = serde_json::json!({"proxied": rec.proxied});
-
-                    sqlx::query(
-                        r#"INSERT INTO dns_records (zone_uuid, record_id, record_type, name, content, ttl, extra, vps_id, synced_at)
-                           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                           ON CONFLICT (zone_uuid, record_id)
-                           DO UPDATE SET record_type = $3, name = $4, content = $5, ttl = $6, extra = $7, vps_id = $8, synced_at = $9, updated_at = now()"#,
-                    )
-                    .bind(zone_uuid.0)
-                    .bind(&rec.id)
-                    .bind(&rec.record_type)
-                    .bind(&rec.name)
-                    .bind(&rec.content)
-                    .bind(rec.ttl)
-                    .bind(&extra)
-                    .bind(vps_id)
-                    .bind(now)
-                    .execute(&state.db)
-                    .await?;
-
-                    total_records += 1;
-                }
-            }
-        }
-
-        // Delete stale records for this zone
-        if !seen_record_ids.is_empty() {
-            let deleted = sqlx::query(
-                "DELETE FROM dns_records WHERE zone_uuid = $1 AND record_id != ALL($2)",
-            )
-            .bind(zone_uuid.0)
-            .bind(&seen_record_ids)
-            .execute(&state.db)
-            .await?;
-            total_deleted += deleted.rows_affected() as i64;
-        } else {
-            let deleted = sqlx::query("DELETE FROM dns_records WHERE zone_uuid = $1")
-                .bind(zone_uuid.0)
-                .execute(&state.db)
-                .await?;
-            total_deleted += deleted.rows_affected() as i64;
-        }
-
-        // Best-effort: fetch cert expiry
-        let cert_expires = fetch_cert_expiry(client, token, &zone.id).await;
-        if let Some(expires) = cert_expires {
-            let _ =
-                sqlx::query("UPDATE dns_zones SET cert_expires_at = $2 WHERE id = $1")
-                    .bind(zone_uuid.0)
-                    .bind(expires)
-                    .execute(&state.db)
-                    .await;
-        }
-
-        // Best-effort: fetch domain expiry (CF Registrar)
-        let domain_expires =
-            fetch_domain_expiry(client, token, &zone.account.id, &zone.name).await;
-        if let Some(expires) = domain_expires {
-            let _ = sqlx::query(
-                "UPDATE dns_zones SET domain_expires_at = $2 WHERE id = $1",
-            )
-            .bind(zone_uuid.0)
-            .bind(expires)
-            .execute(&state.db)
-            .await;
-        }
+    for result in zone_results {
+        let zr = result?;
+        total_records += zr.records;
+        total_linked += zr.linked;
+        total_deleted += zr.deleted;
     }
 
     // Delete stale zones not seen in this sync
@@ -294,10 +206,142 @@ pub async fn sync(state: &AppState, account: &DnsAccount) -> Result<DnsSyncResul
     }
 
     Ok(DnsSyncResult {
-        zones_count: all_zones.len() as i64,
+        zones_count,
         records_count: total_records,
         records_linked: total_linked,
         records_deleted: total_deleted,
+    })
+}
+
+struct ZoneSyncResult {
+    records: i64,
+    linked: i64,
+    deleted: i64,
+}
+
+/// Process a single zone: upsert zone, fetch records + cert + domain concurrently, upsert records.
+async fn sync_zone(
+    db: &sqlx::PgPool,
+    client: &reqwest::Client,
+    token: &str,
+    ip_to_vps: &std::collections::HashMap<String, Uuid>,
+    account_id: Uuid,
+    zone: &CfZone,
+    now: DateTime<Utc>,
+) -> Result<ZoneSyncResult, AppError> {
+    // Upsert zone
+    let zone_uuid: (Uuid,) = sqlx::query_as(
+        r#"INSERT INTO dns_zones (account_id, zone_id, zone_name, status, synced_at)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (account_id, zone_id)
+           DO UPDATE SET zone_name = $3, status = $4, synced_at = $5, updated_at = now()
+           RETURNING id"#,
+    )
+    .bind(account_id)
+    .bind(&zone.id)
+    .bind(&zone.name)
+    .bind(&zone.status)
+    .bind(now)
+    .fetch_one(db)
+    .await?;
+
+    // Fetch DNS records, cert expiry, and domain expiry concurrently
+    let records_fut = client
+        .get(format!(
+            "https://api.cloudflare.com/client/v4/zones/{}/dns_records?per_page=5000",
+            zone.id
+        ))
+        .header("Authorization", format!("Bearer {token}"))
+        .send();
+    let cert_fut = fetch_cert_expiry(client, token, &zone.id);
+    let domain_fut = fetch_domain_expiry(client, token, &zone.account.id, &zone.name);
+
+    let (dns_resp, cert_expires, domain_expires) =
+        tokio::join!(records_fut, cert_fut, domain_fut);
+
+    // Process DNS records
+    let mut seen_record_ids: Vec<String> = Vec::new();
+    let mut records: i64 = 0;
+    let mut linked: i64 = 0;
+
+    if let Ok(resp) = dns_resp {
+        if let Ok(body) = resp.json::<CfResponse<Vec<CfDnsRecord>>>().await {
+            for rec in body.result {
+                seen_record_ids.push(rec.id.clone());
+
+                let vps_id = if rec.record_type == "A" || rec.record_type == "AAAA" {
+                    ip_to_vps.get(&rec.content).copied()
+                } else {
+                    None
+                };
+
+                if vps_id.is_some() {
+                    linked += 1;
+                }
+
+                let extra = serde_json::json!({"proxied": rec.proxied});
+
+                sqlx::query(
+                    r#"INSERT INTO dns_records (zone_uuid, record_id, record_type, name, content, ttl, extra, vps_id, synced_at)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                       ON CONFLICT (zone_uuid, record_id)
+                       DO UPDATE SET record_type = $3, name = $4, content = $5, ttl = $6, extra = $7, vps_id = $8, synced_at = $9, updated_at = now()"#,
+                )
+                .bind(zone_uuid.0)
+                .bind(&rec.id)
+                .bind(&rec.record_type)
+                .bind(&rec.name)
+                .bind(&rec.content)
+                .bind(rec.ttl)
+                .bind(&extra)
+                .bind(vps_id)
+                .bind(now)
+                .execute(db)
+                .await?;
+
+                records += 1;
+            }
+        }
+    }
+
+    // Delete stale records for this zone
+    let deleted = if !seen_record_ids.is_empty() {
+        sqlx::query(
+            "DELETE FROM dns_records WHERE zone_uuid = $1 AND record_id != ALL($2)",
+        )
+        .bind(zone_uuid.0)
+        .bind(&seen_record_ids)
+        .execute(db)
+        .await?
+        .rows_affected() as i64
+    } else {
+        sqlx::query("DELETE FROM dns_records WHERE zone_uuid = $1")
+            .bind(zone_uuid.0)
+            .execute(db)
+            .await?
+            .rows_affected() as i64
+    };
+
+    // Update cert/domain expiry (best-effort)
+    if let Some(expires) = cert_expires {
+        let _ = sqlx::query("UPDATE dns_zones SET cert_expires_at = $2 WHERE id = $1")
+            .bind(zone_uuid.0)
+            .bind(expires)
+            .execute(db)
+            .await;
+    }
+    if let Some(expires) = domain_expires {
+        let _ = sqlx::query("UPDATE dns_zones SET domain_expires_at = $2 WHERE id = $1")
+            .bind(zone_uuid.0)
+            .bind(expires)
+            .execute(db)
+            .await;
+    }
+
+    Ok(ZoneSyncResult {
+        records,
+        linked,
+        deleted,
     })
 }
 
