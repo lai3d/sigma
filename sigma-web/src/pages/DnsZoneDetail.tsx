@@ -88,6 +88,11 @@ function RecordHistory({ recordId }: { recordId: string }) {
             {h.action === 'deleted' && (
               <span className="font-mono text-red-600 line-through">{h.old_content}</span>
             )}
+            {h.actor_email && (
+              <span className="text-gray-400">
+                by {h.actor_email}{h.actor_ip ? ` (${h.actor_ip})` : ''}
+              </span>
+            )}
           </div>
           <span className="text-gray-400 shrink-0">{new Date(h.created_at).toLocaleString()}</span>
         </div>

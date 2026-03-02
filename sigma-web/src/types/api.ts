@@ -535,6 +535,8 @@ export interface DnsRecordHistory {
   new_content: string | null;
   old_extra: Record<string, unknown> | null;
   new_extra: Record<string, unknown> | null;
+  actor_email: string | null;
+  actor_ip: string | null;
   created_at: string;
 }
 

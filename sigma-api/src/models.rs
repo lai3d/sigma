@@ -1255,6 +1255,8 @@ pub struct DnsRecordHistory {
     pub new_content: Option<String>,
     pub old_extra: Option<serde_json::Value>,
     pub new_extra: Option<serde_json::Value>,
+    pub actor_email: Option<String>,
+    pub actor_ip: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 

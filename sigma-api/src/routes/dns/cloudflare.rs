@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use futures::stream::{self, StreamExt};
 use serde::Deserialize;
+use tracing::warn;
 use uuid::Uuid;
 
 use crate::errors::AppError;
@@ -63,6 +64,189 @@ struct CfRegistrarDomain {
     expires_at: Option<String>,
 }
 
+// ─── Cloudflare Audit Log structs ───────────────────────
+
+#[derive(Deserialize)]
+struct CfAuditLogResponse {
+    result: Vec<CfAuditLogEntry>,
+    result_info: Option<CfAuditLogResultInfo>,
+    success: bool,
+}
+
+#[derive(Deserialize)]
+struct CfAuditLogResultInfo {
+    #[allow(dead_code)]
+    page: u32,
+    total_pages: u32,
+}
+
+#[derive(Deserialize)]
+struct CfAuditLogEntry {
+    action: CfAuditAction,
+    actor: CfAuditActor,
+    resource: CfAuditResource,
+}
+
+#[derive(Deserialize)]
+struct CfAuditAction {
+    #[serde(rename = "type")]
+    action_type: String,
+}
+
+#[derive(Deserialize)]
+struct CfAuditActor {
+    email: Option<String>,
+    ip: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct CfAuditResource {
+    id: Option<String>,
+}
+
+struct AuditInfo {
+    email: Option<String>,
+    ip: Option<String>,
+}
+
+/// Fetch Cloudflare audit logs for DNS record actions since the given timestamp.
+/// Returns empty Vec on permission errors (403) or any failure.
+async fn fetch_audit_logs(
+    client: &reqwest::Client,
+    token: &str,
+    cf_account_id: &str,
+    since: &DateTime<Utc>,
+) -> Vec<CfAuditLogEntry> {
+    let since_str = since.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let mut all_entries = Vec::new();
+    let mut page = 1u32;
+
+    loop {
+        let url = format!(
+            "https://api.cloudflare.com/client/v4/accounts/{cf_account_id}/audit_logs?since={since_str}&per_page=100&page={page}"
+        );
+
+        let resp = match client
+            .get(&url)
+            .header("Authorization", format!("Bearer {token}"))
+            .send()
+            .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                warn!("audit log fetch failed: {e}");
+                return all_entries;
+            }
+        };
+
+        if resp.status() == reqwest::StatusCode::FORBIDDEN {
+            warn!("audit log fetch: 403 forbidden (token lacks Audit Logs Read permission)");
+            return Vec::new();
+        }
+
+        if !resp.status().is_success() {
+            warn!("audit log fetch: HTTP {}", resp.status());
+            return all_entries;
+        }
+
+        let body: CfAuditLogResponse = match resp.json().await {
+            Ok(b) => b,
+            Err(e) => {
+                warn!("audit log parse error: {e}");
+                return all_entries;
+            }
+        };
+
+        if !body.success {
+            warn!("audit log API returned success=false");
+            return all_entries;
+        }
+
+        // Filter to DNS record actions only
+        let dns_entries: Vec<CfAuditLogEntry> = body
+            .result
+            .into_iter()
+            .filter(|e| matches!(e.action.action_type.as_str(), "rec_add" | "rec_set" | "rec_del"))
+            .collect();
+
+        all_entries.extend(dns_entries);
+
+        match body.result_info {
+            Some(info) if page < info.total_pages => page += 1,
+            _ => break,
+        }
+    }
+
+    all_entries
+}
+
+/// Map Cloudflare audit action types to our history action names.
+fn cf_action_to_history_action(cf_action: &str) -> Option<&'static str> {
+    match cf_action {
+        "rec_add" => Some("created"),
+        "rec_set" => Some("updated"),
+        "rec_del" => Some("deleted"),
+        _ => None,
+    }
+}
+
+/// After sync, enrich dns_record_history rows with actor info from Cloudflare audit logs.
+async fn enrich_history_with_audit_logs(
+    db: &sqlx::PgPool,
+    client: &reqwest::Client,
+    token: &str,
+    cf_account_id: &str,
+    since: &DateTime<Utc>,
+) {
+    let entries = fetch_audit_logs(client, token, cf_account_id, since).await;
+    if entries.is_empty() {
+        return;
+    }
+
+    // Build lookup: (cf_record_id, history_action) → AuditInfo
+    let mut lookup: std::collections::HashMap<(String, String), AuditInfo> =
+        std::collections::HashMap::new();
+
+    for entry in entries {
+        if let (Some(record_id), Some(action)) = (
+            entry.resource.id,
+            cf_action_to_history_action(&entry.action.action_type),
+        ) {
+            lookup.insert(
+                (record_id, action.to_string()),
+                AuditInfo {
+                    email: entry.actor.email,
+                    ip: entry.actor.ip,
+                },
+            );
+        }
+    }
+
+    let mut enriched: i64 = 0;
+    for ((record_id, action), info) in &lookup {
+        let result = sqlx::query(
+            r#"UPDATE dns_record_history
+               SET actor_email = $1, actor_ip = $2
+               WHERE record_id = $3 AND action = $4
+                 AND actor_email IS NULL
+                 AND created_at >= $5"#,
+        )
+        .bind(&info.email)
+        .bind(&info.ip)
+        .bind(record_id)
+        .bind(action)
+        .bind(since)
+        .execute(db)
+        .await;
+
+        if let Ok(r) = result {
+            enriched += r.rows_affected() as i64;
+        }
+    }
+
+    tracing::info!("audit log enrichment: processed {enriched} entries from {} audit records", lookup.len());
+}
+
 /// Validate Cloudflare credentials by calling the token verify endpoint.
 pub async fn validate(
     http_client: &reqwest::Client,
@@ -117,6 +301,8 @@ pub async fn sync(state: &AppState, account: &DnsAccount) -> Result<DnsSyncResul
         .and_then(|v| v.as_str())
         .ok_or_else(|| AppError::Internal("Missing api_token in account config".into()))?;
 
+    let sync_start = Utc::now();
+
     // 1. Fetch all zones (paginated)
     let mut all_zones: Vec<CfZone> = Vec::new();
     let mut page = 1u32;
@@ -165,6 +351,8 @@ pub async fn sync(state: &AppState, account: &DnsAccount) -> Result<DnsSyncResul
     let now = Utc::now();
     let zones_count = all_zones.len() as i64;
     let seen_zone_ids: Vec<String> = all_zones.iter().map(|z| z.id.clone()).collect();
+    let cf_account_id_from_zones: Option<String> =
+        all_zones.first().map(|z| z.account.id.clone());
 
     // Process zones concurrently (up to 10 at a time)
     let zone_results: Vec<Result<ZoneSyncResult, AppError>> = stream::iter(all_zones)
@@ -205,6 +393,12 @@ pub async fn sync(state: &AppState, account: &DnsAccount) -> Result<DnsSyncResul
         total_deleted += deleted.rows_affected() as i64;
     }
 
+    // Enrich history with audit logs (best-effort, Cloudflare only)
+    if let Some(cf_account_id) = cf_account_id_from_zones.as_deref() {
+        enrich_history_with_audit_logs(&state.db, client, token, cf_account_id, &sync_start)
+            .await;
+    }
+
     Ok(DnsSyncResult {
         zones_count,
         records_count: total_records,
@@ -226,6 +420,8 @@ pub async fn sync_single_zone(
         .get("api_token")
         .and_then(|v| v.as_str())
         .ok_or_else(|| AppError::Internal("Missing api_token in account config".into()))?;
+
+    let sync_start = Utc::now();
 
     // Fetch zone info from CF to get the account ref (needed for registrar API)
     let resp = client
@@ -269,6 +465,10 @@ pub async fn sync_single_zone(
         &state.db, client, token, &ip_to_vps, account.id, &zone, now,
     )
     .await?;
+
+    // Enrich history with audit logs (best-effort)
+    enrich_history_with_audit_logs(&state.db, client, token, &zone.account.id, &sync_start)
+        .await;
 
     Ok(DnsSyncResult {
         zones_count: 1,

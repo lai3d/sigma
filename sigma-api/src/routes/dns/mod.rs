@@ -675,7 +675,8 @@ pub async fn dns_record_history(
 
     let rows = sqlx::query_as::<_, DnsRecordHistory>(
         r#"SELECT id, dns_record_id, zone_uuid, record_id, record_type, name,
-                  action, old_content, new_content, old_extra, new_extra, created_at
+                  action, old_content, new_content, old_extra, new_extra,
+                  actor_email, actor_ip, created_at
            FROM dns_record_history
            WHERE dns_record_id = $1
            ORDER BY created_at DESC
