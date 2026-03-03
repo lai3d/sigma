@@ -74,6 +74,18 @@ pub struct Config {
     /// Host /proc path (mount host /proc into container for process attribution)
     #[arg(long, env = "AGENT_HOST_PROC", default_value = "/proc")]
     pub host_proc: String,
+
+    /// Enable eBPF TCP traffic monitoring (requires kernel 5.10+, BTF, privileged)
+    #[arg(long, env = "AGENT_EBPF_TRAFFIC", default_value = "false")]
+    pub ebpf_traffic: bool,
+
+    /// eBPF traffic stats collection interval in seconds
+    #[arg(long, env = "AGENT_EBPF_TRAFFIC_INTERVAL", default_value = "30")]
+    pub ebpf_traffic_interval: u64,
+
+    /// eBPF traffic BPF map max entries (number of unique PIDs tracked)
+    #[arg(long, env = "AGENT_EBPF_TRAFFIC_MAX_ENTRIES", default_value = "8192")]
+    pub ebpf_traffic_max_entries: u32,
 }
 
 impl Config {

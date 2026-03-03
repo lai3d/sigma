@@ -15,14 +15,16 @@ sigma-agent/
 ├── Cargo.toml
 ├── Dockerfile
 ├── CLAUDE.md
+├── ebpf-programs/         # Pre-compiled eBPF bytecode (populated by Docker build)
 └── src/
-    ├── main.rs            # Entry point: register + heartbeat loop + spawn scan/metrics/xds/config-sync
+    ├── main.rs            # Entry point: register + heartbeat loop + spawn scan/metrics/xds/config-sync/ebpf
     ├── config.rs          # Configuration: env vars + CLI flags (clap)
     ├── client.rs          # HTTP client (GET + POST with X-Api-Key auth)
     ├── models.rs          # API request/response types
     ├── system.rs          # Linux system info collection (/proc, statvfs)
     ├── port_scan.rs       # Port scanning: TcpListener::bind test + ss parsing
     ├── metrics.rs         # Prometheus metrics HTTP server (/metrics)
+    ├── ebpf_traffic.rs    # eBPF traffic monitoring: loader, harvester, container resolution (feature-gated)
     ├── envoy_config.rs    # Parse envoy.yaml static_resources → static route entries
     ├── xds.rs             # gRPC ADS server: config polling, push to Envoy clients
     └── xds_resources.rs   # Builds xDS Cluster + Listener protos from envoy routes
@@ -48,6 +50,10 @@ sigma-agent/
 | `AGENT_ENVOY_CONFIG_SYNC` | `--envoy-config-sync` | `false` | Enable static config sync |
 | `AGENT_ENVOY_CONFIG_SYNC_INTERVAL` | `--envoy-config-sync-interval` | `60` | File poll interval (seconds) |
 | `AGENT_ENVOY_CONFIG_EXCLUDE` | `--envoy-config-exclude` | (none) | Glob pattern to exclude files (e.g. `*dynamic*`) |
+| `AGENT_HOST_PROC` | `--host-proc` | `/proc` | Host /proc mount path for process attribution |
+| `AGENT_EBPF_TRAFFIC` | `--ebpf-traffic` | `false` | Enable eBPF TCP traffic monitoring |
+| `AGENT_EBPF_TRAFFIC_INTERVAL` | `--ebpf-traffic-interval` | `30` | eBPF traffic stats collection interval (seconds) |
+| `AGENT_EBPF_TRAFFIC_MAX_ENTRIES` | `--ebpf-traffic-max-entries` | `8192` | BPF map max entries (unique PIDs) |
 
 ## IP Discovery
 
@@ -293,6 +299,61 @@ From each listener + its referenced cluster:
 The xDS poll loop adds `&source=dynamic` to its route query, so static routes are never
 pushed back to Envoy via xDS (Envoy already has them in its config file).
 
+## eBPF TCP Traffic Monitoring
+
+When `--ebpf-traffic` is enabled, the agent uses eBPF kprobes on `tcp_sendmsg` and `tcp_recvmsg`
+to count TCP bytes sent/received per process. This is feature-gated behind the `ebpf-traffic`
+cargo feature (compiled in via Docker by default).
+
+### Configuration
+
+| Env var | CLI flag | Default | Description |
+|---------|----------|---------|-------------|
+| `AGENT_EBPF_TRAFFIC` | `--ebpf-traffic` | `false` | Enable eBPF traffic monitoring |
+| `AGENT_EBPF_TRAFFIC_INTERVAL` | `--ebpf-traffic-interval` | `30` | Stats collection interval (seconds) |
+| `AGENT_EBPF_TRAFFIC_MAX_ENTRIES` | `--ebpf-traffic-max-entries` | `8192` | BPF map max entries (unique PIDs) |
+
+### Prometheus Metrics
+
+Exposed on the existing `/metrics` endpoint when enabled:
+
+```
+# HELP sigma_traffic_bytes_sent_total TCP bytes sent by process (eBPF)
+# TYPE sigma_traffic_bytes_sent_total gauge
+sigma_traffic_bytes_sent_total{hostname="relay-01",process="envoy",container=""} 1234567
+sigma_traffic_bytes_sent_total{hostname="relay-01",process="xray",container="abc123def456"} 987654
+
+# HELP sigma_traffic_bytes_recv_total TCP bytes received by process (eBPF)
+# TYPE sigma_traffic_bytes_recv_total gauge
+sigma_traffic_bytes_recv_total{hostname="relay-01",process="envoy",container=""} 2345678
+```
+
+Labels: `process` = resolved from `/proc/<pid>/comm`, `container` = Docker/containerd ID (first 12 hex chars) or empty.
+
+### Requirements
+
+- **Kernel**: Linux 5.10+ with BTF (BPF Type Format) support
+- **Docker**: `privileged: true`, `pid: host`, `network_mode: host`
+- **Host proc**: mount `/proc:/host/proc:ro` and set `AGENT_HOST_PROC=/host/proc`
+
+### Crate Structure
+
+```
+sigma-agent-ebpf-common/   # Shared #[repr(C)] types (no_std, no deps)
+sigma-agent-ebpf/           # eBPF kernel programs (nightly, bpfel-unknown-none target)
+sigma-agent/src/ebpf_traffic.rs  # Userspace: loader, harvester, container ID resolution
+```
+
+The Dockerfile uses a multi-stage build: nightly toolchain compiles eBPF programs to BPF bytecode,
+then stable toolchain builds the agent with `--features ebpf-traffic`, embedding the bytecode via
+`include_bytes!()`.
+
+### Graceful Degradation
+
+If the kernel doesn't support BTF or eBPF programs fail to load, the agent logs a warning and
+continues without traffic metrics. The feature is fully optional — building without `--features
+ebpf-traffic` produces a binary with zero eBPF dependencies.
+
 ## Dependencies
 
 - Reuses sigma-probe HTTP client pattern (SigmaClient with X-Api-Key auth)
@@ -301,3 +362,4 @@ pushed back to Envoy via xDS (Envoy already has them in its config file).
 - `iproute2` package required in Docker image (provides `ss` command for port scan)
 - xDS: `tonic` 0.12, `prost` 0.13, `xds-api` 0.2 (pre-compiled Envoy proto bindings)
 - Static config sync: `serde_yaml` 0.9 (parse envoy.yaml)
+- eBPF traffic (optional): `aya` 0.13, `aya-log` 0.2, `aya-ebpf` 0.1 (kernel programs)

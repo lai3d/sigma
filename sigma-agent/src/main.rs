@@ -1,5 +1,7 @@
 mod client;
 mod config;
+#[cfg(feature = "ebpf-traffic")]
+mod ebpf_traffic;
 mod envoy_config;
 mod metrics;
 mod models;
@@ -69,13 +71,41 @@ async fn main() -> Result<()> {
         None
     };
 
+    // Conditionally start eBPF traffic monitoring
+    #[cfg(feature = "ebpf-traffic")]
+    let traffic_stats: Option<ebpf_traffic::SharedTrafficStats> = if config.ebpf_traffic {
+        match ebpf_traffic::load_ebpf() {
+            Ok(ebpf) => {
+                let stats = Arc::new(RwLock::new(Vec::new()));
+                let stats_clone = stats.clone();
+                let interval = config.ebpf_traffic_interval;
+                let host_proc = config.host_proc.clone();
+                tokio::spawn(async move {
+                    ebpf_traffic::traffic_loop(ebpf, stats_clone, interval, host_proc).await;
+                });
+                info!("eBPF traffic monitoring started (interval={}s)", interval);
+                Some(stats)
+            }
+            Err(e) => {
+                warn!("Failed to load eBPF programs, traffic monitoring disabled: {:#}", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    #[cfg(not(feature = "ebpf-traffic"))]
+    let traffic_stats: Option<()> = None;
+
     // Conditionally start metrics server
     if config.metrics_port > 0 {
         let shared = scan_result.clone();
         let port = config.metrics_port;
         let hn = hostname.clone();
+        let ts = traffic_stats.clone();
         tokio::spawn(async move {
-            metrics::serve_metrics(port, shared, hn, port_range).await;
+            metrics::serve_metrics(port, shared, hn, port_range, ts).await;
         });
     }
 

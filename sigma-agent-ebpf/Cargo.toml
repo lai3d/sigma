@@ -1,0 +1,17 @@
+[package]
+name = "sigma-agent-ebpf"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "sigma-agent-ebpf"
+path = "src/main.rs"
+
+[dependencies]
+aya-ebpf = "0.1"
+aya-log-ebpf = "0.1"
+sigma-agent-ebpf-common = { path = "../sigma-agent-ebpf-common" }
+
+[profile.release]
+panic = "abort"
+lto = true

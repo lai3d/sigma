@@ -7,6 +7,10 @@ edition = "2021"
 name = "sigma-agent"
 path = "src/main.rs"
 
+[features]
+default = []
+ebpf-traffic = ["aya", "aya-log", "sigma-agent-ebpf-common"]
+
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.12", features = ["json"] }
@@ -27,6 +31,9 @@ prost = "0.13"
 prost-types = "0.13"
 xds-api = "0.2"
 tokio-stream = "0.1"
+aya = { version = "0.13", optional = true }
+aya-log = { version = "0.2", optional = true }
+sigma-agent-ebpf-common = { path = "../sigma-agent-ebpf-common", optional = true }
 
 [dev-dependencies]
 tempfile = "3"

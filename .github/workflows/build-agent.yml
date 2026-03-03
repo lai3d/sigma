@@ -3,10 +3,16 @@ name: Build Agent
 on:
   push:
     branches: [main]
-    paths: [sigma-agent/**]
+    paths:
+      - sigma-agent/**
+      - sigma-agent-ebpf/**
+      - sigma-agent-ebpf-common/**
   pull_request:
     branches: [main]
-    paths: [sigma-agent/**]
+    paths:
+      - sigma-agent/**
+      - sigma-agent-ebpf/**
+      - sigma-agent-ebpf-common/**
 
 env:
   REGISTRY: ghcr.io
@@ -47,7 +53,8 @@ jobs:
       - name: Build and push Agent image
         uses: docker/build-push-action@v5
         with:
-          context: ./sigma-agent
+          context: .
+          file: ./sigma-agent/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

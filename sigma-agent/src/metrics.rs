@@ -13,6 +13,9 @@ use tracing::{error, info};
 
 use crate::port_scan::{self, PortScanResult, SharedScanResult};
 
+#[cfg(feature = "ebpf-traffic")]
+use crate::ebpf_traffic::SharedTrafficStats;
+
 /// Known sources that are always emitted (even when count=0) for stable time series
 const KNOWN_SOURCES: &[&str] = &[
     "envoy",
@@ -28,6 +31,8 @@ struct MetricsState {
     scan_result: SharedScanResult,
     hostname: String,
     port_range: Option<(u16, u16)>,
+    #[cfg(feature = "ebpf-traffic")]
+    traffic_stats: Option<SharedTrafficStats>,
 }
 
 #[derive(Deserialize)]
@@ -159,9 +164,53 @@ pub fn render_metrics(result: &PortScanResult, hostname: &str) -> String {
     out
 }
 
+/// Render eBPF traffic metrics in Prometheus text format.
+#[cfg(feature = "ebpf-traffic")]
+pub fn render_traffic_metrics(stats: &[crate::ebpf_traffic::ProcessTraffic], hostname: &str) -> String {
+    let mut out = String::with_capacity(512);
+
+    writeln!(out, "# HELP sigma_traffic_bytes_sent_total TCP bytes sent by process (eBPF)").unwrap();
+    writeln!(out, "# TYPE sigma_traffic_bytes_sent_total gauge").unwrap();
+    for entry in stats {
+        let container = entry.container_id.as_deref().unwrap_or("");
+        writeln!(
+            out,
+            "sigma_traffic_bytes_sent_total{{hostname=\"{}\",process=\"{}\",container=\"{}\"}} {}",
+            hostname, entry.process_name, container, entry.bytes_sent
+        ).unwrap();
+    }
+
+    writeln!(out).unwrap();
+
+    writeln!(out, "# HELP sigma_traffic_bytes_recv_total TCP bytes received by process (eBPF)").unwrap();
+    writeln!(out, "# TYPE sigma_traffic_bytes_recv_total gauge").unwrap();
+    for entry in stats {
+        let container = entry.container_id.as_deref().unwrap_or("");
+        writeln!(
+            out,
+            "sigma_traffic_bytes_recv_total{{hostname=\"{}\",process=\"{}\",container=\"{}\"}} {}",
+            hostname, entry.process_name, container, entry.bytes_recv
+        ).unwrap();
+    }
+
+    out
+}
+
 async fn metrics_handler(State(state): State<Arc<MetricsState>>) -> impl IntoResponse {
     let result = state.scan_result.read().await;
-    let body = render_metrics(&result, &state.hostname);
+
+    #[allow(unused_mut)]
+    let mut body = render_metrics(&result, &state.hostname);
+
+    #[cfg(feature = "ebpf-traffic")]
+    if let Some(ref traffic_stats) = state.traffic_stats {
+        let stats = traffic_stats.read().await;
+        if !stats.is_empty() {
+            body.push('\n');
+            body.push_str(&render_traffic_metrics(&stats, &state.hostname));
+        }
+    }
+
     (
         [(
             header::CONTENT_TYPE,
@@ -219,11 +268,15 @@ pub async fn serve_metrics(
     scan_result: SharedScanResult,
     hostname: String,
     port_range: Option<(u16, u16)>,
+    #[cfg(feature = "ebpf-traffic")] traffic_stats: Option<SharedTrafficStats>,
+    #[cfg(not(feature = "ebpf-traffic"))] _traffic_stats: Option<()>,
 ) {
     let state = Arc::new(MetricsState {
         scan_result,
         hostname,
         port_range,
+        #[cfg(feature = "ebpf-traffic")]
+        traffic_stats,
     });
 
     let app = Router::new()
