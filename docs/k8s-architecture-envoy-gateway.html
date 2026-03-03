@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sigma K8s Architecture — Envoy Gateway</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, 'SF Pro Display', 'Inter', 'Segoe UI', sans-serif;
+    background: #0a0e1a;
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 32px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #c084fc, #f472b6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.5px;
+  }
+  .subtitle {
+    text-align: center;
+    color: #64748b;
+    font-size: 14px;
+    margin-bottom: 40px;
+  }
+  svg {
+    display: block;
+    margin: 0 auto;
+  }
+  .node { cursor: default; }
+
+  @keyframes flowRight {
+    0% { stroke-dashoffset: 16; }
+    100% { stroke-dashoffset: 0; }
+  }
+  @keyframes flowDown {
+    0% { stroke-dashoffset: 16; }
+    100% { stroke-dashoffset: 0; }
+  }
+  .flow-line {
+    animation: flowRight 0.8s linear infinite;
+  }
+  .flow-line-down {
+    animation: flowDown 0.8s linear infinite;
+  }
+
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 28px;
+    margin-top: 32px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #94a3b8;
+  }
+  .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+
+  .note {
+    max-width: 900px;
+    margin: 36px auto 0;
+    background: #111827;
+    border: 1px solid #1e293b;
+    border-radius: 12px;
+    padding: 20px 24px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: #94a3b8;
+  }
+  .note h3 {
+    color: #c084fc;
+    font-size: 14px;
+    margin-bottom: 10px;
+  }
+  .note code {
+    background: #1e293b;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #e2e8f0;
+  }
+  .note .vs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 12px;
+  }
+  .note .vs-col {
+    background: #0a0e1a;
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .note .vs-col h4 {
+    font-size: 12px;
+    margin-bottom: 6px;
+  }
+  .note .vs-col pre {
+    font-size: 11px;
+    line-height: 1.5;
+    color: #cbd5e1;
+    white-space: pre-wrap;
+  }
+</style>
+</head>
+<body>
+
+<h1>Sigma K8s Architecture — Envoy Gateway</h1>
+<p class="subtitle">Gateway API (GatewayClass + Gateway + HTTPRoute) &mdash; Envoy as data plane, unified with sigma-agent xDS stack</p>
+
+<svg viewBox="0 0 1200 960" width="1200" height="960" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gGateway" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c084fc"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+    <linearGradient id="gEnvoyDP" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e879f9"/>
+      <stop offset="100%" stop-color="#d946ef"/>
+    </linearGradient>
+    <linearGradient id="gWeb" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="gApi" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="gPool" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#0891b2"/>
+    </linearGradient>
+    <linearGradient id="gPgPrimary" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="gRedis" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#dc2626"/>
+    </linearGradient>
+    <linearGradient id="gAgent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+    <linearGradient id="gProbe" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ec4899"/>
+      <stop offset="100%" stop-color="#db2777"/>
+    </linearGradient>
+
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+
+    <marker id="arrow" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#475569"/>
+    </marker>
+    <marker id="arrowPurple" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#c084fc"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#10b981"/>
+    </marker>
+    <marker id="arrowOrange" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f97316"/>
+    </marker>
+    <marker id="arrowPink" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#e879f9"/>
+    </marker>
+  </defs>
+
+  <!-- ==================== K8s Cluster Boundary ==================== -->
+  <rect x="30" y="50" width="1140" height="710" rx="16" ry="16"
+        fill="none" stroke="#1e293b" stroke-width="2" stroke-dasharray="8,4"/>
+  <rect x="42" y="36" width="200" height="28" rx="6" fill="#0a0e1a"/>
+  <text x="52" y="55" font-size="13" fill="#475569" font-weight="600">
+    Kubernetes Cluster (sigma)
+  </text>
+
+  <!-- ==================== Internet ==================== -->
+  <g class="node" transform="translate(540, 10)">
+    <rect x="0" y="0" width="120" height="36" rx="18" fill="#1e293b" filter="shadow"/>
+    <text x="60" y="23" text-anchor="middle" font-size="13" fill="#94a3b8" font-weight="600">Internet</text>
+  </g>
+
+  <!-- Arrow: Internet -> Gateway API layer -->
+  <line x1="600" y1="46" x2="600" y2="68" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ==================== Gateway API Resources (control plane) ==================== -->
+  <g transform="translate(300, 70)">
+    <rect x="0" y="0" width="600" height="54" rx="10" fill="#1a0a2e" stroke="#7c3aed" stroke-width="1.2" opacity="0.9"/>
+    <text x="300" y="20" text-anchor="middle" font-size="11" fill="#c4b5fd" font-weight="500">Gateway API Resources</text>
+
+    <!-- GatewayClass -->
+    <g transform="translate(16, 26)">
+      <rect x="0" y="0" width="120" height="22" rx="4" fill="#2e1065"/>
+      <text x="60" y="15" text-anchor="middle" font-size="10" fill="#c4b5fd" font-weight="600">GatewayClass</text>
+    </g>
+    <!-- Gateway -->
+    <g transform="translate(150, 26)">
+      <rect x="0" y="0" width="140" height="22" rx="4" fill="#2e1065"/>
+      <text x="70" y="15" text-anchor="middle" font-size="10" fill="#c4b5fd" font-weight="600">Gateway :443/:80</text>
+    </g>
+    <!-- HTTPRoute web -->
+    <g transform="translate(306, 26)">
+      <rect x="0" y="0" width="130" height="22" rx="4" fill="#1e3a5f"/>
+      <text x="65" y="15" text-anchor="middle" font-size="10" fill="#93c5fd" font-weight="600">HTTPRoute /*</text>
+    </g>
+    <!-- HTTPRoute api -->
+    <g transform="translate(450, 26)">
+      <rect x="0" y="0" width="130" height="22" rx="4" fill="#2e1065"/>
+      <text x="65" y="15" text-anchor="middle" font-size="10" fill="#ddd6fe" font-weight="600">HTTPRoute /api/*</text>
+    </g>
+  </g>
+
+  <!-- Arrow: Gateway API -> Envoy data plane -->
+  <line x1="600" y1="124" x2="600" y2="140" stroke="#c084fc" stroke-width="1.5" marker-end="url(#arrowPurple)"/>
+
+  <!-- ==================== Envoy Gateway Control Plane + Data Plane ==================== -->
+  <g transform="translate(260, 142)">
+    <!-- Outer box: Envoy Gateway system -->
+    <rect x="0" y="0" width="680" height="82" rx="12" fill="#1a0a2e" stroke="#a855f7" stroke-width="1.5" opacity="0.85"/>
+    <text x="340" y="18" text-anchor="middle" font-size="11" fill="#e9d5ff" font-weight="600">Envoy Gateway (envoy-gateway-system namespace)</text>
+
+    <!-- Control plane -->
+    <g class="node" transform="translate(20, 26)">
+      <rect x="0" y="0" width="200" height="44" rx="8" fill="url(#gGateway)" filter="shadow" opacity="0.9"/>
+      <text x="100" y="18" text-anchor="middle" font-size="10" fill="#f3e8ff" font-weight="500">Control Plane</text>
+      <text x="100" y="35" text-anchor="middle" font-size="13" fill="#fff" font-weight="700">envoy-gateway</text>
+    </g>
+
+    <!-- Data plane pods -->
+    <g class="node" transform="translate(250, 26)">
+      <rect x="0" y="0" width="186" height="44" rx="8" fill="url(#gEnvoyDP)" filter="shadow" opacity="0.9"/>
+      <text x="93" y="18" text-anchor="middle" font-size="10" fill="#fdf4ff" font-weight="500">Data Plane Pod</text>
+      <text x="93" y="35" text-anchor="middle" font-size="13" fill="#fff" font-weight="700">Envoy Proxy #1</text>
+    </g>
+    <g class="node" transform="translate(460, 26)">
+      <rect x="0" y="0" width="186" height="44" rx="8" fill="url(#gEnvoyDP)" filter="shadow" opacity="0.9"/>
+      <text x="93" y="18" text-anchor="middle" font-size="10" fill="#fdf4ff" font-weight="500">Data Plane Pod</text>
+      <text x="93" y="35" text-anchor="middle" font-size="13" fill="#fff" font-weight="700">Envoy Proxy #2</text>
+    </g>
+
+    <!-- xDS arrow control -> data -->
+    <path d="M 220 48 L 248 48" stroke="#e9d5ff" stroke-width="1" marker-end="url(#arrowPurple)" opacity="0.5"/>
+    <text x="234" y="43" font-size="8" fill="#c4b5fd">xDS</text>
+  </g>
+
+  <!-- ==================== Routing arrows from Envoy data plane ==================== -->
+  <!-- Envoy -> Web -->
+  <path d="M 460 224 L 300 264" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrowBlue)" stroke-dasharray="5,3" class="flow-line"/>
+  <text x="360" y="236" font-size="10" fill="#60a5fa" font-weight="500" transform="rotate(-14,360,236)">/* (static)</text>
+
+  <!-- Envoy -> API -->
+  <path d="M 730 224 L 830 264" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#arrow)" stroke-dasharray="5,3" class="flow-line"/>
+  <text x="790" y="236" font-size="10" fill="#a78bfa" font-weight="500" transform="rotate(14,790,236)">/api/*</text>
+
+  <!-- ==================== Web Pods ==================== -->
+  <g transform="translate(120, 266)">
+    <rect x="10" y="-10" width="300" height="110" rx="12" fill="#111827" stroke="#1e3a5f" stroke-width="1" opacity="0.7"/>
+    <text x="160" y="6" text-anchor="middle" font-size="10" fill="#60a5fa" font-weight="500">sigma-web-service :80  (ClusterIP)</text>
+
+    <g class="node" transform="translate(20, 16)">
+      <rect x="0" y="0" width="120" height="68" rx="8" fill="url(#gWeb)" filter="shadow" opacity="0.9"/>
+      <text x="60" y="22" text-anchor="middle" font-size="10" fill="#dbeafe" font-weight="500">Pod</text>
+      <text x="60" y="40" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-web</text>
+      <text x="60" y="56" text-anchor="middle" font-size="10" fill="#bfdbfe">nginx:alpine</text>
+    </g>
+
+    <g class="node" transform="translate(170, 16)">
+      <rect x="0" y="0" width="120" height="68" rx="8" fill="url(#gWeb)" filter="shadow" opacity="0.9"/>
+      <text x="60" y="22" text-anchor="middle" font-size="10" fill="#dbeafe" font-weight="500">Pod</text>
+      <text x="60" y="40" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-web</text>
+      <text x="60" y="56" text-anchor="middle" font-size="10" fill="#bfdbfe">nginx:alpine</text>
+    </g>
+
+    <text x="160" y="100" text-anchor="middle" font-size="10" fill="#475569">replicas: 2</text>
+  </g>
+
+  <!-- ==================== API Pods ==================== -->
+  <g transform="translate(680, 266)">
+    <rect x="10" y="-10" width="300" height="110" rx="12" fill="#111827" stroke="#2e1065" stroke-width="1" opacity="0.7"/>
+    <text x="160" y="6" text-anchor="middle" font-size="10" fill="#a78bfa" font-weight="500">sigma-api-service :3000  (ClusterIP)</text>
+
+    <g class="node" transform="translate(20, 16)">
+      <rect x="0" y="0" width="120" height="68" rx="8" fill="url(#gApi)" filter="shadow" opacity="0.9"/>
+      <text x="60" y="22" text-anchor="middle" font-size="10" fill="#ede9fe" font-weight="500">Pod</text>
+      <text x="60" y="40" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-api</text>
+      <text x="60" y="56" text-anchor="middle" font-size="10" fill="#ddd6fe">Rust / Axum</text>
+    </g>
+
+    <g class="node" transform="translate(170, 16)">
+      <rect x="0" y="0" width="120" height="68" rx="8" fill="url(#gApi)" filter="shadow" opacity="0.9"/>
+      <text x="60" y="22" text-anchor="middle" font-size="10" fill="#ede9fe" font-weight="500">Pod</text>
+      <text x="60" y="40" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-api</text>
+      <text x="60" y="56" text-anchor="middle" font-size="10" fill="#ddd6fe">Rust / Axum</text>
+    </g>
+
+    <text x="160" y="100" text-anchor="middle" font-size="10" fill="#475569">replicas: 2</text>
+  </g>
+
+  <!-- ==================== Redis ==================== -->
+  <g class="node" transform="translate(80, 480)">
+    <rect x="0" y="0" width="160" height="60" rx="8" fill="url(#gRedis)" filter="shadow" opacity="0.9"/>
+    <text x="80" y="22" text-anchor="middle" font-size="10" fill="#fecaca" font-weight="500">redis-service :6379</text>
+    <text x="80" y="42" text-anchor="middle" font-size="15" fill="#fff" font-weight="700">Redis</text>
+    <text x="80" y="56" text-anchor="middle" font-size="9" fill="#fca5a5">rate limiting + cache</text>
+  </g>
+
+  <!-- Arrow: API -> Redis -->
+  <path d="M 790 382 L 790 420 Q 790 440 770 440 L 250 478" stroke="#ef4444" stroke-width="1.2" fill="none" marker-end="url(#arrow)" stroke-dasharray="5,3" opacity="0.6"/>
+  <text x="500" y="434" font-size="9" fill="#f87171" text-anchor="middle">rate limit</text>
+
+  <!-- ==================== PgBouncer Pooler ==================== -->
+  <g transform="translate(480, 430)">
+    <rect x="0" y="0" width="340" height="110" rx="12" fill="#111827" stroke="#155e75" stroke-width="1.5" opacity="0.8"/>
+    <text x="170" y="18" text-anchor="middle" font-size="11" fill="#22d3ee" font-weight="600">sigma-db-pooler-rw  (ClusterIP)</text>
+
+    <g class="node" transform="translate(20, 28)">
+      <rect x="0" y="0" width="136" height="60" rx="8" fill="url(#gPool)" filter="shadow" opacity="0.9"/>
+      <text x="68" y="20" text-anchor="middle" font-size="10" fill="#cffafe" font-weight="500">PgBouncer</text>
+      <text x="68" y="38" text-anchor="middle" font-size="12" fill="#fff" font-weight="700">Pooler #1</text>
+      <text x="68" y="52" text-anchor="middle" font-size="9" fill="#a5f3fc">txn mode, pool=20</text>
+    </g>
+
+    <g class="node" transform="translate(180, 28)">
+      <rect x="0" y="0" width="136" height="60" rx="8" fill="url(#gPool)" filter="shadow" opacity="0.9"/>
+      <text x="68" y="20" text-anchor="middle" font-size="10" fill="#cffafe" font-weight="500">PgBouncer</text>
+      <text x="68" y="38" text-anchor="middle" font-size="12" fill="#fff" font-weight="700">Pooler #2</text>
+      <text x="68" y="52" text-anchor="middle" font-size="9" fill="#a5f3fc">txn mode, pool=20</text>
+    </g>
+
+    <text x="170" y="104" text-anchor="middle" font-size="10" fill="#475569">instances: 2  |  max_client_conn: 100  |  default_pool_size: 20</text>
+  </g>
+
+  <!-- Arrow: API -> PgBouncer -->
+  <line x1="830" y1="382" x2="730" y2="428" stroke="#06b6d4" stroke-width="1.5" marker-end="url(#arrow)" stroke-dasharray="5,3" class="flow-line-down"/>
+  <text x="795" y="406" font-size="9" fill="#22d3ee" transform="rotate(28,795,406)">:5432</text>
+
+  <!-- ==================== CloudNativePG Cluster ==================== -->
+  <g transform="translate(340, 590)">
+    <rect x="0" y="0" width="540" height="150" rx="14" fill="#0f1d14" stroke="#065f46" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="270" y="20" text-anchor="middle" font-size="12" fill="#34d399" font-weight="600">CloudNativePG Cluster &mdash; PostgreSQL 16.6</text>
+
+    <!-- Primary -->
+    <g class="node" transform="translate(30, 32)">
+      <rect x="0" y="0" width="150" height="72" rx="8" fill="url(#gPgPrimary)" filter="shadow"/>
+      <text x="75" y="20" text-anchor="middle" font-size="10" fill="#d1fae5" font-weight="700">PRIMARY (RW)</text>
+      <text x="75" y="40" text-anchor="middle" font-size="15" fill="#fff" font-weight="700">sigma-db-1</text>
+      <text x="75" y="58" text-anchor="middle" font-size="9" fill="#a7f3d0">max_conn: 200, 256MB</text>
+    </g>
+
+    <!-- Replica 1 -->
+    <g class="node" transform="translate(200, 32)">
+      <rect x="0" y="0" width="140" height="72" rx="8" fill="#064e3b" stroke="#34d399" stroke-width="1" filter="shadow"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#6ee7b7" font-weight="600">REPLICA (RO)</text>
+      <text x="70" y="40" text-anchor="middle" font-size="14" fill="#ecfdf5" font-weight="700">sigma-db-2</text>
+      <text x="70" y="58" text-anchor="middle" font-size="9" fill="#a7f3d0">streaming repl</text>
+    </g>
+
+    <!-- Replica 2 -->
+    <g class="node" transform="translate(360, 32)">
+      <rect x="0" y="0" width="140" height="72" rx="8" fill="#064e3b" stroke="#34d399" stroke-width="1" filter="shadow"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#6ee7b7" font-weight="600">REPLICA (RO)</text>
+      <text x="70" y="40" text-anchor="middle" font-size="14" fill="#ecfdf5" font-weight="700">sigma-db-3</text>
+      <text x="70" y="58" text-anchor="middle" font-size="9" fill="#a7f3d0">streaming repl</text>
+    </g>
+
+    <!-- Replication arrows -->
+    <path d="M 170 68 L 200 68" stroke="#34d399" stroke-width="1.2" marker-end="url(#arrowGreen)" opacity="0.6"/>
+    <path d="M 170 68 Q 185 95 270 95 Q 355 95 370 68" stroke="#34d399" stroke-width="1.2" marker-end="url(#arrowGreen)" opacity="0.6" fill="none"/>
+
+    <!-- PVC labels -->
+    <g transform="translate(30, 110)">
+      <rect x="0" y="0" width="150" height="20" rx="4" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <text x="75" y="14" text-anchor="middle" font-size="9" fill="#94a3b8">PVC: 10Gi</text>
+    </g>
+    <g transform="translate(200, 110)">
+      <rect x="0" y="0" width="140" height="20" rx="4" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <text x="70" y="14" text-anchor="middle" font-size="9" fill="#94a3b8">PVC: 10Gi</text>
+    </g>
+    <g transform="translate(360, 110)">
+      <rect x="0" y="0" width="140" height="20" rx="4" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <text x="70" y="14" text-anchor="middle" font-size="9" fill="#94a3b8">PVC: 10Gi</text>
+    </g>
+
+    <text x="270" y="146" text-anchor="middle" font-size="10" fill="#065f46">sigma-db-rw :5432 (primary)  |  sigma-db-ro :5432 (replicas)</text>
+  </g>
+
+  <!-- Arrow: PgBouncer -> PG Primary -->
+  <path d="M 650 540 L 650 555 Q 650 575 620 580 L 500 604" stroke="#10b981" stroke-width="1.5" fill="none" marker-end="url(#arrowGreen)" stroke-dasharray="5,3" class="flow-line-down"/>
+  <text x="590" y="572" font-size="9" fill="#34d399">rw :5432</text>
+
+  <!-- ==================== ConfigMap + Secret ==================== -->
+  <g transform="translate(50, 560)">
+    <rect x="0" y="0" width="170" height="62" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <text x="85" y="16" text-anchor="middle" font-size="10" fill="#94a3b8" font-weight="600">ConfigMap: sigma-config</text>
+    <text x="14" y="32" font-size="9" fill="#64748b">LISTEN_PORT: 3000</text>
+    <text x="14" y="44" font-size="9" fill="#64748b">REDIS_URL: redis://redis...</text>
+    <text x="14" y="56" font-size="9" fill="#64748b">RATE_LIMIT: 100/60s</text>
+  </g>
+
+  <g transform="translate(50, 636)">
+    <rect x="0" y="0" width="170" height="52" rx="8" fill="#1e293b" stroke="#7f1d1d" stroke-width="1"/>
+    <text x="85" y="16" text-anchor="middle" font-size="10" fill="#f87171" font-weight="600">Secret: sigma-secrets</text>
+    <text x="14" y="32" font-size="9" fill="#64748b">DATABASE_URL: postgres://...</text>
+    <text x="14" y="44" font-size="9" fill="#64748b">API_KEY: ********</text>
+  </g>
+
+  <!-- ==================== Right side: Envoy Gateway advantages ==================== -->
+  <g transform="translate(940, 430)">
+    <rect x="0" y="0" width="210" height="160" rx="10" fill="#111827" stroke="#7c3aed" stroke-width="1"/>
+    <text x="105" y="20" text-anchor="middle" font-size="11" fill="#c084fc" font-weight="600">Why Envoy Gateway?</text>
+    <line x1="10" y1="28" x2="200" y2="28" stroke="#1e293b" stroke-width="1"/>
+    <text x="16" y="46" font-size="10" fill="#c4b5fd">Gateway API (GA)</text>
+    <text x="16" y="62" font-size="10" fill="#94a3b8">Envoy data plane</text>
+    <text x="16" y="78" font-size="10" fill="#94a3b8">TLS via cert-manager</text>
+    <text x="16" y="94" font-size="10" fill="#94a3b8">Rate limit built-in</text>
+    <text x="16" y="110" font-size="10" fill="#94a3b8">WASM extensibility</text>
+    <text x="16" y="130" font-size="10" fill="#f97316">sigma-agent xDS +</text>
+    <text x="16" y="146" font-size="10" fill="#f97316">EG = all Envoy stack</text>
+  </g>
+
+  <g transform="translate(940, 608)">
+    <rect x="0" y="0" width="210" height="120" rx="10" fill="#111827" stroke="#1e293b" stroke-width="1"/>
+    <text x="105" y="20" text-anchor="middle" font-size="11" fill="#e2e8f0" font-weight="600">Connection Flow</text>
+    <line x1="10" y1="28" x2="200" y2="28" stroke="#1e293b" stroke-width="1"/>
+    <text x="16" y="46" font-size="10" fill="#e879f9">Envoy Proxy (L7)</text>
+    <text x="108" y="58" text-anchor="middle" font-size="9" fill="#475569">|</text>
+    <text x="16" y="72" font-size="10" fill="#94a3b8">API Pod (N conns)</text>
+    <text x="108" y="84" text-anchor="middle" font-size="9" fill="#475569">|</text>
+    <text x="16" y="98" font-size="10" fill="#22d3ee">PgBouncer (pooled)</text>
+    <text x="108" y="110" text-anchor="middle" font-size="9" fill="#475569">|</text>
+    <text x="16" y="118" font-size="10" fill="#34d399">PG Primary (200 max)</text>
+  </g>
+
+  <!-- ==================== External Agents ==================== -->
+  <rect x="30" y="775" width="1140" height="150" rx="14"
+        fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="6,3"/>
+  <rect x="42" y="761" width="280" height="28" rx="6" fill="#0a0e1a"/>
+  <text x="52" y="781" font-size="13" fill="#475569" font-weight="600">
+    External (deployed on VPS nodes, not in K8s)
+  </text>
+
+  <!-- Agent nodes -->
+  <g transform="translate(60, 804)">
+    <g class="node">
+      <rect x="0" y="0" width="140" height="72" rx="8" fill="url(#gAgent)" filter="shadow" opacity="0.9"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#ffedd5" font-weight="500">VPS Node A</text>
+      <text x="70" y="40" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-agent</text>
+      <text x="70" y="56" text-anchor="middle" font-size="9" fill="#fed7aa">heartbeat + port scan</text>
+      <text x="70" y="68" text-anchor="middle" font-size="9" fill="#fed7aa">+ eBPF traffic + xDS</text>
+    </g>
+    <g class="node" transform="translate(160, 0)">
+      <rect x="0" y="0" width="140" height="72" rx="8" fill="url(#gAgent)" filter="shadow" opacity="0.9"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#ffedd5" font-weight="500">VPS Node B</text>
+      <text x="70" y="40" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-agent</text>
+      <text x="70" y="56" text-anchor="middle" font-size="9" fill="#fed7aa">heartbeat + port scan</text>
+      <text x="70" y="68" text-anchor="middle" font-size="9" fill="#fed7aa">+ eBPF traffic + xDS</text>
+    </g>
+    <g class="node" transform="translate(320, 0)">
+      <rect x="0" y="0" width="110" height="72" rx="8" fill="#292524" stroke="#f97316" stroke-width="1" stroke-dasharray="4,2"/>
+      <text x="55" y="20" text-anchor="middle" font-size="10" fill="#f97316" font-weight="500">VPS Node ...</text>
+      <text x="55" y="40" text-anchor="middle" font-size="12" fill="#fed7aa" font-weight="600">agent</text>
+      <text x="55" y="56" text-anchor="middle" font-size="9" fill="#a8a29e">N instances</text>
+    </g>
+  </g>
+
+  <!-- Probe nodes -->
+  <g transform="translate(680, 804)">
+    <g class="node">
+      <rect x="0" y="0" width="140" height="72" rx="8" fill="url(#gProbe)" filter="shadow" opacity="0.9"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#fce7f3" font-weight="500">China Node</text>
+      <text x="70" y="40" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-probe</text>
+      <text x="70" y="56" text-anchor="middle" font-size="9" fill="#fbcfe8">ICMP/TCP/HTTP</text>
+      <text x="70" y="68" text-anchor="middle" font-size="9" fill="#fbcfe8">reachability checks</text>
+    </g>
+    <g class="node" transform="translate(160, 0)">
+      <rect x="0" y="0" width="140" height="72" rx="8" fill="url(#gProbe)" filter="shadow" opacity="0.9"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#fce7f3" font-weight="500">China Node</text>
+      <text x="70" y="40" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-probe</text>
+      <text x="70" y="56" text-anchor="middle" font-size="9" fill="#fbcfe8">ICMP/TCP/HTTP</text>
+      <text x="70" y="68" text-anchor="middle" font-size="9" fill="#fbcfe8">reachability checks</text>
+    </g>
+  </g>
+
+  <!-- Arrows: Agents -> API -->
+  <path d="M 200 804 L 200 768 Q 200 755 280 752 L 780 752 Q 850 752 850 742 L 850 382" stroke="#f97316" stroke-width="1.2" fill="none" marker-end="url(#arrowOrange)" stroke-dasharray="5,3" opacity="0.5"/>
+  <text x="530" y="746" font-size="9" fill="#f97316" text-anchor="middle">/api/agent/heartbeat, /api/agent/register</text>
+
+  <!-- Arrows: Probes -> API -->
+  <path d="M 830 804 L 830 768 Q 830 755 860 752 Q 890 752 890 742 L 890 382" stroke="#ec4899" stroke-width="1.2" fill="none" marker-end="url(#arrow)" stroke-dasharray="5,3" opacity="0.5"/>
+  <text x="968" y="746" font-size="9" fill="#ec4899" text-anchor="middle">/api/ip-checks</text>
+</svg>
+
+<div class="legend">
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #a855f7;"></div>
+    <span>Envoy Gateway (control)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #d946ef;"></div>
+    <span>Envoy Proxy (data plane)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #3b82f6;"></div>
+    <span>Web (React + Nginx)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #8b5cf6;"></div>
+    <span>API (Rust + Axum)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #06b6d4;"></div>
+    <span>PgBouncer Pooler</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #10b981;"></div>
+    <span>PostgreSQL (CNPG HA)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #ef4444;"></div>
+    <span>Redis</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #f97316;"></div>
+    <span>Agent (VPS nodes)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #ec4899;"></div>
+    <span>Probe (China nodes)</span>
+  </div>
+</div>
+
+<div class="note">
+  <h3>Nginx Ingress vs Envoy Gateway</h3>
+  <div class="vs">
+    <div class="vs-col">
+      <h4 style="color: #f59e0b;">Nginx Ingress (retiring March 2026)</h4>
+      <pre>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sigma-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/...
+spec:
+  rules:
+  - host: sigma.yourdomain.com
+    http:
+      paths:
+      - path: /api
+        backend:
+          service:
+            name: sigma-api-service
+            port: { number: 3000 }</pre>
+    </div>
+    <div class="vs-col">
+      <h4 style="color: #c084fc;">Envoy Gateway (Gateway API GA)</h4>
+      <pre>apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: sigma-gateway
+spec:
+  gatewayClassName: eg
+  listeners:
+  - name: https
+    port: 443
+    protocol: HTTPS
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: sigma-api
+spec:
+  parentRefs:
+  - name: sigma-gateway
+  rules:
+  - matches:
+    - path: { type: PathPrefix, value: /api }
+    backendRefs:
+    - name: sigma-api-service
+      port: 3000</pre>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
