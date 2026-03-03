@@ -166,7 +166,7 @@
   <text x="370" y="104" font-size="8" fill="#6366f1">xDS config push</text>
 
   <path d="M 200 150 Q 200 260 200 298" stroke="#466be3" stroke-width="1" marker-end="url(#arrowIndigo)" stroke-dasharray="4,3" opacity="0.35"/>
-  <path d="M 240 150 Q 600 230 780 298" stroke="#466be3" stroke-width="1" marker-end="url(#arrowIndigo)" stroke-dasharray="4,3" opacity="0.35"/>
+  <path d="M 240 150 Q 500 230 650 298" stroke="#466be3" stroke-width="1" marker-end="url(#arrowIndigo)" stroke-dasharray="4,3" opacity="0.35"/>
   <text x="120" y="230" font-size="8" fill="#6366f1" opacity="0.6">sidecar config</text>
 
   <!-- ==================== Gateway API Resources ==================== -->
@@ -213,8 +213,8 @@
   <path d="M 500 208 L 310 260" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrowBlue)" stroke-dasharray="5,3" class="flow-line"/>
   <text x="384" y="226" font-size="10" fill="#60a5fa" font-weight="500" transform="rotate(-14,384,226)">/* (static)</text>
 
-  <path d="M 700 208 L 830 260" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#arrow)" stroke-dasharray="5,3" class="flow-line"/>
-  <text x="778" y="226" font-size="10" fill="#a78bfa" font-weight="500" transform="rotate(12,778,226)">/api/*</text>
+  <path d="M 680 208 L 720 260" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#arrow)" stroke-dasharray="5,3" class="flow-line"/>
+  <text x="718" y="228" font-size="10" fill="#a78bfa" font-weight="500" transform="rotate(14,718,228)">/api/*</text>
 
   <!-- ==================== Web Pods with sidecar ==================== -->
   <g transform="translate(100, 262)">
@@ -244,7 +244,7 @@
   </g>
 
   <!-- ==================== API Pods with sidecar ==================== -->
-  <g transform="translate(660, 262)">
+  <g transform="translate(530, 262)">
     <rect x="10" y="-10" width="340" height="130" rx="12" fill="#111827" stroke="#2e1065" stroke-width="1" opacity="0.7"/>
     <text x="180" y="6" text-anchor="middle" font-size="10" fill="#a78bfa" font-weight="500">sigma-api-service :3000  (ClusterIP)</text>
 
@@ -270,8 +270,8 @@
   </g>
 
   <!-- mTLS indicator between web and api -->
-  <path d="M 440 340 L 660 340" stroke="#6366f1" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
-  <text x="550" y="334" font-size="8" fill="#818cf8" text-anchor="middle">mTLS (auto)</text>
+  <path d="M 440 340 L 530 340" stroke="#6366f1" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
+  <text x="485" y="334" font-size="8" fill="#818cf8" text-anchor="middle">mTLS (auto)</text>
 
   <!-- ==================== Redis ==================== -->
   <g class="node" transform="translate(80, 530)">
@@ -282,8 +282,8 @@
   </g>
 
   <!-- Arrow: API -> Redis -->
-  <path d="M 790 398 L 790 470 Q 790 490 770 490 L 250 528" stroke="#ef4444" stroke-width="1.2" fill="none" marker-end="url(#arrow)" stroke-dasharray="5,3" opacity="0.6"/>
-  <text x="500" y="484" font-size="9" fill="#f87171" text-anchor="middle">rate limit</text>
+  <path d="M 660 398 L 660 470 Q 660 490 640 490 L 250 528" stroke="#ef4444" stroke-width="1.2" fill="none" marker-end="url(#arrow)" stroke-dasharray="5,3" opacity="0.6"/>
+  <text x="430" y="484" font-size="9" fill="#f87171" text-anchor="middle">rate limit</text>
 
   <!-- ==================== PgBouncer Pooler ==================== -->
   <g transform="translate(480, 480)">
@@ -308,8 +308,8 @@
   </g>
 
   <!-- Arrow: API -> PgBouncer -->
-  <line x1="830" y1="398" x2="730" y2="478" stroke="#06b6d4" stroke-width="1.5" marker-end="url(#arrow)" stroke-dasharray="5,3" class="flow-line-down"/>
-  <text x="795" y="440" font-size="9" fill="#22d3ee" transform="rotate(28,795,440)">:5432</text>
+  <line x1="700" y1="398" x2="660" y2="478" stroke="#06b6d4" stroke-width="1.5" marker-end="url(#arrow)" stroke-dasharray="5,3" class="flow-line-down"/>
+  <text x="694" y="440" font-size="9" fill="#22d3ee" transform="rotate(14,694,440)">:5432</text>
 
   <!-- ==================== CloudNativePG Cluster ==================== -->
   <g transform="translate(340, 640)">
@@ -450,11 +450,11 @@
   </g>
 
   <!-- Arrows: Agents/Probes -> API -->
-  <path d="M 200 864 L 200 828 Q 200 815 280 812 L 780 812 Q 850 812 850 802 L 850 398" stroke="#f97316" stroke-width="1.2" fill="none" marker-end="url(#arrowOrange)" stroke-dasharray="5,3" opacity="0.5"/>
-  <text x="530" y="806" font-size="9" fill="#f97316" text-anchor="middle">/api/agent/heartbeat, /api/agent/register</text>
+  <path d="M 200 864 L 200 828 Q 200 815 280 812 L 680 812 Q 720 812 720 802 L 720 398" stroke="#f97316" stroke-width="1.2" fill="none" marker-end="url(#arrowOrange)" stroke-dasharray="5,3" opacity="0.5"/>
+  <text x="460" y="806" font-size="9" fill="#f97316" text-anchor="middle">/api/agent/heartbeat, /api/agent/register</text>
 
-  <path d="M 830 864 L 830 828 Q 830 815 860 812 Q 890 812 890 802 L 890 398" stroke="#ec4899" stroke-width="1.2" fill="none" marker-end="url(#arrow)" stroke-dasharray="5,3" opacity="0.5"/>
-  <text x="968" y="806" font-size="9" fill="#ec4899" text-anchor="middle">/api/ip-checks</text>
+  <path d="M 830 864 L 830 828 Q 830 815 800 812 Q 770 812 760 802 L 760 398" stroke="#ec4899" stroke-width="1.2" fill="none" marker-end="url(#arrow)" stroke-dasharray="5,3" opacity="0.5"/>
+  <text x="880" y="806" font-size="9" fill="#ec4899" text-anchor="middle">/api/ip-checks</text>
 </svg>
 
 <div class="legend">
