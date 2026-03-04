@@ -5,10 +5,10 @@ RUN cargo +nightly install bpf-linker
 WORKDIR /build
 COPY sigma-agent-ebpf-common/ sigma-agent-ebpf-common/
 COPY sigma-agent-ebpf/ sigma-agent-ebpf/
+COPY sigma-agent-ebpf/.cargo/ sigma-agent-ebpf/.cargo/
 RUN cd sigma-agent-ebpf && \
     cargo +nightly build \
       --release \
-      -Z build-std=core \
       --target bpfel-unknown-none
 
 # Stage 2: Build agent with eBPF feature (stable toolchain)
