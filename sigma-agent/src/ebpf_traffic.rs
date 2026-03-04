@@ -23,8 +23,23 @@ struct TrafficValue {
     bytes_recv: u64,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct RetransmitValue {
+    count: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct ConnValue {
+    active: u64,
+    total: u64,
+}
+
 unsafe impl aya::Pod for TrafficKey {}
 unsafe impl aya::Pod for TrafficValue {}
+unsafe impl aya::Pod for RetransmitValue {}
+unsafe impl aya::Pod for ConnValue {}
 
 /// Per-process traffic stats resolved from eBPF data.
 #[derive(Clone, Debug)]
@@ -33,6 +48,9 @@ pub struct ProcessTraffic {
     pub container_id: Option<String>,
     pub bytes_sent: u64,
     pub bytes_recv: u64,
+    pub retransmits: u64,
+    pub active_connections: u64,
+    pub total_connections: u64,
 }
 
 pub type SharedTrafficStats = Arc<RwLock<Vec<ProcessTraffic>>>;
@@ -59,6 +77,66 @@ pub fn load_ebpf() -> anyhow::Result<Ebpf> {
     recvmsg.load()?;
     recvmsg.attach("tcp_recvmsg", 0)?;
     info!("Attached kretprobe to tcp_recvmsg");
+
+    // Attach kprobe to tcp_retransmit_skb (non-fatal)
+    match ebpf.program_mut("tcp_retransmit_skb") {
+        Some(prog) => match KProbe::try_from(prog) {
+            Ok(kp) => {
+                if let Err(e) = kp.load().and_then(|()| kp.attach("tcp_retransmit_skb", 0)) {
+                    warn!("Failed to attach kprobe to tcp_retransmit_skb: {:#}", e);
+                } else {
+                    info!("Attached kprobe to tcp_retransmit_skb");
+                }
+            }
+            Err(e) => warn!("tcp_retransmit_skb program type mismatch: {:#}", e),
+        },
+        None => warn!("kprobe program 'tcp_retransmit_skb' not found in eBPF object"),
+    }
+
+    // Attach kretprobe to tcp_v4_connect (non-fatal)
+    match ebpf.program_mut("tcp_v4_connect") {
+        Some(prog) => match KProbe::try_from(prog) {
+            Ok(kp) => {
+                if let Err(e) = kp.load().and_then(|()| kp.attach("tcp_v4_connect", 0)) {
+                    warn!("Failed to attach kretprobe to tcp_v4_connect: {:#}", e);
+                } else {
+                    info!("Attached kretprobe to tcp_v4_connect");
+                }
+            }
+            Err(e) => warn!("tcp_v4_connect program type mismatch: {:#}", e),
+        },
+        None => warn!("kretprobe program 'tcp_v4_connect' not found in eBPF object"),
+    }
+
+    // Attach kprobe to tcp_close (non-fatal)
+    match ebpf.program_mut("tcp_close") {
+        Some(prog) => match KProbe::try_from(prog) {
+            Ok(kp) => {
+                if let Err(e) = kp.load().and_then(|()| kp.attach("tcp_close", 0)) {
+                    warn!("Failed to attach kprobe to tcp_close: {:#}", e);
+                } else {
+                    info!("Attached kprobe to tcp_close");
+                }
+            }
+            Err(e) => warn!("tcp_close program type mismatch: {:#}", e),
+        },
+        None => warn!("kprobe program 'tcp_close' not found in eBPF object"),
+    }
+
+    // Attach kretprobe to inet_csk_accept (non-fatal)
+    match ebpf.program_mut("inet_csk_accept") {
+        Some(prog) => match KProbe::try_from(prog) {
+            Ok(kp) => {
+                if let Err(e) = kp.load().and_then(|()| kp.attach("inet_csk_accept", 0)) {
+                    warn!("Failed to attach kretprobe to inet_csk_accept: {:#}", e);
+                } else {
+                    info!("Attached kretprobe to inet_csk_accept");
+                }
+            }
+            Err(e) => warn!("inet_csk_accept program type mismatch: {:#}", e),
+        },
+        None => warn!("kretprobe program 'inet_csk_accept' not found in eBPF object"),
+    }
 
     Ok(ebpf)
 }
@@ -116,26 +194,87 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
         let _ = traffic_map.remove(key);
     }
 
+    // --- Read RETRANSMIT_MAP (read-and-clear, like TRAFFIC_MAP) ---
+    let mut retransmit_entries: Vec<(TrafficKey, RetransmitValue)> = Vec::new();
+    if let Some(map) = ebpf.map_mut("RETRANSMIT_MAP") {
+        if let Ok(mut retransmit_map) = BpfHashMap::<&mut aya::maps::MapData, TrafficKey, RetransmitValue>::try_from(map) {
+            let mut retransmit_keys: Vec<TrafficKey> = Vec::new();
+            for item in retransmit_map.iter() {
+                match item {
+                    Ok((key, value)) => {
+                        retransmit_entries.push((key, value));
+                        retransmit_keys.push(key);
+                    }
+                    Err(e) => debug!("Error reading RETRANSMIT_MAP entry: {}", e),
+                }
+            }
+            for key in &retransmit_keys {
+                let _ = retransmit_map.remove(key);
+            }
+        }
+    }
+
+    // --- Read CONN_MAP (don't clear — active is a gauge) ---
+    let mut conn_entries: Vec<(TrafficKey, ConnValue)> = Vec::new();
+    if let Some(map) = ebpf.map_mut("CONN_MAP") {
+        if let Ok(mut conn_map) = BpfHashMap::<&mut aya::maps::MapData, TrafficKey, ConnValue>::try_from(map) {
+            let mut zero_keys: Vec<TrafficKey> = Vec::new();
+            for item in conn_map.iter() {
+                match item {
+                    Ok((key, value)) => {
+                        if value.active == 0 && value.total == 0 {
+                            zero_keys.push(key);
+                        } else {
+                            conn_entries.push((key, value));
+                        }
+                    }
+                    Err(e) => debug!("Error reading CONN_MAP entry: {}", e),
+                }
+            }
+            // Clean up entries with zero active+total to prevent map from growing
+            for key in &zero_keys {
+                let _ = conn_map.remove(key);
+            }
+        }
+    }
+
     // Aggregate by (process_name, container_id)
-    let mut aggregated: HashMap<(String, Option<String>), (u64, u64)> = HashMap::new();
+    // (bytes_sent, bytes_recv, retransmits, active_conns, total_conns)
+    let mut aggregated: HashMap<(String, Option<String>), (u64, u64, u64, u64, u64)> = HashMap::new();
 
     for (key, value) in &raw_entries {
         let proc_name = resolve_process_name(key.pid, host_proc);
         let container_id = resolve_container_id(key.pid, host_proc);
-        let agg_key = (proc_name, container_id);
-
-        let entry = aggregated.entry(agg_key).or_insert((0, 0));
+        let entry = aggregated.entry((proc_name, container_id)).or_insert((0, 0, 0, 0, 0));
         entry.0 += value.bytes_sent;
         entry.1 += value.bytes_recv;
     }
 
+    for (key, value) in &retransmit_entries {
+        let proc_name = resolve_process_name(key.pid, host_proc);
+        let container_id = resolve_container_id(key.pid, host_proc);
+        let entry = aggregated.entry((proc_name, container_id)).or_insert((0, 0, 0, 0, 0));
+        entry.2 += value.count;
+    }
+
+    for (key, value) in &conn_entries {
+        let proc_name = resolve_process_name(key.pid, host_proc);
+        let container_id = resolve_container_id(key.pid, host_proc);
+        let entry = aggregated.entry((proc_name, container_id)).or_insert((0, 0, 0, 0, 0));
+        entry.3 += value.active;
+        entry.4 += value.total;
+    }
+
     let stats: Vec<ProcessTraffic> = aggregated
         .into_iter()
-        .map(|((process_name, container_id), (bytes_sent, bytes_recv))| ProcessTraffic {
+        .map(|((process_name, container_id), (bytes_sent, bytes_recv, retransmits, active_connections, total_connections))| ProcessTraffic {
             process_name,
             container_id,
             bytes_sent,
             bytes_recv,
+            retransmits,
+            active_connections,
+            total_connections,
         })
         .collect();
 

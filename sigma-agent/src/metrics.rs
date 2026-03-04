@@ -193,6 +193,45 @@ pub fn render_traffic_metrics(stats: &[crate::ebpf_traffic::ProcessTraffic], hos
         ).unwrap();
     }
 
+    writeln!(out).unwrap();
+
+    writeln!(out, "# HELP sigma_tcp_retransmits_total TCP retransmit events by process (eBPF)").unwrap();
+    writeln!(out, "# TYPE sigma_tcp_retransmits_total gauge").unwrap();
+    for entry in stats {
+        let container = entry.container_id.as_deref().unwrap_or("");
+        writeln!(
+            out,
+            "sigma_tcp_retransmits_total{{hostname=\"{}\",process=\"{}\",container=\"{}\"}} {}",
+            hostname, entry.process_name, container, entry.retransmits
+        ).unwrap();
+    }
+
+    writeln!(out).unwrap();
+
+    writeln!(out, "# HELP sigma_tcp_connections_active Current active TCP connections by process (eBPF)").unwrap();
+    writeln!(out, "# TYPE sigma_tcp_connections_active gauge").unwrap();
+    for entry in stats {
+        let container = entry.container_id.as_deref().unwrap_or("");
+        writeln!(
+            out,
+            "sigma_tcp_connections_active{{hostname=\"{}\",process=\"{}\",container=\"{}\"}} {}",
+            hostname, entry.process_name, container, entry.active_connections
+        ).unwrap();
+    }
+
+    writeln!(out).unwrap();
+
+    writeln!(out, "# HELP sigma_tcp_connections_total Total TCP connections opened by process (eBPF)").unwrap();
+    writeln!(out, "# TYPE sigma_tcp_connections_total counter").unwrap();
+    for entry in stats {
+        let container = entry.container_id.as_deref().unwrap_or("");
+        writeln!(
+            out,
+            "sigma_tcp_connections_total{{hostname=\"{}\",process=\"{}\",container=\"{}\"}} {}",
+            hostname, entry.process_name, container, entry.total_connections
+        ).unwrap();
+    }
+
     out
 }
 

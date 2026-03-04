@@ -7,11 +7,19 @@ use aya_ebpf::{
     maps::HashMap,
     programs::{ProbeContext, RetProbeContext},
 };
-use sigma_agent_ebpf_common::{TrafficKey, TrafficValue};
+use sigma_agent_ebpf_common::{ConnValue, RetransmitValue, TrafficKey, TrafficValue};
 
 /// Per-PID traffic counters. Userspace reads and periodically clears this map.
 #[map]
 static TRAFFIC_MAP: HashMap<TrafficKey, TrafficValue> = HashMap::with_max_entries(8192, 0);
+
+/// Per-PID TCP retransmit counters.
+#[map]
+static RETRANSMIT_MAP: HashMap<TrafficKey, RetransmitValue> = HashMap::with_max_entries(8192, 0);
+
+/// Per-PID TCP connection counters (active gauge + total cumulative).
+#[map]
+static CONN_MAP: HashMap<TrafficKey, ConnValue> = HashMap::with_max_entries(8192, 0);
 
 /// kprobe on tcp_sendmsg — called as tcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 /// The third argument (size) is the number of bytes being sent.
@@ -74,6 +82,117 @@ fn try_tcp_recvmsg(ctx: &RetProbeContext) -> Result<(), i64> {
             bytes_recv: size,
         };
         let _ = TRAFFIC_MAP.insert(&key, &val, 0);
+    }
+
+    Ok(())
+}
+
+/// kprobe on tcp_retransmit_skb — called on each TCP retransmit event.
+#[kprobe]
+pub fn tcp_retransmit_skb(ctx: ProbeContext) -> u32 {
+    match try_tcp_retransmit_skb(&ctx) {
+        Ok(()) => 0,
+        Err(_) => 0,
+    }
+}
+
+fn try_tcp_retransmit_skb(_ctx: &ProbeContext) -> Result<(), i64> {
+    let pid = (bpf_get_current_pid_tgid() >> 32) as u32;
+    let key = TrafficKey { pid };
+
+    if let Some(val) = RETRANSMIT_MAP.get_ptr_mut(&key) {
+        unsafe {
+            (*val).count += 1;
+        }
+    } else {
+        let val = RetransmitValue { count: 1 };
+        let _ = RETRANSMIT_MAP.insert(&key, &val, 0);
+    }
+
+    Ok(())
+}
+
+/// kretprobe on tcp_v4_connect — on success (ret==0), increments active and total connections.
+#[kretprobe]
+pub fn tcp_v4_connect(ctx: RetProbeContext) -> u32 {
+    match try_tcp_v4_connect(&ctx) {
+        Ok(()) => 0,
+        Err(_) => 0,
+    }
+}
+
+fn try_tcp_v4_connect(ctx: &RetProbeContext) -> Result<(), i64> {
+    let ret: i64 = ctx.ret().ok_or(1i64)?;
+    if ret != 0 {
+        return Ok(()); // Connection failed, skip
+    }
+
+    let pid = (bpf_get_current_pid_tgid() >> 32) as u32;
+    let key = TrafficKey { pid };
+
+    if let Some(val) = CONN_MAP.get_ptr_mut(&key) {
+        unsafe {
+            (*val).active += 1;
+            (*val).total += 1;
+        }
+    } else {
+        let val = ConnValue { active: 1, total: 1 };
+        let _ = CONN_MAP.insert(&key, &val, 0);
+    }
+
+    Ok(())
+}
+
+/// kprobe on tcp_close — decrements active connections (saturating).
+#[kprobe]
+pub fn tcp_close(ctx: ProbeContext) -> u32 {
+    match try_tcp_close(&ctx) {
+        Ok(()) => 0,
+        Err(_) => 0,
+    }
+}
+
+fn try_tcp_close(_ctx: &ProbeContext) -> Result<(), i64> {
+    let pid = (bpf_get_current_pid_tgid() >> 32) as u32;
+    let key = TrafficKey { pid };
+
+    if let Some(val) = CONN_MAP.get_ptr_mut(&key) {
+        unsafe {
+            if (*val).active > 0 {
+                (*val).active -= 1;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// kretprobe on inet_csk_accept — incoming connection accepted (return non-null).
+#[kretprobe]
+pub fn inet_csk_accept(ctx: RetProbeContext) -> u32 {
+    match try_inet_csk_accept(&ctx) {
+        Ok(()) => 0,
+        Err(_) => 0,
+    }
+}
+
+fn try_inet_csk_accept(ctx: &RetProbeContext) -> Result<(), i64> {
+    let ret: u64 = ctx.ret().ok_or(1i64)?;
+    if ret == 0 {
+        return Ok(()); // NULL return — accept failed
+    }
+
+    let pid = (bpf_get_current_pid_tgid() >> 32) as u32;
+    let key = TrafficKey { pid };
+
+    if let Some(val) = CONN_MAP.get_ptr_mut(&key) {
+        unsafe {
+            (*val).active += 1;
+            (*val).total += 1;
+        }
+    } else {
+        let val = ConnValue { active: 1, total: 1 };
+        let _ = CONN_MAP.insert(&key, &val, 0);
     }
 
     Ok(())

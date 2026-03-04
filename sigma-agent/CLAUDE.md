@@ -301,9 +301,10 @@ pushed back to Envoy via xDS (Envoy already has them in its config file).
 
 ## eBPF TCP Traffic Monitoring
 
-When `--ebpf-traffic` is enabled, the agent uses eBPF kprobes on `tcp_sendmsg` and `tcp_recvmsg`
-to count TCP bytes sent/received per process. This is feature-gated behind the `ebpf-traffic`
-cargo feature (compiled in via Docker by default).
+When `--ebpf-traffic` is enabled, the agent uses eBPF kprobes to monitor TCP activity per process.
+This includes bytes sent/received (`tcp_sendmsg`/`tcp_recvmsg`), retransmit events (`tcp_retransmit_skb`),
+and connection tracking (`tcp_v4_connect`/`tcp_close`/`inet_csk_accept`). This is feature-gated behind
+the `ebpf-traffic` cargo feature (compiled in via Docker by default).
 
 ### Configuration
 
@@ -326,6 +327,18 @@ sigma_traffic_bytes_sent_total{hostname="relay-01",process="xray",container="abc
 # HELP sigma_traffic_bytes_recv_total TCP bytes received by process (eBPF)
 # TYPE sigma_traffic_bytes_recv_total gauge
 sigma_traffic_bytes_recv_total{hostname="relay-01",process="envoy",container=""} 2345678
+
+# HELP sigma_tcp_retransmits_total TCP retransmit events by process (eBPF)
+# TYPE sigma_tcp_retransmits_total gauge
+sigma_tcp_retransmits_total{hostname="relay-01",process="envoy",container=""} 42
+
+# HELP sigma_tcp_connections_active Current active TCP connections by process (eBPF)
+# TYPE sigma_tcp_connections_active gauge
+sigma_tcp_connections_active{hostname="relay-01",process="envoy",container=""} 15
+
+# HELP sigma_tcp_connections_total Total TCP connections opened by process (eBPF)
+# TYPE sigma_tcp_connections_total counter
+sigma_tcp_connections_total{hostname="relay-01",process="envoy",container=""} 1234
 ```
 
 Labels: `process` = resolved from `/proc/<pid>/comm`, `container` = Docker/containerd ID (first 12 hex chars) or empty.
