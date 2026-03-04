@@ -40,6 +40,7 @@ async fn main() -> Result<()> {
         .unwrap_or_else(|| system::get_hostname());
 
     info!(
+        version = env!("CARGO_PKG_VERSION"),
         hostname = %hostname,
         interval = config.interval,
         "sigma-agent starting"
