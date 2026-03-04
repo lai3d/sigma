@@ -1,5 +1,7 @@
 {
-  "annotations": { "list": [] },
+  "annotations": {
+    "list": []
+  },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -7,237 +9,518 @@
   "panels": [
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "title": "TCP Overview",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [
-            { "color": "green", "value": null },
-            { "color": "yellow", "value": 1073741824 },
-            { "color": "red", "value": 10737418240 }
-          ]},
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1073741824
+              },
+              {
+                "color": "red",
+                "value": 10737418240
+              }
+            ]
+          },
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "title": "TCP Bytes Sent",
       "type": "stat",
-      "targets": [{
-        "expr": "sum(sigma_traffic_bytes_sent_total{hostname=~\"$hostname\"})",
-        "legendFormat": "sent"
-      }]
+      "targets": [
+        {
+          "expr": "sum(sigma_traffic_bytes_sent_total{hostname=~\"$hostname\"})",
+          "legendFormat": "sent"
+        }
+      ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [
-            { "color": "blue", "value": null },
-            { "color": "yellow", "value": 1073741824 },
-            { "color": "red", "value": 10737418240 }
-          ]},
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1073741824
+              },
+              {
+                "color": "red",
+                "value": 10737418240
+              }
+            ]
+          },
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "title": "TCP Bytes Received",
       "type": "stat",
-      "targets": [{
-        "expr": "sum(sigma_traffic_bytes_recv_total{hostname=~\"$hostname\"})",
-        "legendFormat": "recv"
-      }]
+      "targets": [
+        {
+          "expr": "sum(sigma_traffic_bytes_recv_total{hostname=~\"$hostname\"})",
+          "legendFormat": "recv"
+        }
+      ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [{ "color": "text", "value": null }] },
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
           "unit": "none"
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
-      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 1
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "title": "Tracked Processes",
       "type": "stat",
-      "targets": [{
-        "expr": "count(sigma_traffic_bytes_sent_total{hostname=~\"$hostname\"} > 0)",
-        "legendFormat": "processes"
-      }]
+      "targets": [
+        {
+          "expr": "count(sigma_traffic_bytes_sent_total{hostname=~\"$hostname\"} > 0)",
+          "legendFormat": "processes"
+        }
+      ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [
-            { "color": "semi-dark-green", "value": null }
-          ]},
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "semi-dark-green",
+                "value": null
+              }
+            ]
+          },
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 1
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "title": "Top TCP Sender",
       "type": "stat",
-      "targets": [{
-        "expr": "topk(1, sigma_traffic_bytes_sent_total{hostname=~\"$hostname\"})",
-        "legendFormat": "{{ process }}"
-      }]
+      "targets": [
+        {
+          "expr": "topk(1, sigma_traffic_bytes_sent_total{hostname=~\"$hostname\"})",
+          "legendFormat": "{{ process }}"
+        }
+      ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [
-            { "color": "semi-dark-blue", "value": null }
-          ]},
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "semi-dark-blue",
+                "value": null
+              }
+            ]
+          },
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "title": "Top TCP Receiver",
       "type": "stat",
-      "targets": [{
-        "expr": "topk(1, sigma_traffic_bytes_recv_total{hostname=~\"$hostname\"})",
-        "legendFormat": "{{ process }}"
-      }]
+      "targets": [
+        {
+          "expr": "topk(1, sigma_traffic_bytes_recv_total{hostname=~\"$hostname\"})",
+          "legendFormat": "{{ process }}"
+        }
+      ]
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
       "title": "TCP Traffic Over Time",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "fillOpacity": 20,
             "lineWidth": 2,
-            "stacking": { "mode": "normal" }
+            "stacking": {
+              "mode": "normal"
+            }
           },
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 6
+      },
       "options": {
-        "legend": { "displayMode": "table", "placement": "right", "sortBy": "Last *", "sortDesc": true, "calcs": ["lastNotNull"] },
-        "tooltip": { "mode": "multi" }
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "sortBy": "Last *",
+          "sortDesc": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
       },
       "title": "TCP Bytes Sent by Process",
       "type": "timeseries",
-      "targets": [{
-        "expr": "sigma_traffic_bytes_sent_total{hostname=~\"$hostname\"}",
-        "legendFormat": "{{ process }}"
-      }]
+      "targets": [
+        {
+          "expr": "sigma_traffic_bytes_sent_total{hostname=~\"$hostname\"}",
+          "legendFormat": "{{ process }}"
+        }
+      ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "fillOpacity": 20,
             "lineWidth": 2,
-            "stacking": { "mode": "normal" }
+            "stacking": {
+              "mode": "normal"
+            }
           },
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 6
+      },
       "options": {
-        "legend": { "displayMode": "table", "placement": "right", "sortBy": "Last *", "sortDesc": true, "calcs": ["lastNotNull"] },
-        "tooltip": { "mode": "multi" }
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "sortBy": "Last *",
+          "sortDesc": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
       },
       "title": "TCP Bytes Received by Process",
       "type": "timeseries",
-      "targets": [{
-        "expr": "sigma_traffic_bytes_recv_total{hostname=~\"$hostname\"}",
-        "legendFormat": "{{ process }}"
-      }]
+      "targets": [
+        {
+          "expr": "sigma_traffic_bytes_recv_total{hostname=~\"$hostname\"}",
+          "legendFormat": "{{ process }}"
+        }
+      ]
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
       "title": "TCP Breakdown",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
-          "unit": "decbytes"
-        }
-      },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 15 },
-      "options": {
-        "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] },
-        "pieType": "donut",
-        "reduceOptions": { "calcs": ["lastNotNull"] },
-        "tooltip": { "mode": "single" }
-      },
-      "title": "TCP Sent by Process",
-      "type": "piechart",
-      "targets": [{
-        "expr": "sigma_traffic_bytes_sent_total{hostname=~\"$hostname\"} > 0",
-        "legendFormat": "{{ process }}"
-      }]
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
-          "unit": "decbytes"
-        }
-      },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 15 },
-      "options": {
-        "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] },
-        "pieType": "donut",
-        "reduceOptions": { "calcs": ["lastNotNull"] },
-        "tooltip": { "mode": "single" }
-      },
-      "title": "TCP Received by Process",
-      "type": "piechart",
-      "targets": [{
-        "expr": "sigma_traffic_bytes_recv_total{hostname=~\"$hostname\"} > 0",
-        "legendFormat": "{{ process }}"
-      }]
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
-            "fillOpacity": 30,
-            "lineWidth": 2,
-            "stacking": { "mode": "none" }
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
           },
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 15 },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 15
+      },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "title": "TCP Sent by Process",
+      "type": "piechart",
+      "targets": [
+        {
+          "expr": "sigma_traffic_bytes_sent_total{hostname=~\"$hostname\"} > 0",
+          "legendFormat": "{{ process }}"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 15
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "title": "TCP Received by Process",
+      "type": "piechart",
+      "targets": [
+        {
+          "expr": "sigma_traffic_bytes_recv_total{hostname=~\"$hostname\"} > 0",
+          "legendFormat": "{{ process }}"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 30,
+            "lineWidth": 2,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 15
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
       },
       "title": "Total TCP Sent vs Received",
       "type": "timeseries",
@@ -254,114 +537,254 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
       "title": "TCP RTT (Round-Trip Time)",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [
-            { "color": "green", "value": null },
-            { "color": "yellow", "value": 50000 },
-            { "color": "red", "value": 200000 }
-          ]},
-          "unit": "\u00b5s"
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50000
+              },
+              {
+                "color": "red",
+                "value": 200000
+              }
+            ]
+          },
+          "unit": "µs"
         }
       },
-      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 24 },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 24
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "title": "Avg RTT (All Processes)",
       "type": "stat",
-      "targets": [{
-        "expr": "avg(sigma_tcp_rtt_avg_us{hostname=~\"$hostname\"})",
-        "legendFormat": "avg"
-      }]
+      "targets": [
+        {
+          "expr": "avg(sigma_tcp_rtt_avg_us{hostname=~\"$hostname\"})",
+          "legendFormat": "avg"
+        }
+      ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [
-            { "color": "green", "value": null },
-            { "color": "orange", "value": 100000 },
-            { "color": "red", "value": 500000 }
-          ]},
-          "unit": "\u00b5s"
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 100000
+              },
+              {
+                "color": "red",
+                "value": 500000
+              }
+            ]
+          },
+          "unit": "µs"
         }
       },
-      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 24 },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 24
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "title": "Max RTT",
       "type": "stat",
-      "targets": [{
-        "expr": "max(sigma_tcp_rtt_max_us{hostname=~\"$hostname\"})",
-        "legendFormat": "max"
-      }]
+      "targets": [
+        {
+          "expr": "max(sigma_tcp_rtt_max_us{hostname=~\"$hostname\"})",
+          "legendFormat": "max"
+        }
+      ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [{ "color": "text", "value": null }] },
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
           "unit": "none"
         }
       },
-      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 24 },
-      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 24
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "title": "Processes with RTT Data",
       "type": "stat",
-      "targets": [{
-        "expr": "count(sigma_tcp_rtt_avg_us{hostname=~\"$hostname\"} > 0)",
-        "legendFormat": "processes"
-      }]
+      "targets": [
+        {
+          "expr": "count(sigma_tcp_rtt_avg_us{hostname=~\"$hostname\"} > 0)",
+          "legendFormat": "processes"
+        }
+      ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "fillOpacity": 10,
             "lineWidth": 2,
-            "stacking": { "mode": "none" }
+            "stacking": {
+              "mode": "none"
+            }
           },
-          "unit": "\u00b5s"
+          "unit": "µs"
         }
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 28
+      },
       "options": {
-        "legend": { "displayMode": "table", "placement": "right", "sortBy": "Last *", "sortDesc": true, "calcs": ["lastNotNull"] },
-        "tooltip": { "mode": "multi" }
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "sortBy": "Last *",
+          "sortDesc": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
       },
       "title": "RTT Average by Process",
       "type": "timeseries",
-      "targets": [{
-        "expr": "sigma_tcp_rtt_avg_us{hostname=~\"$hostname\"}",
-        "legendFormat": "{{ process }}"
-      }]
+      "targets": [
+        {
+          "expr": "sigma_tcp_rtt_avg_us{hostname=~\"$hostname\"}",
+          "legendFormat": "{{ process }}"
+        }
+      ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "fillOpacity": 15,
             "lineWidth": 1,
-            "stacking": { "mode": "none" }
+            "stacking": {
+              "mode": "none"
+            }
           },
-          "unit": "\u00b5s"
+          "unit": "µs"
         }
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 28
+      },
       "options": {
-        "legend": { "displayMode": "table", "placement": "right", "sortBy": "Last *", "sortDesc": true, "calcs": ["lastNotNull"] },
-        "tooltip": { "mode": "multi" }
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "sortBy": "Last *",
+          "sortDesc": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
       },
       "title": "RTT Min/Max Range by Process",
       "type": "timeseries",
@@ -378,114 +801,254 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 36
+      },
       "title": "TCP Connection Latency",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [
-            { "color": "green", "value": null },
-            { "color": "yellow", "value": 50000 },
-            { "color": "red", "value": 200000 }
-          ]},
-          "unit": "\u00b5s"
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50000
+              },
+              {
+                "color": "red",
+                "value": 200000
+              }
+            ]
+          },
+          "unit": "µs"
         }
       },
-      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 37 },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 37
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "title": "Avg Conn Latency (All)",
       "type": "stat",
-      "targets": [{
-        "expr": "avg(sigma_tcp_connection_latency_avg_us{hostname=~\"$hostname\"})",
-        "legendFormat": "avg"
-      }]
+      "targets": [
+        {
+          "expr": "avg(sigma_tcp_connection_latency_avg_us{hostname=~\"$hostname\"})",
+          "legendFormat": "avg"
+        }
+      ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [
-            { "color": "green", "value": null },
-            { "color": "orange", "value": 100000 },
-            { "color": "red", "value": 500000 }
-          ]},
-          "unit": "\u00b5s"
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 100000
+              },
+              {
+                "color": "red",
+                "value": 500000
+              }
+            ]
+          },
+          "unit": "µs"
         }
       },
-      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 37 },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 37
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "title": "Max Conn Latency",
       "type": "stat",
-      "targets": [{
-        "expr": "max(sigma_tcp_connection_latency_max_us{hostname=~\"$hostname\"})",
-        "legendFormat": "max"
-      }]
+      "targets": [
+        {
+          "expr": "max(sigma_tcp_connection_latency_max_us{hostname=~\"$hostname\"})",
+          "legendFormat": "max"
+        }
+      ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [{ "color": "text", "value": null }] },
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
           "unit": "none"
         }
       },
-      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 37 },
-      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 37
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "title": "Processes with Latency Data",
       "type": "stat",
-      "targets": [{
-        "expr": "count(sigma_tcp_connection_latency_avg_us{hostname=~\"$hostname\"} > 0)",
-        "legendFormat": "processes"
-      }]
+      "targets": [
+        {
+          "expr": "count(sigma_tcp_connection_latency_avg_us{hostname=~\"$hostname\"} > 0)",
+          "legendFormat": "processes"
+        }
+      ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "fillOpacity": 10,
             "lineWidth": 2,
-            "stacking": { "mode": "none" }
+            "stacking": {
+              "mode": "none"
+            }
           },
-          "unit": "\u00b5s"
+          "unit": "µs"
         }
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 41 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 41
+      },
       "options": {
-        "legend": { "displayMode": "table", "placement": "right", "sortBy": "Last *", "sortDesc": true, "calcs": ["lastNotNull"] },
-        "tooltip": { "mode": "multi" }
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "sortBy": "Last *",
+          "sortDesc": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
       },
       "title": "Conn Latency Avg by Process",
       "type": "timeseries",
-      "targets": [{
-        "expr": "sigma_tcp_connection_latency_avg_us{hostname=~\"$hostname\"}",
-        "legendFormat": "{{ process }}"
-      }]
+      "targets": [
+        {
+          "expr": "sigma_tcp_connection_latency_avg_us{hostname=~\"$hostname\"}",
+          "legendFormat": "{{ process }}"
+        }
+      ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "fillOpacity": 15,
             "lineWidth": 1,
-            "stacking": { "mode": "none" }
+            "stacking": {
+              "mode": "none"
+            }
           },
-          "unit": "\u00b5s"
+          "unit": "µs"
         }
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 41 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 41
+      },
       "options": {
-        "legend": { "displayMode": "table", "placement": "right", "sortBy": "Last *", "sortDesc": true, "calcs": ["lastNotNull"] },
-        "tooltip": { "mode": "multi" }
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "sortBy": "Last *",
+          "sortDesc": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
       },
       "title": "Conn Latency Min/Max Range by Process",
       "type": "timeseries",
@@ -502,333 +1065,725 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 49 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 49
+      },
       "title": "Packet Drops",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [
-            { "color": "green", "value": null },
-            { "color": "yellow", "value": 100 },
-            { "color": "red", "value": 1000 }
-          ]},
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 1000
+              }
+            ]
+          },
           "unit": "none"
         }
       },
-      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 50 },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 50
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "title": "Total Drops",
       "type": "stat",
-      "targets": [{
-        "expr": "sum(sigma_packet_drops_total{hostname=~\"$hostname\"})",
-        "legendFormat": "drops"
-      }]
+      "targets": [
+        {
+          "expr": "sum(sigma_packet_drops_total{hostname=~\"$hostname\"})",
+          "legendFormat": "drops"
+        }
+      ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [{ "color": "orange", "value": null }] },
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          },
           "unit": "none"
         }
       },
-      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 50 },
-      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 50
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "title": "Top Drop Reason",
       "type": "stat",
-      "targets": [{
-        "expr": "topk(1, sum by (reason) (sigma_packet_drops_total{hostname=~\"$hostname\"}))",
-        "legendFormat": "{{ reason }}"
-      }]
+      "targets": [
+        {
+          "expr": "topk(1, sum by (reason) (sigma_packet_drops_total{hostname=~\"$hostname\"}))",
+          "legendFormat": "{{ reason }}"
+        }
+      ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [{ "color": "text", "value": null }] },
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
           "unit": "none"
         }
       },
-      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 50 },
-      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 50
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "title": "Processes with Drops",
       "type": "stat",
-      "targets": [{
-        "expr": "count(sum by (process) (sigma_packet_drops_total{hostname=~\"$hostname\"}) > 0)",
-        "legendFormat": "processes"
-      }]
+      "targets": [
+        {
+          "expr": "count(sum by (process) (sigma_packet_drops_total{hostname=~\"$hostname\"}) > 0)",
+          "legendFormat": "processes"
+        }
+      ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "fillOpacity": 30,
             "lineWidth": 2,
-            "stacking": { "mode": "normal" }
+            "stacking": {
+              "mode": "normal"
+            }
           },
           "unit": "none"
         }
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 54 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 54
+      },
       "options": {
-        "legend": { "displayMode": "table", "placement": "right", "sortBy": "Last *", "sortDesc": true, "calcs": ["lastNotNull"] },
-        "tooltip": { "mode": "multi" }
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "sortBy": "Last *",
+          "sortDesc": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
       },
       "title": "Drops by Reason",
       "type": "timeseries",
-      "targets": [{
-        "expr": "sum by (reason) (sigma_packet_drops_total{hostname=~\"$hostname\"})",
-        "legendFormat": "{{ reason }}"
-      }]
+      "targets": [
+        {
+          "expr": "sum by (reason) (sigma_packet_drops_total{hostname=~\"$hostname\"})",
+          "legendFormat": "{{ reason }}"
+        }
+      ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "fillOpacity": 20,
             "lineWidth": 2,
-            "stacking": { "mode": "normal" }
+            "stacking": {
+              "mode": "normal"
+            }
           },
           "unit": "none"
         }
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 54 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 54
+      },
       "options": {
-        "legend": { "displayMode": "table", "placement": "right", "sortBy": "Last *", "sortDesc": true, "calcs": ["lastNotNull"] },
-        "tooltip": { "mode": "multi" }
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "sortBy": "Last *",
+          "sortDesc": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
       },
       "title": "Drops by Process",
       "type": "timeseries",
-      "targets": [{
-        "expr": "sum by (process) (sigma_packet_drops_total{hostname=~\"$hostname\"})",
-        "legendFormat": "{{ process }}"
-      }]
+      "targets": [
+        {
+          "expr": "sum by (process) (sigma_packet_drops_total{hostname=~\"$hostname\"})",
+          "legendFormat": "{{ process }}"
+        }
+      ]
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 62 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 62
+      },
       "title": "UDP Overview",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [
-            { "color": "dark-orange", "value": null },
-            { "color": "yellow", "value": 1073741824 },
-            { "color": "red", "value": 10737418240 }
-          ]},
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "dark-orange",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1073741824
+              },
+              {
+                "color": "red",
+                "value": 10737418240
+              }
+            ]
+          },
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 63 },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 63
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "title": "UDP Bytes Sent",
       "type": "stat",
-      "targets": [{
-        "expr": "sum(sigma_traffic_udp_bytes_sent_total{hostname=~\"$hostname\"})",
-        "legendFormat": "sent"
-      }]
+      "targets": [
+        {
+          "expr": "sum(sigma_traffic_udp_bytes_sent_total{hostname=~\"$hostname\"})",
+          "legendFormat": "sent"
+        }
+      ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [
-            { "color": "dark-purple", "value": null },
-            { "color": "yellow", "value": 1073741824 },
-            { "color": "red", "value": 10737418240 }
-          ]},
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "dark-purple",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1073741824
+              },
+              {
+                "color": "red",
+                "value": 10737418240
+              }
+            ]
+          },
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 63 },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 63
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "title": "UDP Bytes Received",
       "type": "stat",
-      "targets": [{
-        "expr": "sum(sigma_traffic_udp_bytes_recv_total{hostname=~\"$hostname\"})",
-        "legendFormat": "recv"
-      }]
+      "targets": [
+        {
+          "expr": "sum(sigma_traffic_udp_bytes_recv_total{hostname=~\"$hostname\"})",
+          "legendFormat": "recv"
+        }
+      ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [
-            { "color": "dark-orange", "value": null }
-          ]},
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "dark-orange",
+                "value": null
+              }
+            ]
+          },
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 63 },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 63
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "title": "Top UDP Sender",
       "type": "stat",
-      "targets": [{
-        "expr": "topk(1, sigma_traffic_udp_bytes_sent_total{hostname=~\"$hostname\"})",
-        "legendFormat": "{{ process }}"
-      }]
+      "targets": [
+        {
+          "expr": "topk(1, sigma_traffic_udp_bytes_sent_total{hostname=~\"$hostname\"})",
+          "legendFormat": "{{ process }}"
+        }
+      ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [
-            { "color": "dark-purple", "value": null }
-          ]},
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "dark-purple",
+                "value": null
+              }
+            ]
+          },
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 63 },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 63
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "title": "Top UDP Receiver",
       "type": "stat",
-      "targets": [{
-        "expr": "topk(1, sigma_traffic_udp_bytes_recv_total{hostname=~\"$hostname\"})",
-        "legendFormat": "{{ process }}"
-      }]
+      "targets": [
+        {
+          "expr": "topk(1, sigma_traffic_udp_bytes_recv_total{hostname=~\"$hostname\"})",
+          "legendFormat": "{{ process }}"
+        }
+      ]
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 67 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 67
+      },
       "title": "UDP Traffic Over Time",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "fillOpacity": 20,
             "lineWidth": 2,
-            "stacking": { "mode": "normal" }
+            "stacking": {
+              "mode": "normal"
+            }
           },
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 68 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 68
+      },
       "options": {
-        "legend": { "displayMode": "table", "placement": "right", "sortBy": "Last *", "sortDesc": true, "calcs": ["lastNotNull"] },
-        "tooltip": { "mode": "multi" }
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "sortBy": "Last *",
+          "sortDesc": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
       },
       "title": "UDP Bytes Sent by Process",
       "type": "timeseries",
-      "targets": [{
-        "expr": "sigma_traffic_udp_bytes_sent_total{hostname=~\"$hostname\"}",
-        "legendFormat": "{{ process }}"
-      }]
+      "targets": [
+        {
+          "expr": "sigma_traffic_udp_bytes_sent_total{hostname=~\"$hostname\"}",
+          "legendFormat": "{{ process }}"
+        }
+      ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "fillOpacity": 20,
             "lineWidth": 2,
-            "stacking": { "mode": "normal" }
+            "stacking": {
+              "mode": "normal"
+            }
           },
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 68 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 68
+      },
       "options": {
-        "legend": { "displayMode": "table", "placement": "right", "sortBy": "Last *", "sortDesc": true, "calcs": ["lastNotNull"] },
-        "tooltip": { "mode": "multi" }
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "sortBy": "Last *",
+          "sortDesc": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
       },
       "title": "UDP Bytes Received by Process",
       "type": "timeseries",
-      "targets": [{
-        "expr": "sigma_traffic_udp_bytes_recv_total{hostname=~\"$hostname\"}",
-        "legendFormat": "{{ process }}"
-      }]
+      "targets": [
+        {
+          "expr": "sigma_traffic_udp_bytes_recv_total{hostname=~\"$hostname\"}",
+          "legendFormat": "{{ process }}"
+        }
+      ]
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 76 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 76
+      },
       "title": "UDP Breakdown",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
-          "unit": "decbytes"
-        }
-      },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 77 },
-      "options": {
-        "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] },
-        "pieType": "donut",
-        "reduceOptions": { "calcs": ["lastNotNull"] },
-        "tooltip": { "mode": "single" }
-      },
-      "title": "UDP Sent by Process",
-      "type": "piechart",
-      "targets": [{
-        "expr": "sigma_traffic_udp_bytes_sent_total{hostname=~\"$hostname\"} > 0",
-        "legendFormat": "{{ process }}"
-      }]
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
-          "unit": "decbytes"
-        }
-      },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 77 },
-      "options": {
-        "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] },
-        "pieType": "donut",
-        "reduceOptions": { "calcs": ["lastNotNull"] },
-        "tooltip": { "mode": "single" }
-      },
-      "title": "UDP Received by Process",
-      "type": "piechart",
-      "targets": [{
-        "expr": "sigma_traffic_udp_bytes_recv_total{hostname=~\"$hostname\"} > 0",
-        "legendFormat": "{{ process }}"
-      }]
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
-            "fillOpacity": 30,
-            "lineWidth": 2,
-            "stacking": { "mode": "none" }
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
           },
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 77 },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 77
+      },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "title": "UDP Sent by Process",
+      "type": "piechart",
+      "targets": [
+        {
+          "expr": "sigma_traffic_udp_bytes_sent_total{hostname=~\"$hostname\"} > 0",
+          "legendFormat": "{{ process }}"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 77
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "title": "UDP Received by Process",
+      "type": "piechart",
+      "targets": [
+        {
+          "expr": "sigma_traffic_udp_bytes_recv_total{hostname=~\"$hostname\"} > 0",
+          "legendFormat": "{{ process }}"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 30,
+            "lineWidth": 2,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 77
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
       },
       "title": "Total UDP Sent vs Received",
       "type": "timeseries",
@@ -845,153 +1800,702 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 85 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 85
+      },
       "title": "DNS Query Tracing",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [
-            { "color": "green", "value": null },
-            { "color": "yellow", "value": 100 },
-            { "color": "red", "value": 1000 }
-          ]},
-          "unit": "none"
-        }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
-      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 86 },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "title": "Total DNS Queries",
-      "type": "stat",
-      "targets": [{
-        "expr": "sum(sigma_dns_queries_total{hostname=~\"$hostname\"})",
-        "legendFormat": "queries"
-      }]
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [
-            { "color": "blue", "value": null },
-            { "color": "yellow", "value": 1048576 },
-            { "color": "red", "value": 10485760 }
-          ]},
-          "unit": "decbytes"
-        }
-      },
-      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 86 },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "title": "Total DNS Bytes",
-      "type": "stat",
-      "targets": [{
-        "expr": "sum(sigma_dns_bytes_total{hostname=~\"$hostname\"})",
-        "legendFormat": "bytes"
-      }]
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [{ "color": "orange", "value": null }] },
-          "unit": "none"
-        }
-      },
-      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 86 },
-      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "title": "Processes with DNS Activity",
-      "type": "stat",
-      "targets": [{
-        "expr": "count(sigma_dns_queries_total{hostname=~\"$hostname\"} > 0)",
-        "legendFormat": "processes"
-      }]
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "fillOpacity": 20,
-            "lineWidth": 2,
-            "stacking": { "mode": "normal" }
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 1000
+              }
+            ]
           },
           "unit": "none"
         }
       },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 90 },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 86
+      },
       "options": {
-        "legend": { "displayMode": "table", "placement": "right", "sortBy": "Last *", "sortDesc": true, "calcs": ["lastNotNull"] },
-        "tooltip": { "mode": "multi" }
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "title": "Total DNS Queries",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "sum(sigma_dns_queries_total{hostname=~\"$hostname\"})",
+          "legendFormat": "queries"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1048576
+              },
+              {
+                "color": "red",
+                "value": 10485760
+              }
+            ]
+          },
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 86
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "title": "Total DNS Bytes",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "sum(sigma_dns_bytes_total{hostname=~\"$hostname\"})",
+          "legendFormat": "bytes"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          },
+          "unit": "none"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 86
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "title": "Processes with DNS Activity",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "count(sigma_dns_queries_total{hostname=~\"$hostname\"} > 0)",
+          "legendFormat": "processes"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "stacking": {
+              "mode": "normal"
+            }
+          },
+          "unit": "none"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 90
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "sortBy": "Last *",
+          "sortDesc": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
       },
       "title": "DNS Queries by Process",
       "type": "timeseries",
-      "targets": [{
-        "expr": "sigma_dns_queries_total{hostname=~\"$hostname\"}",
-        "legendFormat": "{{ process }}"
-      }]
+      "targets": [
+        {
+          "expr": "sigma_dns_queries_total{hostname=~\"$hostname\"}",
+          "legendFormat": "{{ process }}"
+        }
+      ]
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 98 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 98
+      },
+      "title": "Exec Tracing (Intrusion Detection)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 1000
+              }
+            ]
+          },
+          "unit": "none"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 99
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "title": "Total Execs",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "sum(sigma_exec_total{hostname=~\"$hostname\"})",
+          "legendFormat": "execs"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          },
+          "unit": "none"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 99
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^process$/"
+        }
+      },
+      "title": "Top Exec Process",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "topk(1, sigma_exec_total{hostname=~\"$hostname\"})",
+          "legendFormat": "{{ process }}",
+          "instant": true,
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "unit": "none"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 99
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "title": "Unique Processes with Execs",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "count(sigma_exec_total{hostname=~\"$hostname\"} > 0)",
+          "legendFormat": "processes"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "stacking": {
+              "mode": "normal"
+            }
+          },
+          "unit": "none"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 103
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "sortBy": "Last *",
+          "sortDesc": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "title": "Execs by Process",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sigma_exec_total{hostname=~\"$hostname\"}",
+          "legendFormat": "{{ process }}"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 111
+      },
       "title": "Process Details",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
-        "defaults": { "unit": "decbytes" },
+        "defaults": {
+          "unit": "decbytes"
+        },
         "overrides": [
-          { "matcher": { "id": "byName", "options": "Process" }, "properties": [{ "id": "unit", "value": "string" }] },
-          { "matcher": { "id": "byName", "options": "Container" }, "properties": [{ "id": "unit", "value": "string" }] },
-          { "matcher": { "id": "byName", "options": "Hostname" }, "properties": [{ "id": "unit", "value": "string" }] },
-          { "matcher": { "id": "byName", "options": "TCP Sent" }, "properties": [
-            { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
-            { "id": "color", "value": { "mode": "continuous-GrYlRd" } }
-          ]},
-          { "matcher": { "id": "byName", "options": "TCP Received" }, "properties": [
-            { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
-            { "id": "color", "value": { "mode": "continuous-BlYlRd" } }
-          ]},
-          { "matcher": { "id": "byName", "options": "UDP Sent" }, "properties": [
-            { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
-            { "id": "color", "value": { "mode": "continuous-GrYlRd" } }
-          ]},
-          { "matcher": { "id": "byName", "options": "UDP Received" }, "properties": [
-            { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
-            { "id": "color", "value": { "mode": "continuous-BlYlRd" } }
-          ]},
-          { "matcher": { "id": "byName", "options": "RTT Avg" }, "properties": [
-            { "id": "unit", "value": "\u00b5s" },
-            { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
-            { "id": "color", "value": { "mode": "continuous-GrYlRd" } }
-          ]},
-          { "matcher": { "id": "byName", "options": "Total Drops" }, "properties": [
-            { "id": "unit", "value": "none" },
-            { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
-            { "id": "color", "value": { "mode": "continuous-GrYlRd" } }
-          ]},
-          { "matcher": { "id": "byName", "options": "Conn Latency Avg" }, "properties": [
-            { "id": "unit", "value": "\u00b5s" },
-            { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
-            { "id": "color", "value": { "mode": "continuous-GrYlRd" } }
-          ]},
-          { "matcher": { "id": "byName", "options": "DNS Queries" }, "properties": [
-            { "id": "unit", "value": "none" },
-            { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
-            { "id": "color", "value": { "mode": "continuous-GrYlRd" } }
-          ]}
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Process"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "string"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Container"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "string"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Hostname"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "string"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "TCP Sent"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "gradient",
+                  "type": "gauge"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-GrYlRd"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "TCP Received"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "gradient",
+                  "type": "gauge"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-BlYlRd"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "UDP Sent"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "gradient",
+                  "type": "gauge"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-GrYlRd"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "UDP Received"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "gradient",
+                  "type": "gauge"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-BlYlRd"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RTT Avg"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "µs"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "gradient",
+                  "type": "gauge"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-GrYlRd"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total Drops"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "gradient",
+                  "type": "gauge"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-GrYlRd"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Conn Latency Avg"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "µs"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "gradient",
+                  "type": "gauge"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-GrYlRd"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DNS Queries"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "gradient",
+                  "type": "gauge"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-GrYlRd"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Execs"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "gradient",
+                  "type": "gauge"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-GrYlRd"
+                }
+              }
+            ]
+          }
         ]
       },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 99 },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 112
+      },
       "options": {
-        "footer": { "enablePagination": true },
-        "sortBy": [{ "desc": true, "displayName": "TCP Sent" }]
+        "footer": {
+          "enablePagination": true
+        },
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "TCP Sent"
+          }
+        ]
       },
       "title": "All Processes — Traffic Detail",
       "type": "table",
@@ -1051,35 +2555,111 @@
           "instant": true,
           "format": "table",
           "refId": "H"
+        },
+        {
+          "expr": "sigma_exec_total{hostname=~\"$hostname\"}",
+          "legendFormat": "",
+          "instant": true,
+          "format": "table",
+          "refId": "I"
         }
       ],
       "transformations": [
-        { "id": "seriesToColumns", "options": { "byField": "process" } },
-        { "id": "organize", "options": {
-          "excludeByName": { "Time 1": true, "Time 2": true, "Time 3": true, "Time 4": true, "Time 5": true, "Time 6": true, "Time 7": true, "Time 8": true, "__name__ 1": true, "__name__ 2": true, "__name__ 3": true, "__name__ 4": true, "__name__ 5": true, "__name__ 6": true, "__name__ 7": true, "container 2": true, "container 3": true, "container 4": true, "container 5": true, "container 6": true, "container 7": true, "container 8": true, "hostname 2": true, "hostname 3": true, "hostname 4": true, "hostname 5": true, "hostname 6": true, "hostname 7": true, "hostname 8": true, "job 1": true, "job 2": true, "job 3": true, "job 4": true, "job 5": true, "job 6": true, "job 7": true, "job 8": true, "instance 1": true, "instance 2": true, "instance 3": true, "instance 4": true, "instance 5": true, "instance 6": true, "instance 7": true, "instance 8": true },
-          "renameByName": {
-            "hostname 1": "Hostname",
-            "process": "Process",
-            "container 1": "Container",
-            "Value #A": "TCP Sent",
-            "Value #B": "TCP Received",
-            "Value #C": "UDP Sent",
-            "Value #D": "UDP Received",
-            "Value #E": "RTT Avg",
-            "Value #F": "Total Drops",
-            "Value #G": "Conn Latency Avg",
-            "Value #H": "DNS Queries"
+        {
+          "id": "seriesToColumns",
+          "options": {
+            "byField": "process"
           }
-        }}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "Time 4": true,
+              "Time 5": true,
+              "Time 6": true,
+              "Time 7": true,
+              "Time 8": true,
+              "__name__ 1": true,
+              "__name__ 2": true,
+              "__name__ 3": true,
+              "__name__ 4": true,
+              "__name__ 5": true,
+              "__name__ 6": true,
+              "__name__ 7": true,
+              "container 2": true,
+              "container 3": true,
+              "container 4": true,
+              "container 5": true,
+              "container 6": true,
+              "container 7": true,
+              "container 8": true,
+              "hostname 2": true,
+              "hostname 3": true,
+              "hostname 4": true,
+              "hostname 5": true,
+              "hostname 6": true,
+              "hostname 7": true,
+              "hostname 8": true,
+              "job 1": true,
+              "job 2": true,
+              "job 3": true,
+              "job 4": true,
+              "job 5": true,
+              "job 6": true,
+              "job 7": true,
+              "job 8": true,
+              "instance 1": true,
+              "instance 2": true,
+              "instance 3": true,
+              "instance 4": true,
+              "instance 5": true,
+              "instance 6": true,
+              "instance 7": true,
+              "instance 8": true,
+              "Time 9": true,
+              "__name__ 8": true,
+              "container 9": true,
+              "hostname 9": true,
+              "job 9": true,
+              "instance 9": true
+            },
+            "renameByName": {
+              "hostname 1": "Hostname",
+              "process": "Process",
+              "container 1": "Container",
+              "Value #A": "TCP Sent",
+              "Value #B": "TCP Received",
+              "Value #C": "UDP Sent",
+              "Value #D": "UDP Received",
+              "Value #E": "RTT Avg",
+              "Value #F": "Total Drops",
+              "Value #G": "Conn Latency Avg",
+              "Value #H": "DNS Queries",
+              "Value #I": "Execs"
+            }
+          }
+        }
       ]
     }
   ],
   "schemaVersion": 39,
-  "tags": ["sigma", "traffic", "ebpf"],
+  "tags": [
+    "sigma",
+    "traffic",
+    "ebpf"
+  ],
   "templating": {
     "list": [
       {
-        "current": { "selected": false, "text": "default", "value": "default" },
+        "current": {
+          "selected": false,
+          "text": "default",
+          "value": "default"
+        },
         "hide": 0,
         "includeAll": false,
         "name": "datasource",
@@ -1088,8 +2668,15 @@
         "type": "datasource"
       },
       {
-        "current": { "selected": true, "text": "All", "value": "$__all" },
-        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
         "definition": "label_values(sigma_traffic_bytes_sent_total, hostname)",
         "hide": 0,
         "includeAll": true,
@@ -1101,7 +2688,10 @@
       }
     ]
   },
-  "time": { "from": "now-6h", "to": "now" },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "title": "Sigma Traffic (eBPF)",
   "uid": "sigma-tcp-traffic"
 }

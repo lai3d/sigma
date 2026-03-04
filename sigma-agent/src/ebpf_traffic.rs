@@ -74,6 +74,12 @@ struct DnsQueryValue {
     bytes: u64,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct ExecValue {
+    count: u64,
+}
+
 unsafe impl aya::Pod for TrafficKey {}
 unsafe impl aya::Pod for TrafficValue {}
 unsafe impl aya::Pod for RetransmitValue {}
@@ -83,6 +89,7 @@ unsafe impl aya::Pod for ConnLatencyValue {}
 unsafe impl aya::Pod for DropKey {}
 unsafe impl aya::Pod for DropValue {}
 unsafe impl aya::Pod for DnsQueryValue {}
+unsafe impl aya::Pod for ExecValue {}
 
 /// Per-process traffic stats resolved from eBPF data.
 #[derive(Clone, Debug)]
@@ -105,6 +112,7 @@ pub struct ProcessTraffic {
     pub drops: Vec<(String, u64)>,
     pub dns_queries: u64,
     pub dns_bytes: u64,
+    pub exec_count: u64,
 }
 
 pub type SharedTrafficStats = Arc<RwLock<Vec<ProcessTraffic>>>;
@@ -280,6 +288,21 @@ pub fn load_ebpf() -> anyhow::Result<Ebpf> {
             Err(e) => warn!("dns_udp_sendmsg program type mismatch: {:#}", e),
         },
         None => warn!("kprobe program 'dns_udp_sendmsg' not found in eBPF object"),
+    }
+
+    // Attach tracepoint to sched/sched_process_exec (non-fatal — exec tracing for intrusion detection)
+    match ebpf.program_mut("sched_process_exec") {
+        Some(prog) => match <&mut TracePoint>::try_from(prog) {
+            Ok(tp) => {
+                if let Err(e) = tp.load().and_then(|()| tp.attach("sched", "sched_process_exec")) {
+                    warn!("Failed to attach tracepoint to sched/sched_process_exec: {:#}", e);
+                } else {
+                    info!("Attached tracepoint to sched/sched_process_exec");
+                }
+            }
+            Err(e) => warn!("sched_process_exec program type mismatch: {:#}", e),
+        },
+        None => warn!("tracepoint program 'sched_process_exec' not found in eBPF object"),
     }
 
     Ok(ebpf)
@@ -482,6 +505,26 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
         }
     }
 
+    // --- Read EXEC_MAP (read-and-clear, like TRAFFIC_MAP) ---
+    let mut exec_entries: Vec<(TrafficKey, ExecValue)> = Vec::new();
+    if let Some(map) = ebpf.map_mut("EXEC_MAP") {
+        if let Ok(mut exec_map) = BpfHashMap::<&mut aya::maps::MapData, TrafficKey, ExecValue>::try_from(map) {
+            let mut exec_keys: Vec<TrafficKey> = Vec::new();
+            for item in exec_map.iter() {
+                match item {
+                    Ok((key, value)) => {
+                        exec_entries.push((key, value));
+                        exec_keys.push(key);
+                    }
+                    Err(e) => debug!("Error reading EXEC_MAP entry: {}", e),
+                }
+            }
+            for key in &exec_keys {
+                let _ = exec_map.remove(key);
+            }
+        }
+    }
+
     // Aggregate by (process_name, container_id)
     // Fields: bytes_sent, bytes_recv, udp_bytes_sent, udp_bytes_recv, retransmits,
     //         active_conns, total_conns, rtt_count, rtt_sum_us, rtt_min_us, rtt_max_us, drops
@@ -505,6 +548,7 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
         drops: HashMap<u32, u64>,
         dns_queries: u64,
         dns_bytes: u64,
+        exec_count: u64,
     }
 
     let mut aggregated: HashMap<(String, Option<String>), Agg> = HashMap::new();
@@ -583,6 +627,13 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
         entry.dns_bytes += value.bytes;
     }
 
+    for (key, value) in &exec_entries {
+        let proc_name = resolve_process_name(key.pid, host_proc);
+        let container_id = resolve_container_id(key.pid, host_proc);
+        let entry = aggregated.entry((proc_name, container_id)).or_default();
+        entry.exec_count += value.count;
+    }
+
     let stats: Vec<ProcessTraffic> = aggregated
         .into_iter()
         .map(|((process_name, container_id), agg)| {
@@ -611,6 +662,7 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
                 drops,
                 dns_queries: agg.dns_queries,
                 dns_bytes: agg.dns_bytes,
+                exec_count: agg.exec_count,
             }
         })
         .collect();

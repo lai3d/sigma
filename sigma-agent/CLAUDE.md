@@ -308,8 +308,10 @@ tracking (`tcp_v4_connect`/`tcp_close`/`inet_csk_accept`), TCP RTT/latency track
 (`tcp_rcv_established` — reads `srtt_us` from `tcp_sock` via `bpf_probe_read_kernel`), TCP
 connection latency (`tcp_v4_connect` entry kprobe + kretprobe — measures SYN-to-established time
 via `bpf_ktime_get_ns()`), packet drop monitoring (`skb:kfree_skb` tracepoint — per-process
-drop counts with kernel reason codes), and DNS query tracing (`dns_udp_sendmsg` kprobe on
-`udp_sendmsg` — filters for destination port 53 to detect DNS leaks on VPN nodes).
+drop counts with kernel reason codes), DNS query tracing (`dns_udp_sendmsg` kprobe on
+`udp_sendmsg` — filters for destination port 53 to detect DNS leaks on VPN nodes), and exec
+tracing (`sched:sched_process_exec` tracepoint — counts every `execve()` call per PID for
+intrusion detection on VPN relay nodes).
 This is feature-gated behind the `ebpf-traffic` cargo feature (compiled in via Docker by default).
 
 ### Configuration
@@ -394,6 +396,11 @@ sigma_dns_bytes_total{hostname="relay-01",process="curl",container=""} 240
 # TYPE sigma_packet_drops_total gauge
 sigma_packet_drops_total{hostname="relay-01",process="envoy",container="",reason="NETFILTER_DROP"} 15
 sigma_packet_drops_total{hostname="relay-01",process="xray",container="abc123def456",reason="NO_SOCKET"} 8
+
+# HELP sigma_exec_total Process exec events by process (eBPF tracepoint sched:sched_process_exec)
+# TYPE sigma_exec_total gauge
+sigma_exec_total{hostname="relay-01",process="ls",container=""} 5
+sigma_exec_total{hostname="relay-01",process="curl",container=""} 3
 ```
 
 Packet drop metrics are only emitted for processes with non-zero drops. The tracepoint uses
@@ -407,6 +414,13 @@ kprobe attaches to the same `udp_sendmsg` kernel function but reads `skc_dport` 
 (at offset 12, `sock.__sk_common.skc_dport`) to filter for destination port 53. This detects DNS
 leaks on VPN nodes — any process sending UDP to port 53 is potentially bypassing the VPN tunnel.
 If the kprobe attachment or dport read fails, the agent continues without DNS metrics.
+
+Exec metrics are only emitted for processes with non-zero exec events. The `sched:sched_process_exec`
+tracepoint fires on every `execve()` call, counting execs per PID. Process names are resolved at
+harvest time from `/proc/{pid}/comm` (which gives the NEW binary name post-exec). On VPN relay nodes,
+any unexpected exec activity may indicate unauthorized access or intrusion. The tracepoint is stable
+since Linux 3.5+, well within the 5.10+ BTF requirement. If attachment fails, the agent continues
+without exec metrics.
 
 Connection latency metrics are only emitted for processes with active connection latency data.
 Unlike RTT (which measures per-packet round-trip on established connections), connection latency

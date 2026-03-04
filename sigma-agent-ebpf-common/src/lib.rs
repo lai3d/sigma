@@ -72,3 +72,10 @@ pub struct DnsQueryValue {
     pub queries: u64,
     pub bytes: u64,
 }
+
+/// Exec event counter per PID (sched:sched_process_exec tracepoint).
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct ExecValue {
+    pub count: u64,
+}

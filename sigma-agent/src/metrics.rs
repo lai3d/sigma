@@ -350,6 +350,23 @@ pub fn render_traffic_metrics(stats: &[crate::ebpf_traffic::ProcessTraffic], hos
         }
     }
 
+    // Exec metrics — only emit for processes with exec events
+    let has_exec: Vec<_> = stats.iter().filter(|e| e.exec_count > 0).collect();
+    if !has_exec.is_empty() {
+        writeln!(out).unwrap();
+
+        writeln!(out, "# HELP sigma_exec_total Process exec events by process (eBPF tracepoint sched:sched_process_exec)").unwrap();
+        writeln!(out, "# TYPE sigma_exec_total gauge").unwrap();
+        for entry in &has_exec {
+            let container = entry.container_id.as_deref().unwrap_or("");
+            writeln!(
+                out,
+                "sigma_exec_total{{hostname=\"{}\",process=\"{}\",container=\"{}\"}} {}",
+                hostname, entry.process_name, container, entry.exec_count
+            ).unwrap();
+        }
+    }
+
     // RTT metrics — only emit for processes with RTT data
     let has_rtt: Vec<_> = stats.iter().filter(|e| e.rtt_avg_us > 0).collect();
     if !has_rtt.is_empty() {

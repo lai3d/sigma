@@ -119,7 +119,7 @@ sigma/
 - [ ] eBPF OOM kill tracking (tracepoint `oom:oom_score_adj_update` — immediate process kill alerts)
 - [ ] eBPF socket buffer depth monitoring (track `sk_rcvbuf`/`sk_sndbuf` usage — detect buffer bloat)
 - [ ] eBPF outbound connection audit (log all `connect()` with dest IP/port — detect unexpected traffic)
-- [ ] eBPF exec tracing (tracepoint `sched:sched_process_exec` — intrusion detection on remote VPS)
+- [x] eBPF exec tracing (tracepoint `sched:sched_process_exec` — intrusion detection on remote VPS)
 
 ## Tech Stack
 

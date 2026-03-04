@@ -7,7 +7,7 @@ use aya_ebpf::{
     maps::HashMap,
     programs::{ProbeContext, RetProbeContext, TracePointContext},
 };
-use sigma_agent_ebpf_common::{ConnLatencyValue, ConnValue, DnsQueryValue, DropKey, DropValue, RetransmitValue, RttValue, TrafficKey, TrafficValue};
+use sigma_agent_ebpf_common::{ConnLatencyValue, ConnValue, DnsQueryValue, DropKey, DropValue, ExecValue, RetransmitValue, RttValue, TrafficKey, TrafficValue};
 
 /// Offset of `skc_dport` within `struct sock` (Linux 5.x/6.x x86_64).
 /// Located at sock.__sk_common.skc_dport. Network byte order (big-endian).
@@ -53,6 +53,10 @@ static DROP_MAP: HashMap<DropKey, DropValue> = HashMap::with_max_entries(8192, 0
 /// Per-PID DNS query counters (UDP sends to port 53).
 #[map]
 static DNS_QUERY_MAP: HashMap<TrafficKey, DnsQueryValue> = HashMap::with_max_entries(8192, 0);
+
+/// Per-PID exec event counters (sched:sched_process_exec tracepoint).
+#[map]
+static EXEC_MAP: HashMap<TrafficKey, ExecValue> = HashMap::with_max_entries(8192, 0);
 
 /// Offset of the `reason` field within the skb:kfree_skb tracepoint args.
 /// Layout: trace_entry common header (8) + skbaddr(8) + location(8) + rx_sk(8) + protocol(2) + padding(2) = 36
@@ -481,6 +485,32 @@ fn try_dns_udp_sendmsg(ctx: &ProbeContext) -> Result<(), i64> {
             bytes: size,
         };
         let _ = DNS_QUERY_MAP.insert(&key, &val, 0);
+    }
+
+    Ok(())
+}
+
+/// tracepoint on sched:sched_process_exec — fires on every execve() call.
+/// Counts exec events per PID for intrusion detection on VPN nodes.
+#[tracepoint]
+pub fn sched_process_exec(ctx: TracePointContext) -> u32 {
+    match try_sched_process_exec(&ctx) {
+        Ok(()) => 0,
+        Err(_) => 0,
+    }
+}
+
+fn try_sched_process_exec(_ctx: &TracePointContext) -> Result<(), i64> {
+    let pid = (bpf_get_current_pid_tgid() >> 32) as u32;
+    let key = TrafficKey { pid };
+
+    if let Some(val) = EXEC_MAP.get_ptr_mut(&key) {
+        unsafe {
+            (*val).count += 1;
+        }
+    } else {
+        let val = ExecValue { count: 1 };
+        let _ = EXEC_MAP.insert(&key, &val, 0);
     }
 
     Ok(())
