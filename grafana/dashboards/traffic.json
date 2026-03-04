@@ -180,7 +180,8 @@
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } }
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+          "unit": "decbytes"
         }
       },
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 15 },
@@ -202,7 +203,8 @@
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } }
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+          "unit": "decbytes"
         }
       },
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 15 },
