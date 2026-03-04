@@ -72,19 +72,28 @@ services:
   agent:
     build: ./sigma-agent
     network_mode: host
+    pid: host             # See host processes for port scan + eBPF PID resolution
+    privileged: true      # Required for eBPF kprobe attach + /proc/<pid>/fd access
     # Port scanning requires host network to see real port usage.
     # The allocate-ports proxy from API won't work in local Docker Desktop
     # (API can't reach host network). Works in production where agent runs
     # directly on VPS and API connects via public IP.
+    volumes:
+      - /proc:/host/proc:ro   # Host proc mount for process attribution + eBPF PID resolution
+    #   - /etc/hostname:/etc/host_hostname:ro
+    #   - ./envoy:/envoy-configs:ro  # Mount envoy configs for static sync
     environment:
       SIGMA_API_URL: http://localhost:3000/api
       SIGMA_API_KEY: ${API_KEY:-change-me-in-production}
       AGENT_INTERVAL: 60
       AGENT_ALIAS: hk004.example.com
       AGENT_METRICS_PORT: 9102
+      AGENT_HOST_PROC: /host/proc
       AGENT_PORT_SCAN: "true"
       AGENT_PORT_SCAN_RANGE: 10000-30000
       AGENT_PORT_SCAN_INTERVAL: 60
+      AGENT_EBPF_TRAFFIC: ${AGENT_EBPF_TRAFFIC:-false}
+      AGENT_EBPF_TRAFFIC_INTERVAL: ${AGENT_EBPF_TRAFFIC_INTERVAL:-30}
       AGENT_XDS_ENABLED: ${AGENT_XDS_ENABLED:-false}
       AGENT_XDS_PORT: ${AGENT_XDS_PORT:-18000}
       AGENT_XDS_POLL_INTERVAL: ${AGENT_XDS_POLL_INTERVAL:-10}
@@ -92,9 +101,6 @@ services:
       AGENT_ENVOY_CONFIG_SYNC: ${AGENT_ENVOY_CONFIG_SYNC:-false}
       AGENT_ENVOY_CONFIG_SYNC_INTERVAL: ${AGENT_ENVOY_CONFIG_SYNC_INTERVAL:-60}
       AGENT_ENVOY_CONFIG_EXCLUDE: ${AGENT_ENVOY_CONFIG_EXCLUDE:-}
-    # volumes:
-    #   - /etc/hostname:/etc/host_hostname:ro
-    #   - ./envoy:/envoy-configs:ro  # Mount envoy configs for static sync
     # Example multi-file glob:
     #   AGENT_ENVOY_CONFIG_PATH: /envoy-configs/layer4*.yaml
     #   AGENT_ENVOY_CONFIG_EXCLUDE: "*dynamic*"
