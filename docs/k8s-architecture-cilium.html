@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sigma K8s Architecture — Cilium</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, 'SF Pro Display', 'Inter', 'Segoe UI', sans-serif;
+    background: #0a0e1a;
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 32px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #38bdf8, #818cf8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.5px;
+  }
+  .subtitle {
+    text-align: center;
+    color: #64748b;
+    font-size: 14px;
+    margin-bottom: 40px;
+  }
+  svg { display: block; margin: 0 auto; }
+  .node { cursor: default; }
+
+  @keyframes flowRight {
+    0% { stroke-dashoffset: 16; }
+    100% { stroke-dashoffset: 0; }
+  }
+  @keyframes flowDown {
+    0% { stroke-dashoffset: 16; }
+    100% { stroke-dashoffset: 0; }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+  .flow-line { animation: flowRight 0.8s linear infinite; }
+  .flow-line-down { animation: flowDown 0.8s linear infinite; }
+  .pulse { animation: pulse 2s ease-in-out infinite; }
+
+  .legend {
+    display: flex; justify-content: center; gap: 28px; margin-top: 32px; flex-wrap: wrap;
+  }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #94a3b8; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+
+  .note {
+    max-width: 900px; margin: 36px auto 0; background: #111827;
+    border: 1px solid #1e293b; border-radius: 12px; padding: 20px 24px;
+    font-size: 13px; line-height: 1.7; color: #94a3b8;
+  }
+  .note h3 { color: #818cf8; font-size: 14px; margin-bottom: 10px; }
+  .note code { background: #1e293b; padding: 1px 6px; border-radius: 4px; font-size: 12px; color: #e2e8f0; }
+  .note .vs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+  .note .vs-col { background: #0a0e1a; border-radius: 8px; padding: 12px 14px; }
+  .note .vs-col h4 { font-size: 11px; margin-bottom: 6px; }
+  .note .vs-col ul { font-size: 11px; padding-left: 16px; color: #94a3b8; }
+  .note .vs-col ul li { margin-bottom: 3px; }
+</style>
+</head>
+<body>
+
+<h1>Sigma K8s Architecture — Cilium Gateway</h1>
+<p class="subtitle">Cilium — eBPF-powered CNI + Gateway API + Network Policy + Hubble observability, all in one</p>
+
+<svg viewBox="0 0 1200 1080" width="1200" height="1080" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gCilium" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e8c23c"/>
+      <stop offset="100%" stop-color="#d4a017"/>
+    </linearGradient>
+    <linearGradient id="gCiliumAgent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#8aab3e"/>
+      <stop offset="100%" stop-color="#6b8f2e"/>
+    </linearGradient>
+    <linearGradient id="gHubble" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="gWeb" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="gApi" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="gPool" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#0891b2"/>
+    </linearGradient>
+    <linearGradient id="gPgPrimary" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="gRedis" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#dc2626"/>
+    </linearGradient>
+    <linearGradient id="gSigmaAgent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+    <linearGradient id="gProbe" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ec4899"/>
+      <stop offset="100%" stop-color="#db2777"/>
+    </linearGradient>
+
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+
+    <marker id="arrow" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#475569"/>
+    </marker>
+    <marker id="arrowYellow" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#e8c23c"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#10b981"/>
+    </marker>
+    <marker id="arrowOrange" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f97316"/>
+    </marker>
+    <marker id="arrowLime" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#84cc16"/>
+    </marker>
+  </defs>
+
+  <!-- ==================== K8s Cluster Boundary ==================== -->
+  <rect x="30" y="50" width="1140" height="830" rx="16" ry="16"
+        fill="none" stroke="#1e293b" stroke-width="2" stroke-dasharray="8,4"/>
+  <rect x="42" y="36" width="200" height="28" rx="6" fill="#0a0e1a"/>
+  <text x="52" y="55" font-size="13" fill="#475569" font-weight="600">
+    Kubernetes Cluster (sigma)
+  </text>
+
+  <!-- ==================== Internet ==================== -->
+  <g class="node" transform="translate(540, 10)">
+    <rect x="0" y="0" width="120" height="36" rx="18" fill="#1e293b" filter="shadow"/>
+    <text x="60" y="23" text-anchor="middle" font-size="13" fill="#94a3b8" font-weight="600">Internet</text>
+  </g>
+
+  <line x1="600" y1="46" x2="600" y2="68" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ==================== eBPF Kernel Layer (background) ==================== -->
+  <g transform="translate(60, 74)">
+    <rect x="0" y="0" width="280" height="94" rx="10" fill="#1a1608" stroke="#8aab3e" stroke-width="1" opacity="0.8"/>
+    <text x="140" y="17" text-anchor="middle" font-size="10" fill="#a3e635" font-weight="600">eBPF Data Plane (kernel)</text>
+
+    <g transform="translate(10, 24)">
+      <rect x="0" y="0" width="82" height="26" rx="4" fill="#365314"/>
+      <text x="41" y="17" text-anchor="middle" font-size="8" fill="#bef264" font-weight="600">XDP fast path</text>
+    </g>
+    <g transform="translate(100, 24)">
+      <rect x="0" y="0" width="82" height="26" rx="4" fill="#365314"/>
+      <text x="41" y="17" text-anchor="middle" font-size="8" fill="#bef264" font-weight="600">tc (L3/L4)</text>
+    </g>
+    <g transform="translate(190, 24)">
+      <rect x="0" y="0" width="82" height="26" rx="4" fill="#365314"/>
+      <text x="41" y="17" text-anchor="middle" font-size="8" fill="#bef264" font-weight="600">socket LB</text>
+    </g>
+    <g transform="translate(10, 56)">
+      <rect x="0" y="0" width="82" height="26" rx="4" fill="#3f2f04"/>
+      <text x="41" y="17" text-anchor="middle" font-size="8" fill="#fde68a" font-weight="600">L7 (Envoy)</text>
+    </g>
+    <g transform="translate(100, 56)">
+      <rect x="0" y="0" width="82" height="26" rx="4" fill="#365314"/>
+      <text x="41" y="17" text-anchor="middle" font-size="8" fill="#bef264" font-weight="600">conntrack</text>
+    </g>
+    <g transform="translate(190, 56)">
+      <rect x="0" y="0" width="82" height="26" rx="4" fill="#365314"/>
+      <text x="41" y="17" text-anchor="middle" font-size="8" fill="#bef264" font-weight="600">NAT (no kube-proxy)</text>
+    </g>
+  </g>
+
+  <!-- ==================== Gateway API Resources ==================== -->
+  <g transform="translate(370, 74)">
+    <rect x="0" y="0" width="520" height="50" rx="10" fill="#1a1608" stroke="#e8c23c" stroke-width="1" opacity="0.9"/>
+    <text x="260" y="18" text-anchor="middle" font-size="11" fill="#fde68a" font-weight="500">Gateway API Resources (Cilium-managed)</text>
+
+    <g transform="translate(14, 24)">
+      <rect x="0" y="0" width="110" height="20" rx="4" fill="#422006"/>
+      <text x="55" y="14" text-anchor="middle" font-size="9" fill="#fde68a" font-weight="600">GatewayClass</text>
+    </g>
+    <g transform="translate(134, 24)">
+      <rect x="0" y="0" width="120" height="20" rx="4" fill="#422006"/>
+      <text x="60" y="14" text-anchor="middle" font-size="9" fill="#fde68a" font-weight="600">Gateway :443/:80</text>
+    </g>
+    <g transform="translate(266, 24)">
+      <rect x="0" y="0" width="110" height="20" rx="4" fill="#1e3a5f"/>
+      <text x="55" y="14" text-anchor="middle" font-size="9" fill="#93c5fd" font-weight="600">HTTPRoute /*</text>
+    </g>
+    <g transform="translate(390, 24)">
+      <rect x="0" y="0" width="116" height="20" rx="4" fill="#422006"/>
+      <text x="58" y="14" text-anchor="middle" font-size="9" fill="#fde68a" font-weight="600">HTTPRoute /api/*</text>
+    </g>
+  </g>
+
+  <!-- ==================== Cilium Gateway (Envoy-based) ==================== -->
+  <g transform="translate(370, 145)">
+    <rect x="0" y="0" width="520" height="100" rx="12" fill="#1a1608" stroke="#e8c23c" stroke-width="1.5" opacity="0.9"/>
+    <text x="260" y="17" text-anchor="middle" font-size="10" fill="#fde68a" font-weight="500">Cilium Gateway (LoadBalancer :443 :80) — powered by Envoy</text>
+
+    <g class="node" transform="translate(20, 24)">
+      <rect x="0" y="0" width="226" height="48" rx="8" fill="url(#gCilium)" filter="shadow" opacity="0.9"/>
+      <text x="113" y="18" text-anchor="middle" font-size="10" fill="#451a03" font-weight="600">Cilium + Envoy L7</text>
+      <text x="113" y="38" text-anchor="middle" font-size="13" fill="#1c1917" font-weight="700">Gateway Pod #1</text>
+    </g>
+    <g class="node" transform="translate(270, 24)">
+      <rect x="0" y="0" width="226" height="48" rx="8" fill="url(#gCilium)" filter="shadow" opacity="0.9"/>
+      <text x="113" y="18" text-anchor="middle" font-size="10" fill="#451a03" font-weight="600">Cilium + Envoy L7</text>
+      <text x="113" y="38" text-anchor="middle" font-size="13" fill="#1c1917" font-weight="700">Gateway Pod #2</text>
+    </g>
+
+    <text x="260" y="92" text-anchor="middle" font-size="10" fill="#475569">replicas: 2  |  eBPF L3/L4 + Envoy L7  |  TLS termination  |  no kube-proxy needed</text>
+  </g>
+
+  <!-- ==================== Cilium Agent (DaemonSet) on each node ==================== -->
+  <g transform="translate(60, 185)">
+    <rect x="0" y="0" width="280" height="60" rx="10" fill="#111827" stroke="#8aab3e" stroke-width="1" opacity="0.8"/>
+    <text x="140" y="17" text-anchor="middle" font-size="10" fill="#a3e635" font-weight="500">cilium-agent (DaemonSet, every node)</text>
+    <g class="node" transform="translate(14, 24)">
+      <rect x="0" y="0" width="120" height="28" rx="6" fill="url(#gCiliumAgent)" filter="shadow" opacity="0.9"/>
+      <text x="60" y="18" text-anchor="middle" font-size="10" fill="#fff" font-weight="700">cilium-agent</text>
+    </g>
+    <g class="node" transform="translate(148, 24)">
+      <rect x="0" y="0" width="120" height="28" rx="6" fill="url(#gHubble)" filter="shadow" opacity="0.9"/>
+      <text x="60" y="18" text-anchor="middle" font-size="10" fill="#451a03" font-weight="700">Hubble</text>
+    </g>
+  </g>
+
+  <!-- Arrow from cilium-agent to eBPF layer -->
+  <path d="M 200 185 L 200 168" stroke="#8aab3e" stroke-width="1" marker-end="url(#arrowLime)" stroke-dasharray="3,2" opacity="0.5"/>
+
+  <!-- ==================== Network Policy badge ==================== -->
+  <g transform="translate(60, 260)">
+    <rect x="0" y="0" width="280" height="44" rx="8" fill="#111827" stroke="#8aab3e" stroke-width="1"/>
+    <text x="140" y="16" text-anchor="middle" font-size="10" fill="#a3e635" font-weight="600">CiliumNetworkPolicy</text>
+    <text x="140" y="32" text-anchor="middle" font-size="9" fill="#94a3b8">L3/L4/L7 identity-based policies, DNS-aware rules</text>
+    <text x="140" y="42" text-anchor="middle" font-size="8" fill="#64748b">replaces traditional NetworkPolicy + no iptables</text>
+  </g>
+
+  <!-- ==================== Routing arrows ==================== -->
+  <path d="M 520 245 L 340 320" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrowBlue)" stroke-dasharray="5,3" class="flow-line"/>
+  <text x="410" y="274" font-size="10" fill="#60a5fa" font-weight="500" transform="rotate(-14,410,274)">/* (static)</text>
+
+  <path d="M 740 245 L 750 320" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#arrow)" stroke-dasharray="5,3" class="flow-line"/>
+  <text x="764" y="276" font-size="10" fill="#a78bfa" font-weight="500" transform="rotate(6,764,276)">/api/*</text>
+
+  <!-- ==================== Web Pods ==================== -->
+  <g transform="translate(100, 322)">
+    <rect x="10" y="-10" width="340" height="110" rx="12" fill="#111827" stroke="#1e3a5f" stroke-width="1" opacity="0.7"/>
+    <text x="180" y="6" text-anchor="middle" font-size="10" fill="#60a5fa" font-weight="500">sigma-web-service :80  (ClusterIP)</text>
+
+    <g class="node" transform="translate(20, 16)">
+      <rect x="0" y="0" width="140" height="64" rx="8" fill="url(#gWeb)" filter="shadow" opacity="0.9"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#dbeafe" font-weight="500">Pod</text>
+      <text x="70" y="38" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-web</text>
+      <text x="70" y="54" text-anchor="middle" font-size="10" fill="#bfdbfe">nginx:alpine</text>
+    </g>
+
+    <g class="node" transform="translate(180, 16)">
+      <rect x="0" y="0" width="140" height="64" rx="8" fill="url(#gWeb)" filter="shadow" opacity="0.9"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#dbeafe" font-weight="500">Pod</text>
+      <text x="70" y="38" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-web</text>
+      <text x="70" y="54" text-anchor="middle" font-size="10" fill="#bfdbfe">nginx:alpine</text>
+    </g>
+
+    <text x="180" y="98" text-anchor="middle" font-size="10" fill="#475569">replicas: 2  |  eBPF L3/L4 enforced</text>
+  </g>
+
+  <!-- ==================== API Pods ==================== -->
+  <g transform="translate(530, 322)">
+    <rect x="10" y="-10" width="340" height="110" rx="12" fill="#111827" stroke="#2e1065" stroke-width="1" opacity="0.7"/>
+    <text x="180" y="6" text-anchor="middle" font-size="10" fill="#a78bfa" font-weight="500">sigma-api-service :3000  (ClusterIP)</text>
+
+    <g class="node" transform="translate(20, 16)">
+      <rect x="0" y="0" width="140" height="64" rx="8" fill="url(#gApi)" filter="shadow" opacity="0.9"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#ede9fe" font-weight="500">Pod</text>
+      <text x="70" y="38" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-api</text>
+      <text x="70" y="54" text-anchor="middle" font-size="10" fill="#ddd6fe">Rust / Axum</text>
+    </g>
+
+    <g class="node" transform="translate(180, 16)">
+      <rect x="0" y="0" width="140" height="64" rx="8" fill="url(#gApi)" filter="shadow" opacity="0.9"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#ede9fe" font-weight="500">Pod</text>
+      <text x="70" y="38" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-api</text>
+      <text x="70" y="54" text-anchor="middle" font-size="10" fill="#ddd6fe">Rust / Axum</text>
+    </g>
+
+    <text x="180" y="98" text-anchor="middle" font-size="10" fill="#475569">replicas: 2  |  eBPF L3/L4 enforced</text>
+  </g>
+
+  <!-- eBPF network indicator between web and api -->
+  <path d="M 440 380 L 530 380" stroke="#84cc16" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
+  <text x="485" y="374" font-size="8" fill="#a3e635" text-anchor="middle">eBPF (identity)</text>
+
+  <!-- ==================== Redis ==================== -->
+  <g class="node" transform="translate(80, 570)">
+    <rect x="0" y="0" width="160" height="60" rx="8" fill="url(#gRedis)" filter="shadow" opacity="0.9"/>
+    <text x="80" y="22" text-anchor="middle" font-size="10" fill="#fecaca" font-weight="500">redis-service :6379</text>
+    <text x="80" y="42" text-anchor="middle" font-size="15" fill="#fff" font-weight="700">Redis</text>
+    <text x="80" y="56" text-anchor="middle" font-size="9" fill="#fca5a5">rate limiting + cache</text>
+  </g>
+
+  <!-- Arrow: API -> Redis -->
+  <path d="M 660 438 L 660 510 Q 660 530 640 530 L 250 568" stroke="#ef4444" stroke-width="1.2" fill="none" marker-end="url(#arrow)" stroke-dasharray="5,3" opacity="0.6"/>
+  <text x="430" y="524" font-size="9" fill="#f87171" text-anchor="middle">rate limit</text>
+
+  <!-- ==================== PgBouncer Pooler ==================== -->
+  <g transform="translate(480, 520)">
+    <rect x="0" y="0" width="340" height="110" rx="12" fill="#111827" stroke="#155e75" stroke-width="1.5" opacity="0.8"/>
+    <text x="170" y="18" text-anchor="middle" font-size="11" fill="#22d3ee" font-weight="600">sigma-db-pooler-rw  (ClusterIP)</text>
+
+    <g class="node" transform="translate(20, 28)">
+      <rect x="0" y="0" width="136" height="60" rx="8" fill="url(#gPool)" filter="shadow" opacity="0.9"/>
+      <text x="68" y="20" text-anchor="middle" font-size="10" fill="#cffafe" font-weight="500">PgBouncer</text>
+      <text x="68" y="38" text-anchor="middle" font-size="12" fill="#fff" font-weight="700">Pooler #1</text>
+      <text x="68" y="52" text-anchor="middle" font-size="9" fill="#a5f3fc">txn mode, pool=20</text>
+    </g>
+
+    <g class="node" transform="translate(180, 28)">
+      <rect x="0" y="0" width="136" height="60" rx="8" fill="url(#gPool)" filter="shadow" opacity="0.9"/>
+      <text x="68" y="20" text-anchor="middle" font-size="10" fill="#cffafe" font-weight="500">PgBouncer</text>
+      <text x="68" y="38" text-anchor="middle" font-size="12" fill="#fff" font-weight="700">Pooler #2</text>
+      <text x="68" y="52" text-anchor="middle" font-size="9" fill="#a5f3fc">txn mode, pool=20</text>
+    </g>
+
+    <text x="170" y="104" text-anchor="middle" font-size="10" fill="#475569">instances: 2  |  max_client_conn: 100  |  default_pool_size: 20</text>
+  </g>
+
+  <!-- Arrow: API -> PgBouncer -->
+  <line x1="700" y1="438" x2="660" y2="518" stroke="#06b6d4" stroke-width="1.5" marker-end="url(#arrow)" stroke-dasharray="5,3" class="flow-line-down"/>
+  <text x="694" y="480" font-size="9" fill="#22d3ee" transform="rotate(14,694,480)">:5432</text>
+
+  <!-- ==================== CloudNativePG Cluster ==================== -->
+  <g transform="translate(340, 680)">
+    <rect x="0" y="0" width="540" height="150" rx="14" fill="#0f1d14" stroke="#065f46" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="270" y="20" text-anchor="middle" font-size="12" fill="#34d399" font-weight="600">CloudNativePG Cluster &mdash; PostgreSQL 16.6</text>
+
+    <g class="node" transform="translate(30, 32)">
+      <rect x="0" y="0" width="150" height="72" rx="8" fill="url(#gPgPrimary)" filter="shadow"/>
+      <text x="75" y="20" text-anchor="middle" font-size="10" fill="#d1fae5" font-weight="700">PRIMARY (RW)</text>
+      <text x="75" y="40" text-anchor="middle" font-size="15" fill="#fff" font-weight="700">sigma-db-1</text>
+      <text x="75" y="58" text-anchor="middle" font-size="9" fill="#a7f3d0">max_conn: 200, 256MB</text>
+    </g>
+
+    <g class="node" transform="translate(200, 32)">
+      <rect x="0" y="0" width="140" height="72" rx="8" fill="#064e3b" stroke="#34d399" stroke-width="1" filter="shadow"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#6ee7b7" font-weight="600">REPLICA (RO)</text>
+      <text x="70" y="40" text-anchor="middle" font-size="14" fill="#ecfdf5" font-weight="700">sigma-db-2</text>
+      <text x="70" y="58" text-anchor="middle" font-size="9" fill="#a7f3d0">streaming repl</text>
+    </g>
+
+    <g class="node" transform="translate(360, 32)">
+      <rect x="0" y="0" width="140" height="72" rx="8" fill="#064e3b" stroke="#34d399" stroke-width="1" filter="shadow"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#6ee7b7" font-weight="600">REPLICA (RO)</text>
+      <text x="70" y="40" text-anchor="middle" font-size="14" fill="#ecfdf5" font-weight="700">sigma-db-3</text>
+      <text x="70" y="58" text-anchor="middle" font-size="9" fill="#a7f3d0">streaming repl</text>
+    </g>
+
+    <path d="M 170 68 L 200 68" stroke="#34d399" stroke-width="1.2" marker-end="url(#arrowGreen)" opacity="0.6"/>
+    <path d="M 170 68 Q 185 95 270 95 Q 355 95 370 68" stroke="#34d399" stroke-width="1.2" marker-end="url(#arrowGreen)" opacity="0.6" fill="none"/>
+
+    <g transform="translate(30, 110)">
+      <rect x="0" y="0" width="150" height="20" rx="4" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <text x="75" y="14" text-anchor="middle" font-size="9" fill="#94a3b8">PVC: 10Gi</text>
+    </g>
+    <g transform="translate(200, 110)">
+      <rect x="0" y="0" width="140" height="20" rx="4" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <text x="70" y="14" text-anchor="middle" font-size="9" fill="#94a3b8">PVC: 10Gi</text>
+    </g>
+    <g transform="translate(360, 110)">
+      <rect x="0" y="0" width="140" height="20" rx="4" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <text x="70" y="14" text-anchor="middle" font-size="9" fill="#94a3b8">PVC: 10Gi</text>
+    </g>
+
+    <text x="270" y="146" text-anchor="middle" font-size="10" fill="#065f46">sigma-db-rw :5432 (primary)  |  sigma-db-ro :5432 (replicas)</text>
+  </g>
+
+  <!-- Arrow: PgBouncer -> PG Primary -->
+  <path d="M 650 630 L 650 650 Q 650 670 620 675 L 500 694" stroke="#10b981" stroke-width="1.5" fill="none" marker-end="url(#arrowGreen)" stroke-dasharray="5,3" class="flow-line-down"/>
+  <text x="590" y="664" font-size="9" fill="#34d399">rw :5432</text>
+
+  <!-- ==================== Right side: Cilium advantages ==================== -->
+  <g transform="translate(940, 322)">
+    <rect x="0" y="0" width="210" height="230" rx="10" fill="#111827" stroke="#e8c23c" stroke-width="1"/>
+    <text x="105" y="20" text-anchor="middle" font-size="11" fill="#fde68a" font-weight="600">Cilium Advantages</text>
+    <line x1="10" y1="28" x2="200" y2="28" stroke="#1e293b" stroke-width="1"/>
+    <text x="16" y="48" font-size="10" fill="#a3e635">eBPF: no iptables/kube-proxy</text>
+    <text x="16" y="66" font-size="10" fill="#94a3b8">CNI + Gateway + Policy unified</text>
+    <text x="16" y="84" font-size="10" fill="#94a3b8">Gateway API (native)</text>
+    <text x="16" y="102" font-size="10" fill="#94a3b8">Identity-based network policy</text>
+    <text x="16" y="120" font-size="10" fill="#94a3b8">Hubble flow observability</text>
+    <text x="16" y="138" font-size="10" fill="#94a3b8">WireGuard encryption (opt)</text>
+    <text x="16" y="156" font-size="10" fill="#94a3b8">No sidecar overhead</text>
+    <text x="16" y="174" font-size="10" fill="#94a3b8">Bandwidth Manager (EDT)</text>
+    <text x="16" y="192" font-size="10" fill="#f97316">Sigma synergy: both use eBPF</text>
+    <text x="16" y="210" font-size="9" fill="#78716c">  (cilium CNI + sigma-agent eBPF)</text>
+    <text x="16" y="226" font-size="10" fill="#94a3b8">XDP DDoS mitigation</text>
+  </g>
+
+  <g transform="translate(940, 570)">
+    <rect x="0" y="0" width="210" height="110" rx="10" fill="#111827" stroke="#1e293b" stroke-width="1"/>
+    <text x="105" y="20" text-anchor="middle" font-size="11" fill="#e2e8f0" font-weight="600">Connection Flow</text>
+    <line x1="10" y1="28" x2="200" y2="28" stroke="#1e293b" stroke-width="1"/>
+    <text x="16" y="46" font-size="10" fill="#fde68a">Cilium GW (eBPF+Envoy L7)</text>
+    <text x="16" y="60" font-size="9" fill="#a3e635">  -> eBPF socket LB -> Pod</text>
+    <text x="16" y="76" font-size="9" fill="#475569">  (no kube-proxy / iptables)</text>
+    <text x="16" y="92" font-size="10" fill="#22d3ee">  -> PgBouncer (pooled)</text>
+    <text x="16" y="106" font-size="10" fill="#34d399">  -> PG Primary (200 max)</text>
+  </g>
+
+  <!-- ==================== ConfigMap + Secret ==================== -->
+  <g transform="translate(50, 654)">
+    <rect x="0" y="0" width="170" height="52" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <text x="85" y="16" text-anchor="middle" font-size="10" fill="#94a3b8" font-weight="600">ConfigMap</text>
+    <text x="14" y="32" font-size="9" fill="#64748b">LISTEN_PORT: 3000</text>
+    <text x="14" y="44" font-size="9" fill="#64748b">REDIS_URL: redis://redis...</text>
+  </g>
+
+  <g transform="translate(50, 720)">
+    <rect x="0" y="0" width="170" height="52" rx="8" fill="#1e293b" stroke="#7f1d1d" stroke-width="1"/>
+    <text x="85" y="16" text-anchor="middle" font-size="10" fill="#f87171" font-weight="600">Secret: sigma-secrets</text>
+    <text x="14" y="32" font-size="9" fill="#64748b">DATABASE_URL: postgres://...</text>
+    <text x="14" y="44" font-size="9" fill="#64748b">API_KEY: ********</text>
+  </g>
+
+  <!-- ==================== External Agents ==================== -->
+  <rect x="30" y="895" width="1140" height="150" rx="14"
+        fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="6,3"/>
+  <rect x="42" y="881" width="280" height="28" rx="6" fill="#0a0e1a"/>
+  <text x="52" y="901" font-size="13" fill="#475569" font-weight="600">
+    External (deployed on VPS nodes, not in K8s)
+  </text>
+
+  <g transform="translate(60, 924)">
+    <g class="node">
+      <rect x="0" y="0" width="140" height="72" rx="8" fill="url(#gSigmaAgent)" filter="shadow" opacity="0.9"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#ffedd5" font-weight="500">VPS Node A</text>
+      <text x="70" y="40" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-agent</text>
+      <text x="70" y="56" text-anchor="middle" font-size="9" fill="#fed7aa">heartbeat + port scan</text>
+      <text x="70" y="68" text-anchor="middle" font-size="9" fill="#fed7aa">+ eBPF traffic + xDS</text>
+    </g>
+    <g class="node" transform="translate(160, 0)">
+      <rect x="0" y="0" width="140" height="72" rx="8" fill="url(#gSigmaAgent)" filter="shadow" opacity="0.9"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#ffedd5" font-weight="500">VPS Node B</text>
+      <text x="70" y="40" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-agent</text>
+      <text x="70" y="56" text-anchor="middle" font-size="9" fill="#fed7aa">heartbeat + port scan</text>
+      <text x="70" y="68" text-anchor="middle" font-size="9" fill="#fed7aa">+ eBPF traffic + xDS</text>
+    </g>
+    <g class="node" transform="translate(320, 0)">
+      <rect x="0" y="0" width="110" height="72" rx="8" fill="#292524" stroke="#f97316" stroke-width="1" stroke-dasharray="4,2"/>
+      <text x="55" y="20" text-anchor="middle" font-size="10" fill="#f97316" font-weight="500">VPS Node ...</text>
+      <text x="55" y="40" text-anchor="middle" font-size="12" fill="#fed7aa" font-weight="600">agent</text>
+      <text x="55" y="56" text-anchor="middle" font-size="9" fill="#a8a29e">N instances</text>
+    </g>
+  </g>
+
+  <g transform="translate(680, 924)">
+    <g class="node">
+      <rect x="0" y="0" width="140" height="72" rx="8" fill="url(#gProbe)" filter="shadow" opacity="0.9"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#fce7f3" font-weight="500">China Node</text>
+      <text x="70" y="40" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-probe</text>
+      <text x="70" y="56" text-anchor="middle" font-size="9" fill="#fbcfe8">ICMP/TCP/HTTP</text>
+      <text x="70" y="68" text-anchor="middle" font-size="9" fill="#fbcfe8">reachability checks</text>
+    </g>
+    <g class="node" transform="translate(160, 0)">
+      <rect x="0" y="0" width="140" height="72" rx="8" fill="url(#gProbe)" filter="shadow" opacity="0.9"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#fce7f3" font-weight="500">China Node</text>
+      <text x="70" y="40" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-probe</text>
+      <text x="70" y="56" text-anchor="middle" font-size="9" fill="#fbcfe8">ICMP/TCP/HTTP</text>
+      <text x="70" y="68" text-anchor="middle" font-size="9" fill="#fbcfe8">reachability checks</text>
+    </g>
+  </g>
+
+  <!-- Arrows: Agents/Probes -> API -->
+  <path d="M 200 924 L 200 888 Q 200 875 280 872 L 680 872 Q 720 872 720 860 L 720 438" stroke="#f97316" stroke-width="1.2" fill="none" marker-end="url(#arrowOrange)" stroke-dasharray="5,3" opacity="0.5"/>
+  <text x="460" y="866" font-size="9" fill="#f97316" text-anchor="middle">/api/agent/heartbeat, /api/agent/register</text>
+
+  <path d="M 830 924 L 830 888 Q 830 875 800 872 Q 770 872 760 860 L 760 438" stroke="#ec4899" stroke-width="1.2" fill="none" marker-end="url(#arrow)" stroke-dasharray="5,3" opacity="0.5"/>
+  <text x="880" y="866" font-size="9" fill="#ec4899" text-anchor="middle">/api/ip-checks</text>
+</svg>
+
+<div class="legend">
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #e8c23c;"></div>
+    <span>Cilium Gateway</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #8aab3e;"></div>
+    <span>Cilium Agent (eBPF)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #f59e0b;"></div>
+    <span>Hubble (observability)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #3b82f6;"></div>
+    <span>Web (React + Nginx)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #8b5cf6;"></div>
+    <span>API (Rust + Axum)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #06b6d4;"></div>
+    <span>PgBouncer Pooler</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #10b981;"></div>
+    <span>PostgreSQL (CNPG HA)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #ef4444;"></div>
+    <span>Redis</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #f97316;"></div>
+    <span>Agent (VPS nodes)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #ec4899;"></div>
+    <span>Probe (China nodes)</span>
+  </div>
+</div>
+
+<div class="note">
+  <h3>Why Cilium for Sigma?</h3>
+  <div class="vs">
+    <div class="vs-col">
+      <h4 style="color: #a3e635;">Advantages</h4>
+      <ul>
+        <li>eBPF synergy &mdash; Sigma agent already uses eBPF for traffic monitoring; Cilium uses eBPF for CNI/gateway/policy</li>
+        <li>Replaces kube-proxy entirely &mdash; pure eBPF networking, lower latency</li>
+        <li>Gateway API native support &mdash; no extra controller needed</li>
+        <li>CiliumNetworkPolicy &mdash; L3/L4/L7 identity-based, DNS-aware</li>
+        <li>Hubble &mdash; flow-level observability, service map, Grafana integration</li>
+        <li>WireGuard transparent encryption (optional, replaces mTLS)</li>
+        <li>XDP fast-path &mdash; kernel-bypass DDoS mitigation</li>
+        <li>No sidecar overhead (unlike Istio)</li>
+        <li>Bandwidth Manager (EDT) for traffic shaping</li>
+      </ul>
+    </div>
+    <div class="vs-col">
+      <h4 style="color: #f87171;">Considerations</h4>
+      <ul>
+        <li>Requires Linux 5.10+ kernel with eBPF support</li>
+        <li>CNI replacement &mdash; must be installed at cluster bootstrap (not retrofittable easily)</li>
+        <li>Heavier learning curve than simple ingress controllers</li>
+        <li>L7 policy uses embedded Envoy (adds some overhead)</li>
+        <li>Less mature Gateway API implementation vs Envoy Gateway</li>
+        <li>Managed K8s compatibility varies (EKS/GKE: good, some providers: limited)</li>
+        <li>Debugging eBPF programs is harder than iptables rules</li>
+        <li>Hubble relay adds resource overhead on each node</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

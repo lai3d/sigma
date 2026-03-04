@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sigma K8s Architecture — Traefik</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, 'SF Pro Display', 'Inter', 'Segoe UI', sans-serif;
+    background: #0a0e1a;
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 32px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #38bdf8, #818cf8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.5px;
+  }
+  .subtitle {
+    text-align: center;
+    color: #64748b;
+    font-size: 14px;
+    margin-bottom: 40px;
+  }
+  svg { display: block; margin: 0 auto; }
+  .node { cursor: default; }
+
+  @keyframes flowRight {
+    0% { stroke-dashoffset: 16; }
+    100% { stroke-dashoffset: 0; }
+  }
+  @keyframes flowDown {
+    0% { stroke-dashoffset: 16; }
+    100% { stroke-dashoffset: 0; }
+  }
+  .flow-line { animation: flowRight 0.8s linear infinite; }
+  .flow-line-down { animation: flowDown 0.8s linear infinite; }
+
+  .legend {
+    display: flex; justify-content: center; gap: 28px; margin-top: 32px; flex-wrap: wrap;
+  }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #94a3b8; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+
+  .note {
+    max-width: 900px; margin: 36px auto 0; background: #111827;
+    border: 1px solid #1e293b; border-radius: 12px; padding: 20px 24px;
+    font-size: 13px; line-height: 1.7; color: #94a3b8;
+  }
+  .note h3 { color: #818cf8; font-size: 14px; margin-bottom: 10px; }
+  .note code { background: #1e293b; padding: 1px 6px; border-radius: 4px; font-size: 12px; color: #e2e8f0; }
+  .note .vs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+  .note .vs-col { background: #0a0e1a; border-radius: 8px; padding: 12px 14px; }
+  .note .vs-col h4 { font-size: 11px; margin-bottom: 6px; }
+  .note .vs-col ul { font-size: 11px; padding-left: 16px; color: #94a3b8; }
+  .note .vs-col ul li { margin-bottom: 3px; }
+</style>
+</head>
+<body>
+
+<h1>Sigma K8s Architecture — Traefik</h1>
+<p class="subtitle">Traefik Proxy — Cloud-native edge router with automatic HTTPS, dashboard, and Gateway API support</p>
+
+<svg viewBox="0 0 1200 1020" width="1200" height="1020" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gTraefik" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#24a1c1"/>
+      <stop offset="100%" stop-color="#1a8ba8"/>
+    </linearGradient>
+    <linearGradient id="gWeb" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="gApi" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="gPool" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#0891b2"/>
+    </linearGradient>
+    <linearGradient id="gPgPrimary" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="gRedis" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#dc2626"/>
+    </linearGradient>
+    <linearGradient id="gAgent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+    <linearGradient id="gProbe" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ec4899"/>
+      <stop offset="100%" stop-color="#db2777"/>
+    </linearGradient>
+    <linearGradient id="gLE" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#eab308"/>
+      <stop offset="100%" stop-color="#ca8a04"/>
+    </linearGradient>
+
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+
+    <marker id="arrow" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#475569"/>
+    </marker>
+    <marker id="arrowCyan" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#24a1c1"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#10b981"/>
+    </marker>
+    <marker id="arrowOrange" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f97316"/>
+    </marker>
+  </defs>
+
+  <!-- ==================== K8s Cluster Boundary ==================== -->
+  <rect x="30" y="50" width="1140" height="770" rx="16" ry="16"
+        fill="none" stroke="#1e293b" stroke-width="2" stroke-dasharray="8,4"/>
+  <rect x="42" y="36" width="200" height="28" rx="6" fill="#0a0e1a"/>
+  <text x="52" y="55" font-size="13" fill="#475569" font-weight="600">
+    Kubernetes Cluster (sigma)
+  </text>
+
+  <!-- ==================== Internet ==================== -->
+  <g class="node" transform="translate(540, 10)">
+    <rect x="0" y="0" width="120" height="36" rx="18" fill="#1e293b" filter="shadow"/>
+    <text x="60" y="23" text-anchor="middle" font-size="13" fill="#94a3b8" font-weight="600">Internet</text>
+  </g>
+
+  <line x1="600" y1="46" x2="600" y2="68" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ==================== Traefik Routing Config ==================== -->
+  <g transform="translate(350, 70)">
+    <rect x="0" y="0" width="540" height="50" rx="10" fill="#0c1f2e" stroke="#24a1c1" stroke-width="1" opacity="0.9"/>
+    <text x="270" y="18" text-anchor="middle" font-size="11" fill="#67e8f9" font-weight="500">Traefik Routing Configuration</text>
+
+    <g transform="translate(14, 24)">
+      <rect x="0" y="0" width="120" height="20" rx="4" fill="#164e63"/>
+      <text x="60" y="14" text-anchor="middle" font-size="9" fill="#67e8f9" font-weight="600">IngressRoute /*</text>
+    </g>
+    <g transform="translate(146, 24)">
+      <rect x="0" y="0" width="130" height="20" rx="4" fill="#164e63"/>
+      <text x="65" y="14" text-anchor="middle" font-size="9" fill="#67e8f9" font-weight="600">IngressRoute /api/*</text>
+    </g>
+    <g transform="translate(288, 24)">
+      <rect x="0" y="0" width="110" height="20" rx="4" fill="#422006"/>
+      <text x="55" y="14" text-anchor="middle" font-size="9" fill="#fbbf24" font-weight="600">TLS (auto ACME)</text>
+    </g>
+    <g transform="translate(410, 24)">
+      <rect x="0" y="0" width="116" height="20" rx="4" fill="#164e63"/>
+      <text x="58" y="14" text-anchor="middle" font-size="9" fill="#67e8f9" font-weight="600">Middleware (rate)</text>
+    </g>
+  </g>
+
+  <!-- ==================== Traefik Proxy Pods ==================== -->
+  <g transform="translate(330, 140)">
+    <rect x="0" y="0" width="540" height="110" rx="12" fill="#0c1f2e" stroke="#24a1c1" stroke-width="1.5" opacity="0.9"/>
+    <text x="270" y="17" text-anchor="middle" font-size="10" fill="#67e8f9" font-weight="500">traefik-service (LoadBalancer :443 :80)</text>
+
+    <g class="node" transform="translate(20, 24)">
+      <rect x="0" y="0" width="230" height="56" rx="8" fill="url(#gTraefik)" filter="shadow" opacity="0.9"/>
+      <text x="115" y="18" text-anchor="middle" font-size="10" fill="#cffafe" font-weight="500">Traefik Proxy v3</text>
+      <text x="115" y="38" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">Traefik Pod #1</text>
+      <text x="115" y="52" text-anchor="middle" font-size="9" fill="#a5f3fc">L7 routing + Let's Encrypt + dashboard</text>
+    </g>
+    <g class="node" transform="translate(280, 24)">
+      <rect x="0" y="0" width="230" height="56" rx="8" fill="url(#gTraefik)" filter="shadow" opacity="0.9"/>
+      <text x="115" y="18" text-anchor="middle" font-size="10" fill="#cffafe" font-weight="500">Traefik Proxy v3</text>
+      <text x="115" y="38" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">Traefik Pod #2</text>
+      <text x="115" y="52" text-anchor="middle" font-size="9" fill="#a5f3fc">L7 routing + Let's Encrypt + dashboard</text>
+    </g>
+
+    <text x="270" y="102" text-anchor="middle" font-size="10" fill="#475569">replicas: 2  |  auto service discovery  |  ACME TLS  |  dashboard :8080</text>
+  </g>
+
+  <!-- Let's Encrypt badge -->
+  <g transform="translate(60, 160)">
+    <rect x="0" y="0" width="180" height="52" rx="8" fill="#1c1917" stroke="#eab308" stroke-width="1"/>
+    <text x="90" y="18" text-anchor="middle" font-size="10" fill="#fbbf24" font-weight="600">Let's Encrypt (ACME)</text>
+    <text x="90" y="34" text-anchor="middle" font-size="9" fill="#a8a29e">Auto TLS cert provisioning</text>
+    <text x="90" y="46" text-anchor="middle" font-size="9" fill="#a8a29e">HTTP-01 / DNS-01 challenge</text>
+  </g>
+  <path d="M 240 186 L 330 186" stroke="#eab308" stroke-width="1" marker-end="url(#arrowCyan)" stroke-dasharray="4,3" opacity="0.6"/>
+  <text x="282" y="180" font-size="8" fill="#eab308">cert sync</text>
+
+  <!-- ==================== Routing arrows ==================== -->
+  <path d="M 480 250 L 310 290" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrowBlue)" stroke-dasharray="5,3" class="flow-line"/>
+  <text x="374" y="262" font-size="10" fill="#60a5fa" font-weight="500" transform="rotate(-14,374,262)">/* (static)</text>
+
+  <path d="M 720 250 L 730 290" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#arrow)" stroke-dasharray="5,3" class="flow-line"/>
+  <text x="745" y="264" font-size="10" fill="#a78bfa" font-weight="500" transform="rotate(6,745,264)">/api/*</text>
+
+  <!-- ==================== Web Pods ==================== -->
+  <g transform="translate(100, 292)">
+    <rect x="10" y="-10" width="340" height="110" rx="12" fill="#111827" stroke="#1e3a5f" stroke-width="1" opacity="0.7"/>
+    <text x="180" y="6" text-anchor="middle" font-size="10" fill="#60a5fa" font-weight="500">sigma-web-service :80  (ClusterIP)</text>
+
+    <g class="node" transform="translate(20, 16)">
+      <rect x="0" y="0" width="140" height="64" rx="8" fill="url(#gWeb)" filter="shadow" opacity="0.9"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#dbeafe" font-weight="500">Pod</text>
+      <text x="70" y="38" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-web</text>
+      <text x="70" y="54" text-anchor="middle" font-size="10" fill="#bfdbfe">nginx:alpine</text>
+    </g>
+
+    <g class="node" transform="translate(180, 16)">
+      <rect x="0" y="0" width="140" height="64" rx="8" fill="url(#gWeb)" filter="shadow" opacity="0.9"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#dbeafe" font-weight="500">Pod</text>
+      <text x="70" y="38" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-web</text>
+      <text x="70" y="54" text-anchor="middle" font-size="10" fill="#bfdbfe">nginx:alpine</text>
+    </g>
+
+    <text x="180" y="98" text-anchor="middle" font-size="10" fill="#475569">replicas: 2</text>
+  </g>
+
+  <!-- ==================== API Pods ==================== -->
+  <g transform="translate(530, 292)">
+    <rect x="10" y="-10" width="340" height="110" rx="12" fill="#111827" stroke="#2e1065" stroke-width="1" opacity="0.7"/>
+    <text x="180" y="6" text-anchor="middle" font-size="10" fill="#a78bfa" font-weight="500">sigma-api-service :3000  (ClusterIP)</text>
+
+    <g class="node" transform="translate(20, 16)">
+      <rect x="0" y="0" width="140" height="64" rx="8" fill="url(#gApi)" filter="shadow" opacity="0.9"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#ede9fe" font-weight="500">Pod</text>
+      <text x="70" y="38" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-api</text>
+      <text x="70" y="54" text-anchor="middle" font-size="10" fill="#ddd6fe">Rust / Axum</text>
+    </g>
+
+    <g class="node" transform="translate(180, 16)">
+      <rect x="0" y="0" width="140" height="64" rx="8" fill="url(#gApi)" filter="shadow" opacity="0.9"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#ede9fe" font-weight="500">Pod</text>
+      <text x="70" y="38" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-api</text>
+      <text x="70" y="54" text-anchor="middle" font-size="10" fill="#ddd6fe">Rust / Axum</text>
+    </g>
+
+    <text x="180" y="98" text-anchor="middle" font-size="10" fill="#475569">replicas: 2</text>
+  </g>
+
+  <!-- ==================== Redis ==================== -->
+  <g class="node" transform="translate(80, 530)">
+    <rect x="0" y="0" width="160" height="60" rx="8" fill="url(#gRedis)" filter="shadow" opacity="0.9"/>
+    <text x="80" y="22" text-anchor="middle" font-size="10" fill="#fecaca" font-weight="500">redis-service :6379</text>
+    <text x="80" y="42" text-anchor="middle" font-size="15" fill="#fff" font-weight="700">Redis</text>
+    <text x="80" y="56" text-anchor="middle" font-size="9" fill="#fca5a5">rate limiting + cache</text>
+  </g>
+
+  <!-- Arrow: API -> Redis -->
+  <path d="M 660 408 L 660 470 Q 660 490 640 490 L 250 528" stroke="#ef4444" stroke-width="1.2" fill="none" marker-end="url(#arrow)" stroke-dasharray="5,3" opacity="0.6"/>
+  <text x="430" y="484" font-size="9" fill="#f87171" text-anchor="middle">rate limit</text>
+
+  <!-- ==================== PgBouncer Pooler ==================== -->
+  <g transform="translate(480, 480)">
+    <rect x="0" y="0" width="340" height="110" rx="12" fill="#111827" stroke="#155e75" stroke-width="1.5" opacity="0.8"/>
+    <text x="170" y="18" text-anchor="middle" font-size="11" fill="#22d3ee" font-weight="600">sigma-db-pooler-rw  (ClusterIP)</text>
+
+    <g class="node" transform="translate(20, 28)">
+      <rect x="0" y="0" width="136" height="60" rx="8" fill="url(#gPool)" filter="shadow" opacity="0.9"/>
+      <text x="68" y="20" text-anchor="middle" font-size="10" fill="#cffafe" font-weight="500">PgBouncer</text>
+      <text x="68" y="38" text-anchor="middle" font-size="12" fill="#fff" font-weight="700">Pooler #1</text>
+      <text x="68" y="52" text-anchor="middle" font-size="9" fill="#a5f3fc">txn mode, pool=20</text>
+    </g>
+
+    <g class="node" transform="translate(180, 28)">
+      <rect x="0" y="0" width="136" height="60" rx="8" fill="url(#gPool)" filter="shadow" opacity="0.9"/>
+      <text x="68" y="20" text-anchor="middle" font-size="10" fill="#cffafe" font-weight="500">PgBouncer</text>
+      <text x="68" y="38" text-anchor="middle" font-size="12" fill="#fff" font-weight="700">Pooler #2</text>
+      <text x="68" y="52" text-anchor="middle" font-size="9" fill="#a5f3fc">txn mode, pool=20</text>
+    </g>
+
+    <text x="170" y="104" text-anchor="middle" font-size="10" fill="#475569">instances: 2  |  max_client_conn: 100  |  default_pool_size: 20</text>
+  </g>
+
+  <!-- Arrow: API -> PgBouncer -->
+  <line x1="700" y1="408" x2="660" y2="478" stroke="#06b6d4" stroke-width="1.5" marker-end="url(#arrow)" stroke-dasharray="5,3" class="flow-line-down"/>
+  <text x="694" y="445" font-size="9" fill="#22d3ee" transform="rotate(14,694,445)">:5432</text>
+
+  <!-- ==================== CloudNativePG Cluster ==================== -->
+  <g transform="translate(340, 640)">
+    <rect x="0" y="0" width="540" height="150" rx="14" fill="#0f1d14" stroke="#065f46" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="270" y="20" text-anchor="middle" font-size="12" fill="#34d399" font-weight="600">CloudNativePG Cluster &mdash; PostgreSQL 16.6</text>
+
+    <g class="node" transform="translate(30, 32)">
+      <rect x="0" y="0" width="150" height="72" rx="8" fill="url(#gPgPrimary)" filter="shadow"/>
+      <text x="75" y="20" text-anchor="middle" font-size="10" fill="#d1fae5" font-weight="700">PRIMARY (RW)</text>
+      <text x="75" y="40" text-anchor="middle" font-size="15" fill="#fff" font-weight="700">sigma-db-1</text>
+      <text x="75" y="58" text-anchor="middle" font-size="9" fill="#a7f3d0">max_conn: 200, 256MB</text>
+    </g>
+
+    <g class="node" transform="translate(200, 32)">
+      <rect x="0" y="0" width="140" height="72" rx="8" fill="#064e3b" stroke="#34d399" stroke-width="1" filter="shadow"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#6ee7b7" font-weight="600">REPLICA (RO)</text>
+      <text x="70" y="40" text-anchor="middle" font-size="14" fill="#ecfdf5" font-weight="700">sigma-db-2</text>
+      <text x="70" y="58" text-anchor="middle" font-size="9" fill="#a7f3d0">streaming repl</text>
+    </g>
+
+    <g class="node" transform="translate(360, 32)">
+      <rect x="0" y="0" width="140" height="72" rx="8" fill="#064e3b" stroke="#34d399" stroke-width="1" filter="shadow"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#6ee7b7" font-weight="600">REPLICA (RO)</text>
+      <text x="70" y="40" text-anchor="middle" font-size="14" fill="#ecfdf5" font-weight="700">sigma-db-3</text>
+      <text x="70" y="58" text-anchor="middle" font-size="9" fill="#a7f3d0">streaming repl</text>
+    </g>
+
+    <path d="M 170 68 L 200 68" stroke="#34d399" stroke-width="1.2" marker-end="url(#arrowGreen)" opacity="0.6"/>
+    <path d="M 170 68 Q 185 95 270 95 Q 355 95 370 68" stroke="#34d399" stroke-width="1.2" marker-end="url(#arrowGreen)" opacity="0.6" fill="none"/>
+
+    <g transform="translate(30, 110)">
+      <rect x="0" y="0" width="150" height="20" rx="4" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <text x="75" y="14" text-anchor="middle" font-size="9" fill="#94a3b8">PVC: 10Gi</text>
+    </g>
+    <g transform="translate(200, 110)">
+      <rect x="0" y="0" width="140" height="20" rx="4" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <text x="70" y="14" text-anchor="middle" font-size="9" fill="#94a3b8">PVC: 10Gi</text>
+    </g>
+    <g transform="translate(360, 110)">
+      <rect x="0" y="0" width="140" height="20" rx="4" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <text x="70" y="14" text-anchor="middle" font-size="9" fill="#94a3b8">PVC: 10Gi</text>
+    </g>
+
+    <text x="270" y="146" text-anchor="middle" font-size="10" fill="#065f46">sigma-db-rw :5432 (primary)  |  sigma-db-ro :5432 (replicas)</text>
+  </g>
+
+  <!-- Arrow: PgBouncer -> PG Primary -->
+  <path d="M 650 590 L 650 610 Q 650 630 620 635 L 500 654" stroke="#10b981" stroke-width="1.5" fill="none" marker-end="url(#arrowGreen)" stroke-dasharray="5,3" class="flow-line-down"/>
+  <text x="590" y="624" font-size="9" fill="#34d399">rw :5432</text>
+
+  <!-- ==================== Right side: Traefik features ==================== -->
+  <g transform="translate(940, 292)">
+    <rect x="0" y="0" width="210" height="200" rx="10" fill="#111827" stroke="#24a1c1" stroke-width="1"/>
+    <text x="105" y="20" text-anchor="middle" font-size="11" fill="#22d3ee" font-weight="600">Traefik Features</text>
+    <line x1="10" y1="28" x2="200" y2="28" stroke="#1e293b" stroke-width="1"/>
+    <text x="16" y="48" font-size="10" fill="#67e8f9">Auto HTTPS (Let's Encrypt)</text>
+    <text x="16" y="66" font-size="10" fill="#94a3b8">IngressRoute CRD</text>
+    <text x="16" y="84" font-size="10" fill="#94a3b8">Gateway API support (v3)</text>
+    <text x="16" y="102" font-size="10" fill="#94a3b8">Built-in dashboard :8080</text>
+    <text x="16" y="120" font-size="10" fill="#94a3b8">Middleware chains</text>
+    <text x="16" y="138" font-size="10" fill="#94a3b8">Canary / weighted round-robin</text>
+    <text x="16" y="156" font-size="10" fill="#94a3b8">Metrics (Prometheus)</text>
+    <text x="16" y="174" font-size="10" fill="#94a3b8">TCP/UDP routing</text>
+    <text x="16" y="192" font-size="10" fill="#fbbf24">K3s default ingress</text>
+  </g>
+
+  <g transform="translate(940, 510)">
+    <rect x="0" y="0" width="210" height="100" rx="10" fill="#111827" stroke="#1e293b" stroke-width="1"/>
+    <text x="105" y="20" text-anchor="middle" font-size="11" fill="#e2e8f0" font-weight="600">Connection Flow</text>
+    <line x1="10" y1="28" x2="200" y2="28" stroke="#1e293b" stroke-width="1"/>
+    <text x="16" y="46" font-size="10" fill="#22d3ee">Traefik (L7 + TLS)</text>
+    <text x="16" y="60" font-size="9" fill="#475569">  -> ClusterIP -> API Pod</text>
+    <text x="16" y="76" font-size="10" fill="#22d3ee">  -> PgBouncer (pooled)</text>
+    <text x="16" y="92" font-size="10" fill="#34d399">  -> PG Primary (200 max)</text>
+  </g>
+
+  <!-- ==================== ConfigMap + Secret ==================== -->
+  <g transform="translate(50, 614)">
+    <rect x="0" y="0" width="170" height="52" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <text x="85" y="16" text-anchor="middle" font-size="10" fill="#94a3b8" font-weight="600">ConfigMap</text>
+    <text x="14" y="32" font-size="9" fill="#64748b">LISTEN_PORT: 3000</text>
+    <text x="14" y="44" font-size="9" fill="#64748b">REDIS_URL: redis://redis...</text>
+  </g>
+
+  <g transform="translate(50, 680)">
+    <rect x="0" y="0" width="170" height="52" rx="8" fill="#1e293b" stroke="#7f1d1d" stroke-width="1"/>
+    <text x="85" y="16" text-anchor="middle" font-size="10" fill="#f87171" font-weight="600">Secret: sigma-secrets</text>
+    <text x="14" y="32" font-size="9" fill="#64748b">DATABASE_URL: postgres://...</text>
+    <text x="14" y="44" font-size="9" fill="#64748b">API_KEY: ********</text>
+  </g>
+
+  <!-- ==================== Traefik Dashboard badge ==================== -->
+  <g transform="translate(60, 96)">
+    <rect x="0" y="0" width="180" height="44" rx="8" fill="#0c1f2e" stroke="#24a1c1" stroke-width="1"/>
+    <text x="90" y="16" text-anchor="middle" font-size="10" fill="#22d3ee" font-weight="600">Traefik Dashboard</text>
+    <text x="90" y="32" text-anchor="middle" font-size="9" fill="#94a3b8">http://traefik:8080/dashboard</text>
+    <text x="90" y="42" text-anchor="middle" font-size="8" fill="#64748b">routers, services, middlewares</text>
+  </g>
+  <path d="M 240 118 L 330 160" stroke="#24a1c1" stroke-width="1" marker-end="url(#arrowCyan)" stroke-dasharray="4,3" opacity="0.5"/>
+
+  <!-- ==================== External Agents ==================== -->
+  <rect x="30" y="835" width="1140" height="150" rx="14"
+        fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="6,3"/>
+  <rect x="42" y="821" width="280" height="28" rx="6" fill="#0a0e1a"/>
+  <text x="52" y="841" font-size="13" fill="#475569" font-weight="600">
+    External (deployed on VPS nodes, not in K8s)
+  </text>
+
+  <g transform="translate(60, 864)">
+    <g class="node">
+      <rect x="0" y="0" width="140" height="72" rx="8" fill="url(#gAgent)" filter="shadow" opacity="0.9"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#ffedd5" font-weight="500">VPS Node A</text>
+      <text x="70" y="40" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-agent</text>
+      <text x="70" y="56" text-anchor="middle" font-size="9" fill="#fed7aa">heartbeat + port scan</text>
+      <text x="70" y="68" text-anchor="middle" font-size="9" fill="#fed7aa">+ eBPF traffic + xDS</text>
+    </g>
+    <g class="node" transform="translate(160, 0)">
+      <rect x="0" y="0" width="140" height="72" rx="8" fill="url(#gAgent)" filter="shadow" opacity="0.9"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#ffedd5" font-weight="500">VPS Node B</text>
+      <text x="70" y="40" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-agent</text>
+      <text x="70" y="56" text-anchor="middle" font-size="9" fill="#fed7aa">heartbeat + port scan</text>
+      <text x="70" y="68" text-anchor="middle" font-size="9" fill="#fed7aa">+ eBPF traffic + xDS</text>
+    </g>
+    <g class="node" transform="translate(320, 0)">
+      <rect x="0" y="0" width="110" height="72" rx="8" fill="#292524" stroke="#f97316" stroke-width="1" stroke-dasharray="4,2"/>
+      <text x="55" y="20" text-anchor="middle" font-size="10" fill="#f97316" font-weight="500">VPS Node ...</text>
+      <text x="55" y="40" text-anchor="middle" font-size="12" fill="#fed7aa" font-weight="600">agent</text>
+      <text x="55" y="56" text-anchor="middle" font-size="9" fill="#a8a29e">N instances</text>
+    </g>
+  </g>
+
+  <g transform="translate(680, 864)">
+    <g class="node">
+      <rect x="0" y="0" width="140" height="72" rx="8" fill="url(#gProbe)" filter="shadow" opacity="0.9"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#fce7f3" font-weight="500">China Node</text>
+      <text x="70" y="40" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-probe</text>
+      <text x="70" y="56" text-anchor="middle" font-size="9" fill="#fbcfe8">ICMP/TCP/HTTP</text>
+      <text x="70" y="68" text-anchor="middle" font-size="9" fill="#fbcfe8">reachability checks</text>
+    </g>
+    <g class="node" transform="translate(160, 0)">
+      <rect x="0" y="0" width="140" height="72" rx="8" fill="url(#gProbe)" filter="shadow" opacity="0.9"/>
+      <text x="70" y="20" text-anchor="middle" font-size="10" fill="#fce7f3" font-weight="500">China Node</text>
+      <text x="70" y="40" text-anchor="middle" font-size="14" fill="#fff" font-weight="700">sigma-probe</text>
+      <text x="70" y="56" text-anchor="middle" font-size="9" fill="#fbcfe8">ICMP/TCP/HTTP</text>
+      <text x="70" y="68" text-anchor="middle" font-size="9" fill="#fbcfe8">reachability checks</text>
+    </g>
+  </g>
+
+  <!-- Arrows: Agents/Probes -> API -->
+  <path d="M 200 864 L 200 828 Q 200 815 280 812 L 680 812 Q 720 812 720 802 L 720 408" stroke="#f97316" stroke-width="1.2" fill="none" marker-end="url(#arrowOrange)" stroke-dasharray="5,3" opacity="0.5"/>
+  <text x="460" y="806" font-size="9" fill="#f97316" text-anchor="middle">/api/agent/heartbeat, /api/agent/register</text>
+
+  <path d="M 830 864 L 830 828 Q 830 815 800 812 Q 770 812 760 802 L 760 408" stroke="#ec4899" stroke-width="1.2" fill="none" marker-end="url(#arrow)" stroke-dasharray="5,3" opacity="0.5"/>
+  <text x="880" y="806" font-size="9" fill="#ec4899" text-anchor="middle">/api/ip-checks</text>
+</svg>
+
+<div class="legend">
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #24a1c1;"></div>
+    <span>Traefik Proxy</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #eab308;"></div>
+    <span>Let's Encrypt</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #3b82f6;"></div>
+    <span>Web (React + Nginx)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #8b5cf6;"></div>
+    <span>API (Rust + Axum)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #06b6d4;"></div>
+    <span>PgBouncer Pooler</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #10b981;"></div>
+    <span>PostgreSQL (CNPG HA)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #ef4444;"></div>
+    <span>Redis</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #f97316;"></div>
+    <span>Agent (VPS nodes)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background: #ec4899;"></div>
+    <span>Probe (China nodes)</span>
+  </div>
+</div>
+
+<div class="note">
+  <h3>Why Traefik?</h3>
+  <div class="vs">
+    <div class="vs-col">
+      <h4 style="color: #22d3ee;">Advantages</h4>
+      <ul>
+        <li>Zero-config HTTPS via Let's Encrypt ACME</li>
+        <li>Built-in dashboard for debugging routes</li>
+        <li>IngressRoute CRD &mdash; more expressive than annotations</li>
+        <li>Gateway API support in Traefik v3</li>
+        <li>Middleware chains (rate-limit, auth, headers, redirect)</li>
+        <li>K3s/K3d default &mdash; lightweight, single binary</li>
+        <li>TCP/UDP routing (SSH, DNS, etc.)</li>
+        <li>Active open-source community</li>
+      </ul>
+    </div>
+    <div class="vs-col">
+      <h4 style="color: #f87171;">Considerations</h4>
+      <ul>
+        <li>No service mesh / mTLS (ingress only)</li>
+        <li>Advanced features require Traefik Enterprise ($)</li>
+        <li>Less raw performance vs Envoy at very high RPS</li>
+        <li>CRD sprawl (IngressRoute, Middleware, TLSOption...)</li>
+        <li>WASM plugin support limited (vs Envoy)</li>
+        <li>No sidecar model &mdash; edge-only proxy</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
