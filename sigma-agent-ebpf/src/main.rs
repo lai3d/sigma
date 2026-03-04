@@ -2,12 +2,12 @@
 #![no_main]
 
 use aya_ebpf::{
-    helpers::{bpf_get_current_pid_tgid, bpf_probe_read_kernel},
+    helpers::{bpf_get_current_pid_tgid, bpf_ktime_get_ns, bpf_probe_read_kernel},
     macros::{kprobe, kretprobe, map, tracepoint},
     maps::HashMap,
     programs::{ProbeContext, RetProbeContext, TracePointContext},
 };
-use sigma_agent_ebpf_common::{ConnValue, DropKey, DropValue, RetransmitValue, RttValue, TrafficKey, TrafficValue};
+use sigma_agent_ebpf_common::{ConnLatencyValue, ConnValue, DropKey, DropValue, RetransmitValue, RttValue, TrafficKey, TrafficValue};
 
 /// Offset of `srtt_us` field within `struct tcp_sock` (Linux 6.x x86_64).
 /// The kernel stores smoothed RTT as `actual_rtt_us << 3`, so we right-shift by 3 to unscale.
@@ -33,6 +33,14 @@ static CONN_MAP: HashMap<TrafficKey, ConnValue> = HashMap::with_max_entries(8192
 /// Per-PID TCP RTT statistics (count, sum, min, max in microseconds).
 #[map]
 static RTT_MAP: HashMap<TrafficKey, RttValue> = HashMap::with_max_entries(8192, 0);
+
+/// Scratch map: stores entry timestamp (ns) for tcp_v4_connect kprobe, keyed by PID.
+#[map]
+static CONN_START_TS: HashMap<TrafficKey, u64> = HashMap::with_max_entries(8192, 0);
+
+/// Per-PID TCP connection latency statistics (SYN-to-established time in microseconds).
+#[map]
+static CONN_LATENCY_MAP: HashMap<TrafficKey, ConnLatencyValue> = HashMap::with_max_entries(8192, 0);
 
 /// Per-(PID, reason) packet drop counters from skb:kfree_skb tracepoint.
 #[map]
@@ -236,7 +244,25 @@ fn try_tcp_retransmit_skb(_ctx: &ProbeContext) -> Result<(), i64> {
     Ok(())
 }
 
-/// kretprobe on tcp_v4_connect — on success (ret==0), increments active and total connections.
+/// kprobe on tcp_v4_connect (entry) — captures start timestamp for connection latency.
+#[kprobe]
+pub fn tcp_v4_connect_entry(ctx: ProbeContext) -> u32 {
+    match try_tcp_v4_connect_entry(&ctx) {
+        Ok(()) => 0,
+        Err(_) => 0,
+    }
+}
+
+fn try_tcp_v4_connect_entry(_ctx: &ProbeContext) -> Result<(), i64> {
+    let pid = (bpf_get_current_pid_tgid() >> 32) as u32;
+    let key = TrafficKey { pid };
+    let ts = unsafe { bpf_ktime_get_ns() };
+    let _ = CONN_START_TS.insert(&key, &ts, 0);
+    Ok(())
+}
+
+/// kretprobe on tcp_v4_connect — on success (ret==0), increments active and total connections
+/// and computes connection latency from the entry timestamp.
 #[kretprobe]
 pub fn tcp_v4_connect(ctx: RetProbeContext) -> u32 {
     match try_tcp_v4_connect(&ctx) {
@@ -262,6 +288,36 @@ fn try_tcp_v4_connect(ctx: &RetProbeContext) -> Result<(), i64> {
     } else {
         let val = ConnValue { active: 1, total: 1 };
         let _ = CONN_MAP.insert(&key, &val, 0);
+    }
+
+    // Compute connection latency from entry timestamp
+    if let Some(start_ts) = CONN_START_TS.get(&key) {
+        let now = unsafe { bpf_ktime_get_ns() };
+        let delta_us = (now - *start_ts) / 1000;
+        let _ = CONN_START_TS.remove(&key);
+
+        if delta_us > 0 {
+            if let Some(val) = CONN_LATENCY_MAP.get_ptr_mut(&key) {
+                unsafe {
+                    (*val).count += 1;
+                    (*val).sum_us += delta_us;
+                    if delta_us < (*val).min_us {
+                        (*val).min_us = delta_us;
+                    }
+                    if delta_us > (*val).max_us {
+                        (*val).max_us = delta_us;
+                    }
+                }
+            } else {
+                let val = ConnLatencyValue {
+                    count: 1,
+                    sum_us: delta_us,
+                    min_us: delta_us,
+                    max_us: delta_us,
+                };
+                let _ = CONN_LATENCY_MAP.insert(&key, &val, 0);
+            }
+        }
     }
 
     Ok(())

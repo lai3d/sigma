@@ -113,7 +113,7 @@ sigma/
 - [x] eBPF UDP traffic monitoring (kprobe on `udp_sendmsg`/`udp_recvmsg` — covers WireGuard/Xray UDP transports)
 - [x] eBPF TCP RTT/latency tracking (kprobe on `tcp_rcv_established` — per-process round-trip time for VPN quality)
 - [x] eBPF packet drop monitoring (tracepoint `skb:kfree_skb` — drop counts with reason codes)
-- [ ] eBPF TCP connection latency (SYN-to-established time via `tcp_v4_connect` entry+return)
+- [x] eBPF TCP connection latency (SYN-to-established time via `tcp_v4_connect` entry+return)
 - [ ] eBPF DNS query tracing (trace UDP sends to port 53 — detect DNS leaks on VPN nodes)
 - [ ] eBPF disk I/O per process (kprobe on `vfs_read`/`vfs_write` — identify disk bottlenecks)
 - [ ] eBPF OOM kill tracking (tracepoint `oom:oom_score_adj_update` — immediate process kill alerts)

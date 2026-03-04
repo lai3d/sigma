@@ -305,8 +305,10 @@ When `--ebpf-traffic` is enabled, the agent uses eBPF kprobes and tracepoints to
 activity per process. This includes TCP bytes sent/received (`tcp_sendmsg`/`tcp_recvmsg`), UDP bytes
 sent/received (`udp_sendmsg`/`udp_recvmsg`), retransmit events (`tcp_retransmit_skb`), connection
 tracking (`tcp_v4_connect`/`tcp_close`/`inet_csk_accept`), TCP RTT/latency tracking
-(`tcp_rcv_established` — reads `srtt_us` from `tcp_sock` via `bpf_probe_read_kernel`), and packet
-drop monitoring (`skb:kfree_skb` tracepoint — per-process drop counts with kernel reason codes).
+(`tcp_rcv_established` — reads `srtt_us` from `tcp_sock` via `bpf_probe_read_kernel`), TCP
+connection latency (`tcp_v4_connect` entry kprobe + kretprobe — measures SYN-to-established time
+via `bpf_ktime_get_ns()`), and packet drop monitoring (`skb:kfree_skb` tracepoint — per-process
+drop counts with kernel reason codes).
 This is feature-gated behind the `ebpf-traffic` cargo feature (compiled in via Docker by default).
 
 ### Configuration
@@ -365,6 +367,18 @@ sigma_tcp_rtt_min_us{hostname="relay-01",process="envoy",container=""} 800
 # TYPE sigma_tcp_rtt_max_us gauge
 sigma_tcp_rtt_max_us{hostname="relay-01",process="envoy",container=""} 95000
 
+# HELP sigma_tcp_connection_latency_avg_us Average TCP connection latency (SYN-to-established) in microseconds by process (eBPF)
+# TYPE sigma_tcp_connection_latency_avg_us gauge
+sigma_tcp_connection_latency_avg_us{hostname="relay-01",process="envoy",container=""} 15200
+
+# HELP sigma_tcp_connection_latency_min_us Minimum TCP connection latency (SYN-to-established) in microseconds by process (eBPF)
+# TYPE sigma_tcp_connection_latency_min_us gauge
+sigma_tcp_connection_latency_min_us{hostname="relay-01",process="envoy",container=""} 1200
+
+# HELP sigma_tcp_connection_latency_max_us Maximum TCP connection latency (SYN-to-established) in microseconds by process (eBPF)
+# TYPE sigma_tcp_connection_latency_max_us gauge
+sigma_tcp_connection_latency_max_us{hostname="relay-01",process="envoy",container=""} 120000
+
 # HELP sigma_packet_drops_total Packet drops by process and reason (eBPF tracepoint skb:kfree_skb)
 # TYPE sigma_packet_drops_total gauge
 sigma_packet_drops_total{hostname="relay-01",process="envoy",container="",reason="NETFILTER_DROP"} 15
@@ -376,6 +390,12 @@ Packet drop metrics are only emitted for processes with non-zero drops. The trac
 On older kernels, the tracepoint attachment fails gracefully and the agent continues without
 drop metrics. Common drop reasons include: `NO_SOCKET`, `TCP_CSUM`, `NETFILTER_DROP`,
 `SOCKET_RCVBUFF`, `TCP_OLD_DATA`, `TCP_RESET`, `QDISC_DROP`.
+
+Connection latency metrics are only emitted for processes with active connection latency data.
+Unlike RTT (which measures per-packet round-trip on established connections), connection latency
+measures the time from `connect()` call to 3-way handshake completion, revealing slow upstream
+servers and network path issues. Uses a scratch map (`CONN_START_TS`) to store entry timestamps
+from the `tcp_v4_connect` kprobe, computed in the existing kretprobe.
 
 RTT metrics are only emitted for processes with active TCP RTT data. The `srtt_us` field offset
 within `tcp_sock` is defined as `SRTT_US_OFFSET` (744 for Linux 6.x x86_64) and may need

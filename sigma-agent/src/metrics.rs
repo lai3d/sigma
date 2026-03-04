@@ -277,6 +277,49 @@ pub fn render_traffic_metrics(stats: &[crate::ebpf_traffic::ProcessTraffic], hos
         }
     }
 
+    // Connection latency metrics — only emit for processes with conn latency data
+    let has_conn_latency: Vec<_> = stats.iter().filter(|e| e.conn_latency_avg_us > 0).collect();
+    if !has_conn_latency.is_empty() {
+        writeln!(out).unwrap();
+
+        writeln!(out, "# HELP sigma_tcp_connection_latency_avg_us Average TCP connection latency (SYN-to-established) in microseconds by process (eBPF)").unwrap();
+        writeln!(out, "# TYPE sigma_tcp_connection_latency_avg_us gauge").unwrap();
+        for entry in &has_conn_latency {
+            let container = entry.container_id.as_deref().unwrap_or("");
+            writeln!(
+                out,
+                "sigma_tcp_connection_latency_avg_us{{hostname=\"{}\",process=\"{}\",container=\"{}\"}} {}",
+                hostname, entry.process_name, container, entry.conn_latency_avg_us
+            ).unwrap();
+        }
+
+        writeln!(out).unwrap();
+
+        writeln!(out, "# HELP sigma_tcp_connection_latency_min_us Minimum TCP connection latency (SYN-to-established) in microseconds by process (eBPF)").unwrap();
+        writeln!(out, "# TYPE sigma_tcp_connection_latency_min_us gauge").unwrap();
+        for entry in &has_conn_latency {
+            let container = entry.container_id.as_deref().unwrap_or("");
+            writeln!(
+                out,
+                "sigma_tcp_connection_latency_min_us{{hostname=\"{}\",process=\"{}\",container=\"{}\"}} {}",
+                hostname, entry.process_name, container, entry.conn_latency_min_us
+            ).unwrap();
+        }
+
+        writeln!(out).unwrap();
+
+        writeln!(out, "# HELP sigma_tcp_connection_latency_max_us Maximum TCP connection latency (SYN-to-established) in microseconds by process (eBPF)").unwrap();
+        writeln!(out, "# TYPE sigma_tcp_connection_latency_max_us gauge").unwrap();
+        for entry in &has_conn_latency {
+            let container = entry.container_id.as_deref().unwrap_or("");
+            writeln!(
+                out,
+                "sigma_tcp_connection_latency_max_us{{hostname=\"{}\",process=\"{}\",container=\"{}\"}} {}",
+                hostname, entry.process_name, container, entry.conn_latency_max_us
+            ).unwrap();
+        }
+    }
+
     // RTT metrics — only emit for processes with RTT data
     let has_rtt: Vec<_> = stats.iter().filter(|e| e.rtt_avg_us > 0).collect();
     if !has_rtt.is_empty() {

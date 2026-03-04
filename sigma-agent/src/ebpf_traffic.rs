@@ -47,6 +47,15 @@ struct RttValue {
 
 #[repr(C)]
 #[derive(Clone, Copy)]
+struct ConnLatencyValue {
+    count: u64,
+    sum_us: u64,
+    min_us: u64,
+    max_us: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
 struct DropKey {
     pid: u32,
     reason: u32,
@@ -63,6 +72,7 @@ unsafe impl aya::Pod for TrafficValue {}
 unsafe impl aya::Pod for RetransmitValue {}
 unsafe impl aya::Pod for ConnValue {}
 unsafe impl aya::Pod for RttValue {}
+unsafe impl aya::Pod for ConnLatencyValue {}
 unsafe impl aya::Pod for DropKey {}
 unsafe impl aya::Pod for DropValue {}
 
@@ -81,6 +91,9 @@ pub struct ProcessTraffic {
     pub rtt_avg_us: u64,
     pub rtt_min_us: u64,
     pub rtt_max_us: u64,
+    pub conn_latency_avg_us: u64,
+    pub conn_latency_min_us: u64,
+    pub conn_latency_max_us: u64,
     pub drops: Vec<(String, u64)>,
 }
 
@@ -122,6 +135,21 @@ pub fn load_ebpf() -> anyhow::Result<Ebpf> {
             Err(e) => warn!("tcp_retransmit_skb program type mismatch: {:#}", e),
         },
         None => warn!("kprobe program 'tcp_retransmit_skb' not found in eBPF object"),
+    }
+
+    // Attach kprobe to tcp_v4_connect entry (non-fatal — connection latency)
+    match ebpf.program_mut("tcp_v4_connect_entry") {
+        Some(prog) => match <&mut KProbe>::try_from(prog) {
+            Ok(kp) => {
+                if let Err(e) = kp.load().and_then(|()| kp.attach("tcp_v4_connect", 0)) {
+                    warn!("Failed to attach kprobe to tcp_v4_connect (entry): {:#}", e);
+                } else {
+                    info!("Attached kprobe to tcp_v4_connect (entry)");
+                }
+            }
+            Err(e) => warn!("tcp_v4_connect_entry program type mismatch: {:#}", e),
+        },
+        None => warn!("kprobe program 'tcp_v4_connect_entry' not found in eBPF object"),
     }
 
     // Attach kretprobe to tcp_v4_connect (non-fatal)
@@ -345,6 +373,26 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
         }
     }
 
+    // --- Read CONN_LATENCY_MAP (read-and-clear, like RTT_MAP) ---
+    let mut conn_latency_entries: Vec<(TrafficKey, ConnLatencyValue)> = Vec::new();
+    if let Some(map) = ebpf.map_mut("CONN_LATENCY_MAP") {
+        if let Ok(mut cl_map) = BpfHashMap::<&mut aya::maps::MapData, TrafficKey, ConnLatencyValue>::try_from(map) {
+            let mut cl_keys: Vec<TrafficKey> = Vec::new();
+            for item in cl_map.iter() {
+                match item {
+                    Ok((key, value)) => {
+                        conn_latency_entries.push((key, value));
+                        cl_keys.push(key);
+                    }
+                    Err(e) => debug!("Error reading CONN_LATENCY_MAP entry: {}", e),
+                }
+            }
+            for key in &cl_keys {
+                let _ = cl_map.remove(key);
+            }
+        }
+    }
+
     // --- Read CONN_MAP (don't clear — active is a gauge) ---
     let mut conn_entries: Vec<(TrafficKey, ConnValue)> = Vec::new();
     if let Some(map) = ebpf.map_mut("CONN_MAP") {
@@ -405,6 +453,10 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
         rtt_sum_us: u64,
         rtt_min_us: u64,
         rtt_max_us: u64,
+        conn_latency_count: u64,
+        conn_latency_sum_us: u64,
+        conn_latency_min_us: u64,
+        conn_latency_max_us: u64,
         drops: HashMap<u32, u64>,
     }
 
@@ -455,6 +507,20 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
         entry.total_conns += value.total;
     }
 
+    for (key, value) in &conn_latency_entries {
+        let proc_name = resolve_process_name(key.pid, host_proc);
+        let container_id = resolve_container_id(key.pid, host_proc);
+        let entry = aggregated.entry((proc_name, container_id)).or_default();
+        entry.conn_latency_count += value.count;
+        entry.conn_latency_sum_us += value.sum_us;
+        if entry.conn_latency_min_us == 0 || value.min_us < entry.conn_latency_min_us {
+            entry.conn_latency_min_us = value.min_us;
+        }
+        if value.max_us > entry.conn_latency_max_us {
+            entry.conn_latency_max_us = value.max_us;
+        }
+    }
+
     for (key, value) in &drop_entries {
         let proc_name = resolve_process_name(key.pid, host_proc);
         let container_id = resolve_container_id(key.pid, host_proc);
@@ -466,6 +532,7 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
         .into_iter()
         .map(|((process_name, container_id), agg)| {
             let rtt_avg_us = if agg.rtt_count > 0 { agg.rtt_sum_us / agg.rtt_count } else { 0 };
+            let conn_latency_avg_us = if agg.conn_latency_count > 0 { agg.conn_latency_sum_us / agg.conn_latency_count } else { 0 };
             let drops: Vec<(String, u64)> = agg.drops
                 .into_iter()
                 .map(|(reason, count)| (drop_reason_name(reason), count))
@@ -483,6 +550,9 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
                 rtt_avg_us,
                 rtt_min_us: agg.rtt_min_us,
                 rtt_max_us: agg.rtt_max_us,
+                conn_latency_avg_us,
+                conn_latency_min_us: agg.conn_latency_min_us,
+                conn_latency_max_us: agg.conn_latency_max_us,
                 drops,
             }
         })

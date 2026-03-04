@@ -40,6 +40,16 @@ pub struct RttValue {
     pub max_us: u64,
 }
 
+/// TCP connection latency statistics per PID (SYN-to-established time).
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct ConnLatencyValue {
+    pub count: u64,
+    pub sum_us: u64,
+    pub min_us: u64,
+    pub max_us: u64,
+}
+
 /// Composite key for per-PID per-reason packet drop counters.
 #[repr(C)]
 #[derive(Clone, Copy)]
