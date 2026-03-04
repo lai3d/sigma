@@ -195,6 +195,32 @@ pub fn render_traffic_metrics(stats: &[crate::ebpf_traffic::ProcessTraffic], hos
 
     writeln!(out).unwrap();
 
+    writeln!(out, "# HELP sigma_traffic_udp_bytes_sent_total UDP bytes sent by process (eBPF)").unwrap();
+    writeln!(out, "# TYPE sigma_traffic_udp_bytes_sent_total gauge").unwrap();
+    for entry in stats {
+        let container = entry.container_id.as_deref().unwrap_or("");
+        writeln!(
+            out,
+            "sigma_traffic_udp_bytes_sent_total{{hostname=\"{}\",process=\"{}\",container=\"{}\"}} {}",
+            hostname, entry.process_name, container, entry.udp_bytes_sent
+        ).unwrap();
+    }
+
+    writeln!(out).unwrap();
+
+    writeln!(out, "# HELP sigma_traffic_udp_bytes_recv_total UDP bytes received by process (eBPF)").unwrap();
+    writeln!(out, "# TYPE sigma_traffic_udp_bytes_recv_total gauge").unwrap();
+    for entry in stats {
+        let container = entry.container_id.as_deref().unwrap_or("");
+        writeln!(
+            out,
+            "sigma_traffic_udp_bytes_recv_total{{hostname=\"{}\",process=\"{}\",container=\"{}\"}} {}",
+            hostname, entry.process_name, container, entry.udp_bytes_recv
+        ).unwrap();
+    }
+
+    writeln!(out).unwrap();
+
     writeln!(out, "# HELP sigma_tcp_retransmits_total TCP retransmit events by process (eBPF)").unwrap();
     writeln!(out, "# TYPE sigma_tcp_retransmits_total gauge").unwrap();
     for entry in stats {

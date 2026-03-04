@@ -109,6 +109,17 @@ sigma/
 - [x] Multi-provider DNS management (Cloudflare, Route 53, GoDaddy, Name.com — read-only sync with VPS-IP linking, domain/cert expiry tracking)
 - [x] Cloud account integration (AWS, Alibaba Cloud, DigitalOcean, Linode, Volcengine — store credentials, sync instances to VPS table, track source/origin)
 - [x] VPS IP change history (PostgreSQL trigger on `ip_addresses` column auto-tracks added/removed IPs across all code paths — manual, agent, cloud sync, import)
+- [x] eBPF TCP retransmit tracking + connection count monitoring (kprobes on `tcp_retransmit_skb`, `tcp_v4_connect`, `tcp_close`, `inet_csk_accept`)
+- [x] eBPF UDP traffic monitoring (kprobe on `udp_sendmsg`/`udp_recvmsg` — covers WireGuard/Xray UDP transports)
+- [ ] eBPF TCP RTT/latency tracking (kprobe on `tcp_rcv_established` — per-process round-trip time for VPN quality)
+- [ ] eBPF packet drop monitoring (tracepoint `skb:kfree_skb` — drop counts with reason codes)
+- [ ] eBPF TCP connection latency (SYN-to-established time via `tcp_v4_connect` entry+return)
+- [ ] eBPF DNS query tracing (trace UDP sends to port 53 — detect DNS leaks on VPN nodes)
+- [ ] eBPF disk I/O per process (kprobe on `vfs_read`/`vfs_write` — identify disk bottlenecks)
+- [ ] eBPF OOM kill tracking (tracepoint `oom:oom_score_adj_update` — immediate process kill alerts)
+- [ ] eBPF socket buffer depth monitoring (track `sk_rcvbuf`/`sk_sndbuf` usage — detect buffer bloat)
+- [ ] eBPF outbound connection audit (log all `connect()` with dest IP/port — detect unexpected traffic)
+- [ ] eBPF exec tracing (tracepoint `sched:sched_process_exec` — intrusion detection on remote VPS)
 
 ## Tech Stack
 

@@ -8,7 +8,7 @@
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
-      "title": "Overview",
+      "title": "TCP Overview",
       "type": "row"
     },
     {
@@ -26,7 +26,7 @@
       },
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
       "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "title": "Total Bytes Sent",
+      "title": "TCP Bytes Sent",
       "type": "stat",
       "targets": [{
         "expr": "sum(sigma_traffic_bytes_sent_total{hostname=~\"$hostname\"})",
@@ -48,7 +48,7 @@
       },
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
       "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "title": "Total Bytes Received",
+      "title": "TCP Bytes Received",
       "type": "stat",
       "targets": [{
         "expr": "sum(sigma_traffic_bytes_recv_total{hostname=~\"$hostname\"})",
@@ -86,7 +86,7 @@
       },
       "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
       "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "title": "Top Sender",
+      "title": "Top TCP Sender",
       "type": "stat",
       "targets": [{
         "expr": "topk(1, sigma_traffic_bytes_sent_total{hostname=~\"$hostname\"})",
@@ -106,7 +106,7 @@
       },
       "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
       "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "title": "Top Receiver",
+      "title": "Top TCP Receiver",
       "type": "stat",
       "targets": [{
         "expr": "topk(1, sigma_traffic_bytes_recv_total{hostname=~\"$hostname\"})",
@@ -116,7 +116,7 @@
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
-      "title": "Traffic Over Time",
+      "title": "TCP Traffic Over Time",
       "type": "row"
     },
     {
@@ -137,7 +137,7 @@
         "legend": { "displayMode": "table", "placement": "right", "sortBy": "Last *", "sortDesc": true, "calcs": ["lastNotNull"] },
         "tooltip": { "mode": "multi" }
       },
-      "title": "Bytes Sent by Process",
+      "title": "TCP Bytes Sent by Process",
       "type": "timeseries",
       "targets": [{
         "expr": "sigma_traffic_bytes_sent_total{hostname=~\"$hostname\"}",
@@ -162,7 +162,7 @@
         "legend": { "displayMode": "table", "placement": "right", "sortBy": "Last *", "sortDesc": true, "calcs": ["lastNotNull"] },
         "tooltip": { "mode": "multi" }
       },
-      "title": "Bytes Received by Process",
+      "title": "TCP Bytes Received by Process",
       "type": "timeseries",
       "targets": [{
         "expr": "sigma_traffic_bytes_recv_total{hostname=~\"$hostname\"}",
@@ -172,7 +172,7 @@
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
-      "title": "Breakdown",
+      "title": "TCP Breakdown",
       "type": "row"
     },
     {
@@ -191,7 +191,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"] },
         "tooltip": { "mode": "single" }
       },
-      "title": "Sent Traffic by Process",
+      "title": "TCP Sent by Process",
       "type": "piechart",
       "targets": [{
         "expr": "sigma_traffic_bytes_sent_total{hostname=~\"$hostname\"} > 0",
@@ -214,7 +214,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"] },
         "tooltip": { "mode": "single" }
       },
-      "title": "Received Traffic by Process",
+      "title": "TCP Received by Process",
       "type": "piechart",
       "targets": [{
         "expr": "sigma_traffic_bytes_recv_total{hostname=~\"$hostname\"} > 0",
@@ -239,22 +239,251 @@
         "legend": { "displayMode": "list", "placement": "bottom" },
         "tooltip": { "mode": "multi" }
       },
-      "title": "Total Sent vs Received",
+      "title": "Total TCP Sent vs Received",
       "type": "timeseries",
       "targets": [
         {
           "expr": "sum(sigma_traffic_bytes_sent_total{hostname=~\"$hostname\"})",
-          "legendFormat": "Total Sent"
+          "legendFormat": "TCP Sent"
         },
         {
           "expr": "sum(sigma_traffic_bytes_recv_total{hostname=~\"$hostname\"})",
-          "legendFormat": "Total Received"
+          "legendFormat": "TCP Received"
         }
       ]
     },
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "title": "UDP Overview",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "dark-orange", "value": null },
+            { "color": "yellow", "value": 1073741824 },
+            { "color": "red", "value": 10737418240 }
+          ]},
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 24 },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "UDP Bytes Sent",
+      "type": "stat",
+      "targets": [{
+        "expr": "sum(sigma_traffic_udp_bytes_sent_total{hostname=~\"$hostname\"})",
+        "legendFormat": "sent"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "dark-purple", "value": null },
+            { "color": "yellow", "value": 1073741824 },
+            { "color": "red", "value": 10737418240 }
+          ]},
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 24 },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "UDP Bytes Received",
+      "type": "stat",
+      "targets": [{
+        "expr": "sum(sigma_traffic_udp_bytes_recv_total{hostname=~\"$hostname\"})",
+        "legendFormat": "recv"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "dark-orange", "value": null }
+          ]},
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 24 },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Top UDP Sender",
+      "type": "stat",
+      "targets": [{
+        "expr": "topk(1, sigma_traffic_udp_bytes_sent_total{hostname=~\"$hostname\"})",
+        "legendFormat": "{{ process }}"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "dark-purple", "value": null }
+          ]},
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 24 },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Top UDP Receiver",
+      "type": "stat",
+      "targets": [{
+        "expr": "topk(1, sigma_traffic_udp_bytes_recv_total{hostname=~\"$hostname\"})",
+        "legendFormat": "{{ process }}"
+      }]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
+      "title": "UDP Traffic Over Time",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "stacking": { "mode": "normal" }
+          },
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 29 },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "sortBy": "Last *", "sortDesc": true, "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "title": "UDP Bytes Sent by Process",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "sigma_traffic_udp_bytes_sent_total{hostname=~\"$hostname\"}",
+        "legendFormat": "{{ process }}"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "stacking": { "mode": "normal" }
+          },
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 29 },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "sortBy": "Last *", "sortDesc": true, "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "title": "UDP Bytes Received by Process",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "sigma_traffic_udp_bytes_recv_total{hostname=~\"$hostname\"}",
+        "legendFormat": "{{ process }}"
+      }]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 37 },
+      "title": "UDP Breakdown",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 38 },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] },
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "single" }
+      },
+      "title": "UDP Sent by Process",
+      "type": "piechart",
+      "targets": [{
+        "expr": "sigma_traffic_udp_bytes_sent_total{hostname=~\"$hostname\"} > 0",
+        "legendFormat": "{{ process }}"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 38 },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] },
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "single" }
+      },
+      "title": "UDP Received by Process",
+      "type": "piechart",
+      "targets": [{
+        "expr": "sigma_traffic_udp_bytes_recv_total{hostname=~\"$hostname\"} > 0",
+        "legendFormat": "{{ process }}"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "fillOpacity": 30,
+            "lineWidth": 2,
+            "stacking": { "mode": "none" }
+          },
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 38 },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "title": "Total UDP Sent vs Received",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(sigma_traffic_udp_bytes_sent_total{hostname=~\"$hostname\"})",
+          "legendFormat": "UDP Sent"
+        },
+        {
+          "expr": "sum(sigma_traffic_udp_bytes_recv_total{hostname=~\"$hostname\"})",
+          "legendFormat": "UDP Received"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 46 },
       "title": "Process Details",
       "type": "row"
     },
@@ -266,20 +495,28 @@
           { "matcher": { "id": "byName", "options": "Process" }, "properties": [{ "id": "unit", "value": "string" }] },
           { "matcher": { "id": "byName", "options": "Container" }, "properties": [{ "id": "unit", "value": "string" }] },
           { "matcher": { "id": "byName", "options": "Hostname" }, "properties": [{ "id": "unit", "value": "string" }] },
-          { "matcher": { "id": "byName", "options": "Sent" }, "properties": [
+          { "matcher": { "id": "byName", "options": "TCP Sent" }, "properties": [
             { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
             { "id": "color", "value": { "mode": "continuous-GrYlRd" } }
           ]},
-          { "matcher": { "id": "byName", "options": "Received" }, "properties": [
+          { "matcher": { "id": "byName", "options": "TCP Received" }, "properties": [
+            { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
+            { "id": "color", "value": { "mode": "continuous-BlYlRd" } }
+          ]},
+          { "matcher": { "id": "byName", "options": "UDP Sent" }, "properties": [
+            { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
+            { "id": "color", "value": { "mode": "continuous-GrYlRd" } }
+          ]},
+          { "matcher": { "id": "byName", "options": "UDP Received" }, "properties": [
             { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
             { "id": "color", "value": { "mode": "continuous-BlYlRd" } }
           ]}
         ]
       },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 24 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 47 },
       "options": {
         "footer": { "enablePagination": true },
-        "sortBy": [{ "desc": true, "displayName": "Sent" }]
+        "sortBy": [{ "desc": true, "displayName": "TCP Sent" }]
       },
       "title": "All Processes — Traffic Detail",
       "type": "table",
@@ -297,18 +534,34 @@
           "instant": true,
           "format": "table",
           "refId": "B"
+        },
+        {
+          "expr": "sigma_traffic_udp_bytes_sent_total{hostname=~\"$hostname\"}",
+          "legendFormat": "",
+          "instant": true,
+          "format": "table",
+          "refId": "C"
+        },
+        {
+          "expr": "sigma_traffic_udp_bytes_recv_total{hostname=~\"$hostname\"}",
+          "legendFormat": "",
+          "instant": true,
+          "format": "table",
+          "refId": "D"
         }
       ],
       "transformations": [
         { "id": "seriesToColumns", "options": { "byField": "process" } },
         { "id": "organize", "options": {
-          "excludeByName": { "Time 1": true, "Time 2": true, "__name__ 1": true, "__name__ 2": true, "container 2": true, "hostname 2": true, "job 1": true, "job 2": true, "instance 1": true, "instance 2": true },
+          "excludeByName": { "Time 1": true, "Time 2": true, "Time 3": true, "Time 4": true, "__name__ 1": true, "__name__ 2": true, "__name__ 3": true, "__name__ 4": true, "container 2": true, "container 3": true, "container 4": true, "hostname 2": true, "hostname 3": true, "hostname 4": true, "job 1": true, "job 2": true, "job 3": true, "job 4": true, "instance 1": true, "instance 2": true, "instance 3": true, "instance 4": true },
           "renameByName": {
             "hostname 1": "Hostname",
             "process": "Process",
             "container 1": "Container",
-            "Value #A": "Sent",
-            "Value #B": "Received"
+            "Value #A": "TCP Sent",
+            "Value #B": "TCP Received",
+            "Value #C": "UDP Sent",
+            "Value #D": "UDP Received"
           }
         }}
       ]
@@ -342,6 +595,6 @@
     ]
   },
   "time": { "from": "now-6h", "to": "now" },
-  "title": "Sigma TCP Traffic (eBPF)",
+  "title": "Sigma Traffic (eBPF)",
   "uid": "sigma-tcp-traffic"
 }

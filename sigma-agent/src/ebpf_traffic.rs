@@ -48,6 +48,8 @@ pub struct ProcessTraffic {
     pub container_id: Option<String>,
     pub bytes_sent: u64,
     pub bytes_recv: u64,
+    pub udp_bytes_sent: u64,
+    pub udp_bytes_recv: u64,
     pub retransmits: u64,
     pub active_connections: u64,
     pub total_connections: u64,
@@ -138,6 +140,36 @@ pub fn load_ebpf() -> anyhow::Result<Ebpf> {
         None => warn!("kretprobe program 'inet_csk_accept' not found in eBPF object"),
     }
 
+    // Attach kprobe to udp_sendmsg (non-fatal)
+    match ebpf.program_mut("udp_sendmsg") {
+        Some(prog) => match KProbe::try_from(prog) {
+            Ok(kp) => {
+                if let Err(e) = kp.load().and_then(|()| kp.attach("udp_sendmsg", 0)) {
+                    warn!("Failed to attach kprobe to udp_sendmsg: {:#}", e);
+                } else {
+                    info!("Attached kprobe to udp_sendmsg");
+                }
+            }
+            Err(e) => warn!("udp_sendmsg program type mismatch: {:#}", e),
+        },
+        None => warn!("kprobe program 'udp_sendmsg' not found in eBPF object"),
+    }
+
+    // Attach kretprobe to udp_recvmsg (non-fatal)
+    match ebpf.program_mut("udp_recvmsg") {
+        Some(prog) => match KProbe::try_from(prog) {
+            Ok(kp) => {
+                if let Err(e) = kp.load().and_then(|()| kp.attach("udp_recvmsg", 0)) {
+                    warn!("Failed to attach kretprobe to udp_recvmsg: {:#}", e);
+                } else {
+                    info!("Attached kretprobe to udp_recvmsg");
+                }
+            }
+            Err(e) => warn!("udp_recvmsg program type mismatch: {:#}", e),
+        },
+        None => warn!("kretprobe program 'udp_recvmsg' not found in eBPF object"),
+    }
+
     Ok(ebpf)
 }
 
@@ -194,6 +226,26 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
         let _ = traffic_map.remove(key);
     }
 
+    // --- Read UDP_TRAFFIC_MAP (read-and-clear, like TRAFFIC_MAP) ---
+    let mut udp_entries: Vec<(TrafficKey, TrafficValue)> = Vec::new();
+    if let Some(map) = ebpf.map_mut("UDP_TRAFFIC_MAP") {
+        if let Ok(mut udp_map) = BpfHashMap::<&mut aya::maps::MapData, TrafficKey, TrafficValue>::try_from(map) {
+            let mut udp_keys: Vec<TrafficKey> = Vec::new();
+            for item in udp_map.iter() {
+                match item {
+                    Ok((key, value)) => {
+                        udp_entries.push((key, value));
+                        udp_keys.push(key);
+                    }
+                    Err(e) => debug!("Error reading UDP_TRAFFIC_MAP entry: {}", e),
+                }
+            }
+            for key in &udp_keys {
+                let _ = udp_map.remove(key);
+            }
+        }
+    }
+
     // --- Read RETRANSMIT_MAP (read-and-clear, like TRAFFIC_MAP) ---
     let mut retransmit_entries: Vec<(TrafficKey, RetransmitValue)> = Vec::new();
     if let Some(map) = ebpf.map_mut("RETRANSMIT_MAP") {
@@ -239,39 +291,49 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
     }
 
     // Aggregate by (process_name, container_id)
-    // (bytes_sent, bytes_recv, retransmits, active_conns, total_conns)
-    let mut aggregated: HashMap<(String, Option<String>), (u64, u64, u64, u64, u64)> = HashMap::new();
+    // (bytes_sent, bytes_recv, udp_bytes_sent, udp_bytes_recv, retransmits, active_conns, total_conns)
+    let mut aggregated: HashMap<(String, Option<String>), (u64, u64, u64, u64, u64, u64, u64)> = HashMap::new();
 
     for (key, value) in &raw_entries {
         let proc_name = resolve_process_name(key.pid, host_proc);
         let container_id = resolve_container_id(key.pid, host_proc);
-        let entry = aggregated.entry((proc_name, container_id)).or_insert((0, 0, 0, 0, 0));
+        let entry = aggregated.entry((proc_name, container_id)).or_insert((0, 0, 0, 0, 0, 0, 0));
         entry.0 += value.bytes_sent;
         entry.1 += value.bytes_recv;
+    }
+
+    for (key, value) in &udp_entries {
+        let proc_name = resolve_process_name(key.pid, host_proc);
+        let container_id = resolve_container_id(key.pid, host_proc);
+        let entry = aggregated.entry((proc_name, container_id)).or_insert((0, 0, 0, 0, 0, 0, 0));
+        entry.2 += value.bytes_sent;
+        entry.3 += value.bytes_recv;
     }
 
     for (key, value) in &retransmit_entries {
         let proc_name = resolve_process_name(key.pid, host_proc);
         let container_id = resolve_container_id(key.pid, host_proc);
-        let entry = aggregated.entry((proc_name, container_id)).or_insert((0, 0, 0, 0, 0));
-        entry.2 += value.count;
+        let entry = aggregated.entry((proc_name, container_id)).or_insert((0, 0, 0, 0, 0, 0, 0));
+        entry.4 += value.count;
     }
 
     for (key, value) in &conn_entries {
         let proc_name = resolve_process_name(key.pid, host_proc);
         let container_id = resolve_container_id(key.pid, host_proc);
-        let entry = aggregated.entry((proc_name, container_id)).or_insert((0, 0, 0, 0, 0));
-        entry.3 += value.active;
-        entry.4 += value.total;
+        let entry = aggregated.entry((proc_name, container_id)).or_insert((0, 0, 0, 0, 0, 0, 0));
+        entry.5 += value.active;
+        entry.6 += value.total;
     }
 
     let stats: Vec<ProcessTraffic> = aggregated
         .into_iter()
-        .map(|((process_name, container_id), (bytes_sent, bytes_recv, retransmits, active_connections, total_connections))| ProcessTraffic {
+        .map(|((process_name, container_id), (bytes_sent, bytes_recv, udp_bytes_sent, udp_bytes_recv, retransmits, active_connections, total_connections))| ProcessTraffic {
             process_name,
             container_id,
             bytes_sent,
             bytes_recv,
+            udp_bytes_sent,
+            udp_bytes_recv,
             retransmits,
             active_connections,
             total_connections,

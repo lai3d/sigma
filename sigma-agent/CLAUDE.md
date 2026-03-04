@@ -299,12 +299,13 @@ From each listener + its referenced cluster:
 The xDS poll loop adds `&source=dynamic` to its route query, so static routes are never
 pushed back to Envoy via xDS (Envoy already has them in its config file).
 
-## eBPF TCP Traffic Monitoring
+## eBPF Traffic Monitoring
 
-When `--ebpf-traffic` is enabled, the agent uses eBPF kprobes to monitor TCP activity per process.
-This includes bytes sent/received (`tcp_sendmsg`/`tcp_recvmsg`), retransmit events (`tcp_retransmit_skb`),
-and connection tracking (`tcp_v4_connect`/`tcp_close`/`inet_csk_accept`). This is feature-gated behind
-the `ebpf-traffic` cargo feature (compiled in via Docker by default).
+When `--ebpf-traffic` is enabled, the agent uses eBPF kprobes to monitor TCP and UDP activity per process.
+This includes TCP bytes sent/received (`tcp_sendmsg`/`tcp_recvmsg`), UDP bytes sent/received
+(`udp_sendmsg`/`udp_recvmsg`), retransmit events (`tcp_retransmit_skb`), and connection tracking
+(`tcp_v4_connect`/`tcp_close`/`inet_csk_accept`). This is feature-gated behind the `ebpf-traffic`
+cargo feature (compiled in via Docker by default).
 
 ### Configuration
 
@@ -327,6 +328,16 @@ sigma_traffic_bytes_sent_total{hostname="relay-01",process="xray",container="abc
 # HELP sigma_traffic_bytes_recv_total TCP bytes received by process (eBPF)
 # TYPE sigma_traffic_bytes_recv_total gauge
 sigma_traffic_bytes_recv_total{hostname="relay-01",process="envoy",container=""} 2345678
+
+# HELP sigma_traffic_udp_bytes_sent_total UDP bytes sent by process (eBPF)
+# TYPE sigma_traffic_udp_bytes_sent_total gauge
+sigma_traffic_udp_bytes_sent_total{hostname="relay-01",process="xray",container="abc123def456"} 5678901
+sigma_traffic_udp_bytes_sent_total{hostname="relay-01",process="wireguard",container=""} 3456789
+
+# HELP sigma_traffic_udp_bytes_recv_total UDP bytes received by process (eBPF)
+# TYPE sigma_traffic_udp_bytes_recv_total gauge
+sigma_traffic_udp_bytes_recv_total{hostname="relay-01",process="xray",container="abc123def456"} 4567890
+sigma_traffic_udp_bytes_recv_total{hostname="relay-01",process="wireguard",container=""} 2345678
 
 # HELP sigma_tcp_retransmits_total TCP retransmit events by process (eBPF)
 # TYPE sigma_tcp_retransmits_total gauge
