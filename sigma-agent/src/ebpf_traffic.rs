@@ -1,16 +1,28 @@
 use std::collections::HashMap;
-use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
 use aya::maps::HashMap as BpfHashMap;
-use aya::programs::{KProbe, TracePoint};
+use aya::programs::KProbe;
 use aya::{Ebpf, EbpfLoader};
-use sigma_agent_ebpf_common::{TrafficKey, TrafficValue};
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
-// Implement Pod for our shared types so aya can read them from BPF maps
+// Local types with same repr(C) layout as sigma_agent_ebpf_common types.
+// Needed because Rust orphan rules prevent implementing aya::Pod for external types.
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct TrafficKey {
+    pid: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct TrafficValue {
+    bytes_sent: u64,
+    bytes_recv: u64,
+}
+
 unsafe impl aya::Pod for TrafficKey {}
 unsafe impl aya::Pod for TrafficValue {}
 

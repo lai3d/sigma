@@ -14,7 +14,6 @@ RUN cd sigma-agent-ebpf && \
 # Stage 2: Build agent with eBPF feature (stable toolchain)
 FROM rust:latest AS builder
 WORKDIR /build
-COPY sigma-agent-ebpf-common/ sigma-agent-ebpf-common/
 COPY sigma-agent/ sigma-agent/
 # Copy compiled eBPF bytecode into a well-known location
 COPY --from=ebpf-builder \
