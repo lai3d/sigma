@@ -95,7 +95,7 @@ pub fn load_ebpf() -> anyhow::Result<Ebpf> {
 
     // Attach kprobe to tcp_retransmit_skb (non-fatal)
     match ebpf.program_mut("tcp_retransmit_skb") {
-        Some(prog) => match KProbe::try_from(prog) {
+        Some(prog) => match <&mut KProbe>::try_from(prog) {
             Ok(kp) => {
                 if let Err(e) = kp.load().and_then(|()| kp.attach("tcp_retransmit_skb", 0)) {
                     warn!("Failed to attach kprobe to tcp_retransmit_skb: {:#}", e);
@@ -110,7 +110,7 @@ pub fn load_ebpf() -> anyhow::Result<Ebpf> {
 
     // Attach kretprobe to tcp_v4_connect (non-fatal)
     match ebpf.program_mut("tcp_v4_connect") {
-        Some(prog) => match KProbe::try_from(prog) {
+        Some(prog) => match <&mut KProbe>::try_from(prog) {
             Ok(kp) => {
                 if let Err(e) = kp.load().and_then(|()| kp.attach("tcp_v4_connect", 0)) {
                     warn!("Failed to attach kretprobe to tcp_v4_connect: {:#}", e);
@@ -125,7 +125,7 @@ pub fn load_ebpf() -> anyhow::Result<Ebpf> {
 
     // Attach kprobe to tcp_close (non-fatal)
     match ebpf.program_mut("tcp_close") {
-        Some(prog) => match KProbe::try_from(prog) {
+        Some(prog) => match <&mut KProbe>::try_from(prog) {
             Ok(kp) => {
                 if let Err(e) = kp.load().and_then(|()| kp.attach("tcp_close", 0)) {
                     warn!("Failed to attach kprobe to tcp_close: {:#}", e);
@@ -140,7 +140,7 @@ pub fn load_ebpf() -> anyhow::Result<Ebpf> {
 
     // Attach kretprobe to inet_csk_accept (non-fatal)
     match ebpf.program_mut("inet_csk_accept") {
-        Some(prog) => match KProbe::try_from(prog) {
+        Some(prog) => match <&mut KProbe>::try_from(prog) {
             Ok(kp) => {
                 if let Err(e) = kp.load().and_then(|()| kp.attach("inet_csk_accept", 0)) {
                     warn!("Failed to attach kretprobe to inet_csk_accept: {:#}", e);
@@ -155,7 +155,7 @@ pub fn load_ebpf() -> anyhow::Result<Ebpf> {
 
     // Attach kprobe to udp_sendmsg (non-fatal)
     match ebpf.program_mut("udp_sendmsg") {
-        Some(prog) => match KProbe::try_from(prog) {
+        Some(prog) => match <&mut KProbe>::try_from(prog) {
             Ok(kp) => {
                 if let Err(e) = kp.load().and_then(|()| kp.attach("udp_sendmsg", 0)) {
                     warn!("Failed to attach kprobe to udp_sendmsg: {:#}", e);
@@ -170,7 +170,7 @@ pub fn load_ebpf() -> anyhow::Result<Ebpf> {
 
     // Attach kprobe to tcp_rcv_established (non-fatal — RTT tracking)
     match ebpf.program_mut("tcp_rcv_established") {
-        Some(prog) => match KProbe::try_from(prog) {
+        Some(prog) => match <&mut KProbe>::try_from(prog) {
             Ok(kp) => {
                 if let Err(e) = kp.load().and_then(|()| kp.attach("tcp_rcv_established", 0)) {
                     warn!("Failed to attach kprobe to tcp_rcv_established: {:#}", e);
@@ -185,7 +185,7 @@ pub fn load_ebpf() -> anyhow::Result<Ebpf> {
 
     // Attach kretprobe to udp_recvmsg (non-fatal)
     match ebpf.program_mut("udp_recvmsg") {
-        Some(prog) => match KProbe::try_from(prog) {
+        Some(prog) => match <&mut KProbe>::try_from(prog) {
             Ok(kp) => {
                 if let Err(e) = kp.load().and_then(|()| kp.attach("udp_recvmsg", 0)) {
                     warn!("Failed to attach kretprobe to udp_recvmsg: {:#}", e);
