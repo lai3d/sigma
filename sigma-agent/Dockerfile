@@ -1,6 +1,7 @@
 # Stage 1: Build eBPF kernel programs (nightly toolchain, BPF target)
 FROM rust:latest AS ebpf-builder
 RUN rustup install nightly && rustup component add rust-src --toolchain nightly
+RUN cargo +nightly install bpf-linker
 WORKDIR /build
 COPY sigma-agent-ebpf-common/ sigma-agent-ebpf-common/
 COPY sigma-agent-ebpf/ sigma-agent-ebpf/

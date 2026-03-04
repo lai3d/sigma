@@ -24,13 +24,13 @@ pub fn tcp_sendmsg(ctx: ProbeContext) -> u32 {
 }
 
 fn try_tcp_sendmsg(ctx: &ProbeContext) -> Result<(), i64> {
-    let size: u64 = unsafe { ctx.arg(2).ok_or(1i64)? };
+    let size: u64 = ctx.arg(2).ok_or(1i64)?;
     let pid = (bpf_get_current_pid_tgid() >> 32) as u32;
 
     let key = TrafficKey { pid };
 
     // Try to update existing entry, otherwise insert new
-    if let Some(val) = unsafe { TRAFFIC_MAP.get_ptr_mut(&key) } {
+    if let Some(val) = TRAFFIC_MAP.get_ptr_mut(&key) {
         unsafe {
             (*val).bytes_sent += size;
         }
@@ -64,7 +64,7 @@ fn try_tcp_recvmsg(ctx: &RetProbeContext) -> Result<(), i64> {
 
     let key = TrafficKey { pid };
 
-    if let Some(val) = unsafe { TRAFFIC_MAP.get_ptr_mut(&key) } {
+    if let Some(val) = TRAFFIC_MAP.get_ptr_mut(&key) {
         unsafe {
             (*val).bytes_recv += size;
         }
