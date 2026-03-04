@@ -1,7 +1,7 @@
 [package]
 name = "sigma-agent-ebpf"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [[bin]]
 name = "sigma-agent-ebpf"

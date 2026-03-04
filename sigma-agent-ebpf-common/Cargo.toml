@@ -1,7 +1,7 @@
 [package]
 name = "sigma-agent-ebpf-common"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 # No dependencies — this crate is shared between eBPF kernel (no_std) and userspace
