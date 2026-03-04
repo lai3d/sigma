@@ -303,9 +303,10 @@ pushed back to Envoy via xDS (Envoy already has them in its config file).
 
 When `--ebpf-traffic` is enabled, the agent uses eBPF kprobes to monitor TCP and UDP activity per process.
 This includes TCP bytes sent/received (`tcp_sendmsg`/`tcp_recvmsg`), UDP bytes sent/received
-(`udp_sendmsg`/`udp_recvmsg`), retransmit events (`tcp_retransmit_skb`), and connection tracking
-(`tcp_v4_connect`/`tcp_close`/`inet_csk_accept`). This is feature-gated behind the `ebpf-traffic`
-cargo feature (compiled in via Docker by default).
+(`udp_sendmsg`/`udp_recvmsg`), retransmit events (`tcp_retransmit_skb`), connection tracking
+(`tcp_v4_connect`/`tcp_close`/`inet_csk_accept`), and TCP RTT/latency tracking
+(`tcp_rcv_established` — reads `srtt_us` from `tcp_sock` via `bpf_probe_read_kernel`).
+This is feature-gated behind the `ebpf-traffic` cargo feature (compiled in via Docker by default).
 
 ### Configuration
 
@@ -350,7 +351,24 @@ sigma_tcp_connections_active{hostname="relay-01",process="envoy",container=""} 1
 # HELP sigma_tcp_connections_total Total TCP connections opened by process (eBPF)
 # TYPE sigma_tcp_connections_total counter
 sigma_tcp_connections_total{hostname="relay-01",process="envoy",container=""} 1234
+
+# HELP sigma_tcp_rtt_avg_us Average TCP round-trip time in microseconds by process (eBPF)
+# TYPE sigma_tcp_rtt_avg_us gauge
+sigma_tcp_rtt_avg_us{hostname="relay-01",process="envoy",container=""} 12500
+
+# HELP sigma_tcp_rtt_min_us Minimum TCP round-trip time in microseconds by process (eBPF)
+# TYPE sigma_tcp_rtt_min_us gauge
+sigma_tcp_rtt_min_us{hostname="relay-01",process="envoy",container=""} 800
+
+# HELP sigma_tcp_rtt_max_us Maximum TCP round-trip time in microseconds by process (eBPF)
+# TYPE sigma_tcp_rtt_max_us gauge
+sigma_tcp_rtt_max_us{hostname="relay-01",process="envoy",container=""} 95000
 ```
+
+RTT metrics are only emitted for processes with active TCP RTT data. The `srtt_us` field offset
+within `tcp_sock` is defined as `SRTT_US_OFFSET` (744 for Linux 6.x x86_64) and may need
+adjustment for different kernel versions. If the read fails, the probe safely returns without
+updating — no crash, just missing RTT data.
 
 Labels: `process` = resolved from `/proc/<pid>/comm`, `container` = Docker/containerd ID (first 12 hex chars) or empty.
 

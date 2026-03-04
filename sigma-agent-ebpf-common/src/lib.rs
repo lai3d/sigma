@@ -29,3 +29,13 @@ pub struct ConnValue {
     pub active: u64,
     pub total: u64,
 }
+
+/// TCP RTT (round-trip time) statistics per PID.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct RttValue {
+    pub count: u64,
+    pub sum_us: u64,
+    pub min_us: u64,
+    pub max_us: u64,
+}

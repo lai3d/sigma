@@ -255,6 +255,130 @@
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "title": "TCP RTT (Round-Trip Time)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 50000 },
+            { "color": "red", "value": 200000 }
+          ]},
+          "unit": "\u00b5s"
+        }
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 24 },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Avg RTT (All Processes)",
+      "type": "stat",
+      "targets": [{
+        "expr": "avg(sigma_tcp_rtt_avg_us{hostname=~\"$hostname\"})",
+        "legendFormat": "avg"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "green", "value": null },
+            { "color": "orange", "value": 100000 },
+            { "color": "red", "value": 500000 }
+          ]},
+          "unit": "\u00b5s"
+        }
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 24 },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Max RTT",
+      "type": "stat",
+      "targets": [{
+        "expr": "max(sigma_tcp_rtt_max_us{hostname=~\"$hostname\"})",
+        "legendFormat": "max"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "text", "value": null }] },
+          "unit": "none"
+        }
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 24 },
+      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Processes with RTT Data",
+      "type": "stat",
+      "targets": [{
+        "expr": "count(sigma_tcp_rtt_avg_us{hostname=~\"$hostname\"} > 0)",
+        "legendFormat": "processes"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "stacking": { "mode": "none" }
+          },
+          "unit": "\u00b5s"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "sortBy": "Last *", "sortDesc": true, "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "title": "RTT Average by Process",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "sigma_tcp_rtt_avg_us{hostname=~\"$hostname\"}",
+        "legendFormat": "{{ process }}"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "fillOpacity": 15,
+            "lineWidth": 1,
+            "stacking": { "mode": "none" }
+          },
+          "unit": "\u00b5s"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "sortBy": "Last *", "sortDesc": true, "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "title": "RTT Min/Max Range by Process",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sigma_tcp_rtt_min_us{hostname=~\"$hostname\"}",
+          "legendFormat": "{{ process }} min"
+        },
+        {
+          "expr": "sigma_tcp_rtt_max_us{hostname=~\"$hostname\"}",
+          "legendFormat": "{{ process }} max"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
       "title": "UDP Overview",
       "type": "row"
     },
@@ -271,7 +395,7 @@
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 24 },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 37 },
       "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "title": "UDP Bytes Sent",
       "type": "stat",
@@ -293,7 +417,7 @@
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 24 },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 37 },
       "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "title": "UDP Bytes Received",
       "type": "stat",
@@ -313,7 +437,7 @@
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 24 },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 37 },
       "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "title": "Top UDP Sender",
       "type": "stat",
@@ -333,7 +457,7 @@
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 24 },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 37 },
       "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "title": "Top UDP Receiver",
       "type": "stat",
@@ -344,7 +468,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 41 },
       "title": "UDP Traffic Over Time",
       "type": "row"
     },
@@ -361,7 +485,7 @@
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 29 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
       "options": {
         "legend": { "displayMode": "table", "placement": "right", "sortBy": "Last *", "sortDesc": true, "calcs": ["lastNotNull"] },
         "tooltip": { "mode": "multi" }
@@ -386,7 +510,7 @@
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 29 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
       "options": {
         "legend": { "displayMode": "table", "placement": "right", "sortBy": "Last *", "sortDesc": true, "calcs": ["lastNotNull"] },
         "tooltip": { "mode": "multi" }
@@ -400,7 +524,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 37 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 50 },
       "title": "UDP Breakdown",
       "type": "row"
     },
@@ -413,7 +537,7 @@
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 38 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 51 },
       "options": {
         "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] },
         "pieType": "donut",
@@ -436,7 +560,7 @@
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 38 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 51 },
       "options": {
         "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] },
         "pieType": "donut",
@@ -463,7 +587,7 @@
           "unit": "decbytes"
         }
       },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 38 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 51 },
       "options": {
         "legend": { "displayMode": "list", "placement": "bottom" },
         "tooltip": { "mode": "multi" }
@@ -483,7 +607,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 46 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 59 },
       "title": "Process Details",
       "type": "row"
     },
@@ -510,10 +634,15 @@
           { "matcher": { "id": "byName", "options": "UDP Received" }, "properties": [
             { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
             { "id": "color", "value": { "mode": "continuous-BlYlRd" } }
+          ]},
+          { "matcher": { "id": "byName", "options": "RTT Avg" }, "properties": [
+            { "id": "unit", "value": "\u00b5s" },
+            { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
+            { "id": "color", "value": { "mode": "continuous-GrYlRd" } }
           ]}
         ]
       },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 47 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 60 },
       "options": {
         "footer": { "enablePagination": true },
         "sortBy": [{ "desc": true, "displayName": "TCP Sent" }]
@@ -548,12 +677,19 @@
           "instant": true,
           "format": "table",
           "refId": "D"
+        },
+        {
+          "expr": "sigma_tcp_rtt_avg_us{hostname=~\"$hostname\"}",
+          "legendFormat": "",
+          "instant": true,
+          "format": "table",
+          "refId": "E"
         }
       ],
       "transformations": [
         { "id": "seriesToColumns", "options": { "byField": "process" } },
         { "id": "organize", "options": {
-          "excludeByName": { "Time 1": true, "Time 2": true, "Time 3": true, "Time 4": true, "__name__ 1": true, "__name__ 2": true, "__name__ 3": true, "__name__ 4": true, "container 2": true, "container 3": true, "container 4": true, "hostname 2": true, "hostname 3": true, "hostname 4": true, "job 1": true, "job 2": true, "job 3": true, "job 4": true, "instance 1": true, "instance 2": true, "instance 3": true, "instance 4": true },
+          "excludeByName": { "Time 1": true, "Time 2": true, "Time 3": true, "Time 4": true, "Time 5": true, "__name__ 1": true, "__name__ 2": true, "__name__ 3": true, "__name__ 4": true, "__name__ 5": true, "container 2": true, "container 3": true, "container 4": true, "container 5": true, "hostname 2": true, "hostname 3": true, "hostname 4": true, "hostname 5": true, "job 1": true, "job 2": true, "job 3": true, "job 4": true, "job 5": true, "instance 1": true, "instance 2": true, "instance 3": true, "instance 4": true, "instance 5": true },
           "renameByName": {
             "hostname 1": "Hostname",
             "process": "Process",
@@ -561,7 +697,8 @@
             "Value #A": "TCP Sent",
             "Value #B": "TCP Received",
             "Value #C": "UDP Sent",
-            "Value #D": "UDP Received"
+            "Value #D": "UDP Received",
+            "Value #E": "RTT Avg"
           }
         }}
       ]

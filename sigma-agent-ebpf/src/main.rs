@@ -2,12 +2,17 @@
 #![no_main]
 
 use aya_ebpf::{
-    helpers::bpf_get_current_pid_tgid,
+    helpers::{bpf_get_current_pid_tgid, bpf_probe_read_kernel},
     macros::{kprobe, kretprobe, map},
     maps::HashMap,
     programs::{ProbeContext, RetProbeContext},
 };
-use sigma_agent_ebpf_common::{ConnValue, RetransmitValue, TrafficKey, TrafficValue};
+use sigma_agent_ebpf_common::{ConnValue, RetransmitValue, RttValue, TrafficKey, TrafficValue};
+
+/// Offset of `srtt_us` field within `struct tcp_sock` (Linux 6.x x86_64).
+/// The kernel stores smoothed RTT as `actual_rtt_us << 3`, so we right-shift by 3 to unscale.
+/// This offset varies by kernel version/config — rebuild if targeting a different kernel.
+const SRTT_US_OFFSET: usize = 744;
 
 /// Per-PID TCP traffic counters. Userspace reads and periodically clears this map.
 #[map]
@@ -24,6 +29,10 @@ static RETRANSMIT_MAP: HashMap<TrafficKey, RetransmitValue> = HashMap::with_max_
 /// Per-PID TCP connection counters (active gauge + total cumulative).
 #[map]
 static CONN_MAP: HashMap<TrafficKey, ConnValue> = HashMap::with_max_entries(8192, 0);
+
+/// Per-PID TCP RTT statistics (count, sum, min, max in microseconds).
+#[map]
+static RTT_MAP: HashMap<TrafficKey, RttValue> = HashMap::with_max_entries(8192, 0);
 
 /// kprobe on tcp_sendmsg — called as tcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 /// The third argument (size) is the number of bytes being sent.
@@ -262,6 +271,60 @@ fn try_inet_csk_accept(ctx: &RetProbeContext) -> Result<(), i64> {
     } else {
         let val = ConnValue { active: 1, total: 1 };
         let _ = CONN_MAP.insert(&key, &val, 0);
+    }
+
+    Ok(())
+}
+
+/// kprobe on tcp_rcv_established — called as tcp_rcv_established(struct sock *sk, ...)
+/// Reads srtt_us from the tcp_sock struct to track per-process RTT.
+#[kprobe]
+pub fn tcp_rcv_established(ctx: ProbeContext) -> u32 {
+    match try_tcp_rcv_established(&ctx) {
+        Ok(()) => 0,
+        Err(_) => 0,
+    }
+}
+
+fn try_tcp_rcv_established(ctx: &ProbeContext) -> Result<(), i64> {
+    let sk: *const u8 = ctx.arg(0).ok_or(1i64)?;
+    if sk.is_null() {
+        return Ok(());
+    }
+
+    // Read srtt_us from tcp_sock at the known offset.
+    // The kernel stores it as actual_rtt << 3, so right-shift to get microseconds.
+    let srtt_raw: u32 = unsafe {
+        bpf_probe_read_kernel(sk.add(SRTT_US_OFFSET) as *const u32).map_err(|_| 1i64)?
+    };
+    let rtt_us = (srtt_raw >> 3) as u64;
+
+    if rtt_us == 0 {
+        return Ok(());
+    }
+
+    let pid = (bpf_get_current_pid_tgid() >> 32) as u32;
+    let key = TrafficKey { pid };
+
+    if let Some(val) = RTT_MAP.get_ptr_mut(&key) {
+        unsafe {
+            (*val).count += 1;
+            (*val).sum_us += rtt_us;
+            if rtt_us < (*val).min_us {
+                (*val).min_us = rtt_us;
+            }
+            if rtt_us > (*val).max_us {
+                (*val).max_us = rtt_us;
+            }
+        }
+    } else {
+        let val = RttValue {
+            count: 1,
+            sum_us: rtt_us,
+            min_us: rtt_us,
+            max_us: rtt_us,
+        };
+        let _ = RTT_MAP.insert(&key, &val, 0);
     }
 
     Ok(())

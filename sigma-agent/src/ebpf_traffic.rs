@@ -36,10 +36,20 @@ struct ConnValue {
     total: u64,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct RttValue {
+    count: u64,
+    sum_us: u64,
+    min_us: u64,
+    max_us: u64,
+}
+
 unsafe impl aya::Pod for TrafficKey {}
 unsafe impl aya::Pod for TrafficValue {}
 unsafe impl aya::Pod for RetransmitValue {}
 unsafe impl aya::Pod for ConnValue {}
+unsafe impl aya::Pod for RttValue {}
 
 /// Per-process traffic stats resolved from eBPF data.
 #[derive(Clone, Debug)]
@@ -53,6 +63,9 @@ pub struct ProcessTraffic {
     pub retransmits: u64,
     pub active_connections: u64,
     pub total_connections: u64,
+    pub rtt_avg_us: u64,
+    pub rtt_min_us: u64,
+    pub rtt_max_us: u64,
 }
 
 pub type SharedTrafficStats = Arc<RwLock<Vec<ProcessTraffic>>>;
@@ -153,6 +166,21 @@ pub fn load_ebpf() -> anyhow::Result<Ebpf> {
             Err(e) => warn!("udp_sendmsg program type mismatch: {:#}", e),
         },
         None => warn!("kprobe program 'udp_sendmsg' not found in eBPF object"),
+    }
+
+    // Attach kprobe to tcp_rcv_established (non-fatal — RTT tracking)
+    match ebpf.program_mut("tcp_rcv_established") {
+        Some(prog) => match KProbe::try_from(prog) {
+            Ok(kp) => {
+                if let Err(e) = kp.load().and_then(|()| kp.attach("tcp_rcv_established", 0)) {
+                    warn!("Failed to attach kprobe to tcp_rcv_established: {:#}", e);
+                } else {
+                    info!("Attached kprobe to tcp_rcv_established");
+                }
+            }
+            Err(e) => warn!("tcp_rcv_established program type mismatch: {:#}", e),
+        },
+        None => warn!("kprobe program 'tcp_rcv_established' not found in eBPF object"),
     }
 
     // Attach kretprobe to udp_recvmsg (non-fatal)
@@ -266,6 +294,26 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
         }
     }
 
+    // --- Read RTT_MAP (read-and-clear, like TRAFFIC_MAP) ---
+    let mut rtt_entries: Vec<(TrafficKey, RttValue)> = Vec::new();
+    if let Some(map) = ebpf.map_mut("RTT_MAP") {
+        if let Ok(mut rtt_map) = BpfHashMap::<&mut aya::maps::MapData, TrafficKey, RttValue>::try_from(map) {
+            let mut rtt_keys: Vec<TrafficKey> = Vec::new();
+            for item in rtt_map.iter() {
+                match item {
+                    Ok((key, value)) => {
+                        rtt_entries.push((key, value));
+                        rtt_keys.push(key);
+                    }
+                    Err(e) => debug!("Error reading RTT_MAP entry: {}", e),
+                }
+            }
+            for key in &rtt_keys {
+                let _ = rtt_map.remove(key);
+            }
+        }
+    }
+
     // --- Read CONN_MAP (don't clear — active is a gauge) ---
     let mut conn_entries: Vec<(TrafficKey, ConnValue)> = Vec::new();
     if let Some(map) = ebpf.map_mut("CONN_MAP") {
@@ -291,52 +339,88 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
     }
 
     // Aggregate by (process_name, container_id)
-    // (bytes_sent, bytes_recv, udp_bytes_sent, udp_bytes_recv, retransmits, active_conns, total_conns)
-    let mut aggregated: HashMap<(String, Option<String>), (u64, u64, u64, u64, u64, u64, u64)> = HashMap::new();
+    // Fields: bytes_sent, bytes_recv, udp_bytes_sent, udp_bytes_recv, retransmits,
+    //         active_conns, total_conns, rtt_count, rtt_sum_us, rtt_min_us, rtt_max_us
+    #[derive(Default)]
+    struct Agg {
+        bytes_sent: u64,
+        bytes_recv: u64,
+        udp_bytes_sent: u64,
+        udp_bytes_recv: u64,
+        retransmits: u64,
+        active_conns: u64,
+        total_conns: u64,
+        rtt_count: u64,
+        rtt_sum_us: u64,
+        rtt_min_us: u64,
+        rtt_max_us: u64,
+    }
+
+    let mut aggregated: HashMap<(String, Option<String>), Agg> = HashMap::new();
 
     for (key, value) in &raw_entries {
         let proc_name = resolve_process_name(key.pid, host_proc);
         let container_id = resolve_container_id(key.pid, host_proc);
-        let entry = aggregated.entry((proc_name, container_id)).or_insert((0, 0, 0, 0, 0, 0, 0));
-        entry.0 += value.bytes_sent;
-        entry.1 += value.bytes_recv;
+        let entry = aggregated.entry((proc_name, container_id)).or_default();
+        entry.bytes_sent += value.bytes_sent;
+        entry.bytes_recv += value.bytes_recv;
     }
 
     for (key, value) in &udp_entries {
         let proc_name = resolve_process_name(key.pid, host_proc);
         let container_id = resolve_container_id(key.pid, host_proc);
-        let entry = aggregated.entry((proc_name, container_id)).or_insert((0, 0, 0, 0, 0, 0, 0));
-        entry.2 += value.bytes_sent;
-        entry.3 += value.bytes_recv;
+        let entry = aggregated.entry((proc_name, container_id)).or_default();
+        entry.udp_bytes_sent += value.bytes_sent;
+        entry.udp_bytes_recv += value.bytes_recv;
     }
 
     for (key, value) in &retransmit_entries {
         let proc_name = resolve_process_name(key.pid, host_proc);
         let container_id = resolve_container_id(key.pid, host_proc);
-        let entry = aggregated.entry((proc_name, container_id)).or_insert((0, 0, 0, 0, 0, 0, 0));
-        entry.4 += value.count;
+        let entry = aggregated.entry((proc_name, container_id)).or_default();
+        entry.retransmits += value.count;
+    }
+
+    for (key, value) in &rtt_entries {
+        let proc_name = resolve_process_name(key.pid, host_proc);
+        let container_id = resolve_container_id(key.pid, host_proc);
+        let entry = aggregated.entry((proc_name, container_id)).or_default();
+        entry.rtt_count += value.count;
+        entry.rtt_sum_us += value.sum_us;
+        if entry.rtt_min_us == 0 || value.min_us < entry.rtt_min_us {
+            entry.rtt_min_us = value.min_us;
+        }
+        if value.max_us > entry.rtt_max_us {
+            entry.rtt_max_us = value.max_us;
+        }
     }
 
     for (key, value) in &conn_entries {
         let proc_name = resolve_process_name(key.pid, host_proc);
         let container_id = resolve_container_id(key.pid, host_proc);
-        let entry = aggregated.entry((proc_name, container_id)).or_insert((0, 0, 0, 0, 0, 0, 0));
-        entry.5 += value.active;
-        entry.6 += value.total;
+        let entry = aggregated.entry((proc_name, container_id)).or_default();
+        entry.active_conns += value.active;
+        entry.total_conns += value.total;
     }
 
     let stats: Vec<ProcessTraffic> = aggregated
         .into_iter()
-        .map(|((process_name, container_id), (bytes_sent, bytes_recv, udp_bytes_sent, udp_bytes_recv, retransmits, active_connections, total_connections))| ProcessTraffic {
-            process_name,
-            container_id,
-            bytes_sent,
-            bytes_recv,
-            udp_bytes_sent,
-            udp_bytes_recv,
-            retransmits,
-            active_connections,
-            total_connections,
+        .map(|((process_name, container_id), agg)| {
+            let rtt_avg_us = if agg.rtt_count > 0 { agg.rtt_sum_us / agg.rtt_count } else { 0 };
+            ProcessTraffic {
+                process_name,
+                container_id,
+                bytes_sent: agg.bytes_sent,
+                bytes_recv: agg.bytes_recv,
+                udp_bytes_sent: agg.udp_bytes_sent,
+                udp_bytes_recv: agg.udp_bytes_recv,
+                retransmits: agg.retransmits,
+                active_connections: agg.active_conns,
+                total_connections: agg.total_conns,
+                rtt_avg_us,
+                rtt_min_us: agg.rtt_min_us,
+                rtt_max_us: agg.rtt_max_us,
+            }
         })
         .collect();
 
