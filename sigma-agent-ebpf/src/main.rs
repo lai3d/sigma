@@ -6,6 +6,7 @@ use aya_ebpf::{
     macros::{kprobe, kretprobe, map, tracepoint},
     maps::HashMap,
     programs::{ProbeContext, RetProbeContext, TracePointContext},
+    EbpfContext,
 };
 use sigma_agent_ebpf_common::{ConnLatencyValue, ConnValue, DnsQueryValue, DropKey, DropValue, ExecValue, RetransmitValue, RttValue, TrafficKey, TrafficValue};
 
@@ -303,7 +304,7 @@ fn try_tcp_v4_connect(ctx: &RetProbeContext) -> Result<(), i64> {
     }
 
     // Compute connection latency from entry timestamp
-    if let Some(start_ts) = CONN_START_TS.get(&key) {
+    if let Some(start_ts) = unsafe { CONN_START_TS.get(&key) } {
         let now = unsafe { bpf_ktime_get_ns() };
         let delta_us = (now - *start_ts) / 1000;
         let _ = CONN_START_TS.remove(&key);
