@@ -3,11 +3,11 @@
 
 use aya_ebpf::{
     helpers::{bpf_get_current_pid_tgid, bpf_probe_read_kernel},
-    macros::{kprobe, kretprobe, map},
+    macros::{kprobe, kretprobe, map, tracepoint},
     maps::HashMap,
-    programs::{ProbeContext, RetProbeContext},
+    programs::{ProbeContext, RetProbeContext, TracePointContext},
 };
-use sigma_agent_ebpf_common::{ConnValue, RetransmitValue, RttValue, TrafficKey, TrafficValue};
+use sigma_agent_ebpf_common::{ConnValue, DropKey, DropValue, RetransmitValue, RttValue, TrafficKey, TrafficValue};
 
 /// Offset of `srtt_us` field within `struct tcp_sock` (Linux 6.x x86_64).
 /// The kernel stores smoothed RTT as `actual_rtt_us << 3`, so we right-shift by 3 to unscale.
@@ -33,6 +33,52 @@ static CONN_MAP: HashMap<TrafficKey, ConnValue> = HashMap::with_max_entries(8192
 /// Per-PID TCP RTT statistics (count, sum, min, max in microseconds).
 #[map]
 static RTT_MAP: HashMap<TrafficKey, RttValue> = HashMap::with_max_entries(8192, 0);
+
+/// Per-(PID, reason) packet drop counters from skb:kfree_skb tracepoint.
+#[map]
+static DROP_MAP: HashMap<DropKey, DropValue> = HashMap::with_max_entries(8192, 0);
+
+/// Offset of the `reason` field within the skb:kfree_skb tracepoint args.
+/// Layout: trace_entry common header (8) + skbaddr(8) + location(8) + rx_sk(8) + protocol(2) + padding(2) = 36
+const KFREE_SKB_REASON_OFFSET: usize = 36;
+
+/// tracepoint on skb:kfree_skb — fires when a socket buffer is freed.
+/// On Linux 5.17+, includes a `reason` field from `enum skb_drop_reason`.
+#[tracepoint]
+pub fn kfree_skb(ctx: TracePointContext) -> u32 {
+    match try_kfree_skb(&ctx) {
+        Ok(()) => 0,
+        Err(_) => 0,
+    }
+}
+
+fn try_kfree_skb(ctx: &TracePointContext) -> Result<(), i64> {
+    // Read the drop reason at the known offset within the tracepoint args.
+    // On kernels < 5.17, this read may fail — we return Ok to skip silently.
+    let reason: u32 = unsafe {
+        bpf_probe_read_kernel((ctx.as_ptr() as *const u8).add(KFREE_SKB_REASON_OFFSET) as *const u32)
+            .map_err(|_| 1i64)?
+    };
+
+    // reason=0 means SKB_NOT_DROPPED_YET / normal free — not a real drop
+    if reason == 0 {
+        return Ok(());
+    }
+
+    let pid = (bpf_get_current_pid_tgid() >> 32) as u32;
+    let key = DropKey { pid, reason };
+
+    if let Some(val) = DROP_MAP.get_ptr_mut(&key) {
+        unsafe {
+            (*val).count += 1;
+        }
+    } else {
+        let val = DropValue { count: 1 };
+        let _ = DROP_MAP.insert(&key, &val, 0);
+    }
+
+    Ok(())
+}
 
 /// kprobe on tcp_sendmsg — called as tcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 /// The third argument (size) is the number of bytes being sent.

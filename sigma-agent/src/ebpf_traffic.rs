@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use aya::maps::HashMap as BpfHashMap;
-use aya::programs::KProbe;
+use aya::programs::{KProbe, TracePoint};
 use aya::{Ebpf, EbpfLoader};
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
@@ -45,11 +45,26 @@ struct RttValue {
     max_us: u64,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct DropKey {
+    pid: u32,
+    reason: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct DropValue {
+    count: u64,
+}
+
 unsafe impl aya::Pod for TrafficKey {}
 unsafe impl aya::Pod for TrafficValue {}
 unsafe impl aya::Pod for RetransmitValue {}
 unsafe impl aya::Pod for ConnValue {}
 unsafe impl aya::Pod for RttValue {}
+unsafe impl aya::Pod for DropKey {}
+unsafe impl aya::Pod for DropValue {}
 
 /// Per-process traffic stats resolved from eBPF data.
 #[derive(Clone, Debug)]
@@ -66,6 +81,7 @@ pub struct ProcessTraffic {
     pub rtt_avg_us: u64,
     pub rtt_min_us: u64,
     pub rtt_max_us: u64,
+    pub drops: Vec<(String, u64)>,
 }
 
 pub type SharedTrafficStats = Arc<RwLock<Vec<ProcessTraffic>>>;
@@ -196,6 +212,21 @@ pub fn load_ebpf() -> anyhow::Result<Ebpf> {
             Err(e) => warn!("udp_recvmsg program type mismatch: {:#}", e),
         },
         None => warn!("kretprobe program 'udp_recvmsg' not found in eBPF object"),
+    }
+
+    // Attach tracepoint to skb/kfree_skb (non-fatal — requires Linux 5.17+ for reason field)
+    match ebpf.program_mut("kfree_skb") {
+        Some(prog) => match <&mut TracePoint>::try_from(prog) {
+            Ok(tp) => {
+                if let Err(e) = tp.load().and_then(|()| tp.attach("skb", "kfree_skb")) {
+                    warn!("Failed to attach tracepoint to skb/kfree_skb: {:#}", e);
+                } else {
+                    info!("Attached tracepoint to skb/kfree_skb");
+                }
+            }
+            Err(e) => warn!("kfree_skb program type mismatch: {:#}", e),
+        },
+        None => warn!("tracepoint program 'kfree_skb' not found in eBPF object"),
     }
 
     Ok(ebpf)
@@ -338,9 +369,29 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
         }
     }
 
+    // --- Read DROP_MAP (read-and-clear, like TRAFFIC_MAP) ---
+    let mut drop_entries: Vec<(DropKey, DropValue)> = Vec::new();
+    if let Some(map) = ebpf.map_mut("DROP_MAP") {
+        if let Ok(mut drop_map) = BpfHashMap::<&mut aya::maps::MapData, DropKey, DropValue>::try_from(map) {
+            let mut drop_keys: Vec<DropKey> = Vec::new();
+            for item in drop_map.iter() {
+                match item {
+                    Ok((key, value)) => {
+                        drop_entries.push((key, value));
+                        drop_keys.push(key);
+                    }
+                    Err(e) => debug!("Error reading DROP_MAP entry: {}", e),
+                }
+            }
+            for key in &drop_keys {
+                let _ = drop_map.remove(key);
+            }
+        }
+    }
+
     // Aggregate by (process_name, container_id)
     // Fields: bytes_sent, bytes_recv, udp_bytes_sent, udp_bytes_recv, retransmits,
-    //         active_conns, total_conns, rtt_count, rtt_sum_us, rtt_min_us, rtt_max_us
+    //         active_conns, total_conns, rtt_count, rtt_sum_us, rtt_min_us, rtt_max_us, drops
     #[derive(Default)]
     struct Agg {
         bytes_sent: u64,
@@ -354,6 +405,7 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
         rtt_sum_us: u64,
         rtt_min_us: u64,
         rtt_max_us: u64,
+        drops: HashMap<u32, u64>,
     }
 
     let mut aggregated: HashMap<(String, Option<String>), Agg> = HashMap::new();
@@ -403,10 +455,21 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
         entry.total_conns += value.total;
     }
 
+    for (key, value) in &drop_entries {
+        let proc_name = resolve_process_name(key.pid, host_proc);
+        let container_id = resolve_container_id(key.pid, host_proc);
+        let entry = aggregated.entry((proc_name, container_id)).or_default();
+        *entry.drops.entry(key.reason).or_insert(0) += value.count;
+    }
+
     let stats: Vec<ProcessTraffic> = aggregated
         .into_iter()
         .map(|((process_name, container_id), agg)| {
             let rtt_avg_us = if agg.rtt_count > 0 { agg.rtt_sum_us / agg.rtt_count } else { 0 };
+            let drops: Vec<(String, u64)> = agg.drops
+                .into_iter()
+                .map(|(reason, count)| (drop_reason_name(reason), count))
+                .collect();
             ProcessTraffic {
                 process_name,
                 container_id,
@@ -420,11 +483,87 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
                 rtt_avg_us,
                 rtt_min_us: agg.rtt_min_us,
                 rtt_max_us: agg.rtt_max_us,
+                drops,
             }
         })
         .collect();
 
     Ok(stats)
+}
+
+/// Map kernel `enum skb_drop_reason` values to human-readable names.
+/// Values from include/net/dropreason-core.h (Linux 6.x).
+fn drop_reason_name(reason: u32) -> String {
+    match reason {
+        1 => "NOT_SPECIFIED".into(),
+        2 => "NO_SOCKET".into(),
+        3 => "PKT_TOO_SMALL".into(),
+        4 => "TCP_CSUM".into(),
+        5 => "SOCKET_FILTER".into(),
+        6 => "UDP_CSUM".into(),
+        7 => "NETFILTER_DROP".into(),
+        8 => "OTHERHOST".into(),
+        9 => "IP_CSUM".into(),
+        10 => "IP_INHDR".into(),
+        11 => "IP_RPFILTER".into(),
+        12 => "UNICAST_IN_L2_MULTICAST".into(),
+        13 => "XFRM_POLICY".into(),
+        14 => "IP_NOPROTO".into(),
+        15 => "SOCKET_RCVBUFF".into(),
+        16 => "PROTO_MEM".into(),
+        17 => "TCP_MD5NOTFOUND".into(),
+        18 => "TCP_MD5UNEXPECTED".into(),
+        19 => "TCP_MD5FAILURE".into(),
+        20 => "SOCKET_BACKLOG".into(),
+        21 => "TCP_FLAGS".into(),
+        22 => "TCP_ZEROWINDOW".into(),
+        23 => "TCP_OLD_DATA".into(),
+        24 => "TCP_OVERWINDOW".into(),
+        25 => "TCP_OFOMERGE".into(),
+        26 => "TCP_RFC7323_PAWS".into(),
+        27 => "TCP_INVALID_SEQUENCE".into(),
+        28 => "TCP_RESET".into(),
+        29 => "TCP_INVALID_SYN".into(),
+        30 => "TCP_CLOSE".into(),
+        31 => "TCP_FASTOPEN".into(),
+        32 => "TCP_OLD_ACK".into(),
+        33 => "TCP_TOO_OLD_ACK".into(),
+        34 => "TCP_ACK_UNSENT_DATA".into(),
+        35 => "TCP_OFO_QUEUE_PRUNE".into(),
+        36 => "TCP_OFO_DROP".into(),
+        37 => "IP_OUTNOROUTES".into(),
+        38 => "BPF_CGROUP_EGRESS".into(),
+        39 => "IPV6DISABLED".into(),
+        40 => "NEIGH_CREATEFAIL".into(),
+        41 => "NEIGH_FAILED".into(),
+        42 => "NEIGH_QUEUEFULL".into(),
+        43 => "NEIGH_DEAD".into(),
+        44 => "TC_EGRESS".into(),
+        45 => "QDISC_DROP".into(),
+        46 => "CPU_BACKLOG".into(),
+        47 => "XDP".into(),
+        48 => "TC_INGRESS".into(),
+        49 => "UNHANDLED_PROTO".into(),
+        50 => "SKB_CSUM".into(),
+        51 => "SKB_GSO_SEG".into(),
+        52 => "SKB_UCOPY_FAULT".into(),
+        53 => "DEV_HDR".into(),
+        54 => "DEV_READY".into(),
+        55 => "FULL_RING".into(),
+        56 => "NOMEM".into(),
+        57 => "HDR_TRUNC".into(),
+        58 => "TAP_FILTER".into(),
+        59 => "TAP_TXFILTER".into(),
+        60 => "ICMP_CSUM".into(),
+        61 => "INVALID_PROTO".into(),
+        62 => "IP_INADDRERRORS".into(),
+        63 => "IP_INNOROUTES".into(),
+        64 => "PKT_TOO_BIG".into(),
+        65 => "DUP_FRAG".into(),
+        66 => "FRAG_REASM_TIMEOUT".into(),
+        67 => "FRAG_TOO_FAR".into(),
+        _ => format!("UNKNOWN_{}", reason),
+    }
 }
 
 /// Read /proc/<pid>/comm to get the process name.

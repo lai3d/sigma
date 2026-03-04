@@ -258,6 +258,25 @@ pub fn render_traffic_metrics(stats: &[crate::ebpf_traffic::ProcessTraffic], hos
         ).unwrap();
     }
 
+    // Packet drop metrics — only emit for processes with drops
+    let has_drops: Vec<_> = stats.iter().filter(|e| !e.drops.is_empty()).collect();
+    if !has_drops.is_empty() {
+        writeln!(out).unwrap();
+
+        writeln!(out, "# HELP sigma_packet_drops_total Packet drops by process and reason (eBPF tracepoint skb:kfree_skb)").unwrap();
+        writeln!(out, "# TYPE sigma_packet_drops_total gauge").unwrap();
+        for entry in &has_drops {
+            let container = entry.container_id.as_deref().unwrap_or("");
+            for (reason, count) in &entry.drops {
+                writeln!(
+                    out,
+                    "sigma_packet_drops_total{{hostname=\"{}\",process=\"{}\",container=\"{}\",reason=\"{}\"}} {}",
+                    hostname, entry.process_name, container, reason, count
+                ).unwrap();
+            }
+        }
+    }
+
     // RTT metrics — only emit for processes with RTT data
     let has_rtt: Vec<_> = stats.iter().filter(|e| e.rtt_avg_us > 0).collect();
     if !has_rtt.is_empty() {

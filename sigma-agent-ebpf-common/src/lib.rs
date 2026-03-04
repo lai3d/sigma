@@ -39,3 +39,18 @@ pub struct RttValue {
     pub min_us: u64,
     pub max_us: u64,
 }
+
+/// Composite key for per-PID per-reason packet drop counters.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct DropKey {
+    pub pid: u32,
+    pub reason: u32,
+}
+
+/// Packet drop counter value.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct DropValue {
+    pub count: u64,
+}

@@ -301,11 +301,12 @@ pushed back to Envoy via xDS (Envoy already has them in its config file).
 
 ## eBPF Traffic Monitoring
 
-When `--ebpf-traffic` is enabled, the agent uses eBPF kprobes to monitor TCP and UDP activity per process.
-This includes TCP bytes sent/received (`tcp_sendmsg`/`tcp_recvmsg`), UDP bytes sent/received
-(`udp_sendmsg`/`udp_recvmsg`), retransmit events (`tcp_retransmit_skb`), connection tracking
-(`tcp_v4_connect`/`tcp_close`/`inet_csk_accept`), and TCP RTT/latency tracking
-(`tcp_rcv_established` — reads `srtt_us` from `tcp_sock` via `bpf_probe_read_kernel`).
+When `--ebpf-traffic` is enabled, the agent uses eBPF kprobes and tracepoints to monitor TCP and UDP
+activity per process. This includes TCP bytes sent/received (`tcp_sendmsg`/`tcp_recvmsg`), UDP bytes
+sent/received (`udp_sendmsg`/`udp_recvmsg`), retransmit events (`tcp_retransmit_skb`), connection
+tracking (`tcp_v4_connect`/`tcp_close`/`inet_csk_accept`), TCP RTT/latency tracking
+(`tcp_rcv_established` — reads `srtt_us` from `tcp_sock` via `bpf_probe_read_kernel`), and packet
+drop monitoring (`skb:kfree_skb` tracepoint — per-process drop counts with kernel reason codes).
 This is feature-gated behind the `ebpf-traffic` cargo feature (compiled in via Docker by default).
 
 ### Configuration
@@ -363,7 +364,18 @@ sigma_tcp_rtt_min_us{hostname="relay-01",process="envoy",container=""} 800
 # HELP sigma_tcp_rtt_max_us Maximum TCP round-trip time in microseconds by process (eBPF)
 # TYPE sigma_tcp_rtt_max_us gauge
 sigma_tcp_rtt_max_us{hostname="relay-01",process="envoy",container=""} 95000
+
+# HELP sigma_packet_drops_total Packet drops by process and reason (eBPF tracepoint skb:kfree_skb)
+# TYPE sigma_packet_drops_total gauge
+sigma_packet_drops_total{hostname="relay-01",process="envoy",container="",reason="NETFILTER_DROP"} 15
+sigma_packet_drops_total{hostname="relay-01",process="xray",container="abc123def456",reason="NO_SOCKET"} 8
 ```
+
+Packet drop metrics are only emitted for processes with non-zero drops. The tracepoint uses
+`skb:kfree_skb` which requires Linux 5.17+ for the `reason` field (from `enum skb_drop_reason`).
+On older kernels, the tracepoint attachment fails gracefully and the agent continues without
+drop metrics. Common drop reasons include: `NO_SOCKET`, `TCP_CSUM`, `NETFILTER_DROP`,
+`SOCKET_RCVBUFF`, `TCP_OLD_DATA`, `TCP_RESET`, `QDISC_DROP`.
 
 RTT metrics are only emitted for processes with active TCP RTT data. The `srtt_us` field offset
 within `tcp_sock` is defined as `SRTT_US_OFFSET` (744 for Linux 6.x x86_64) and may need
