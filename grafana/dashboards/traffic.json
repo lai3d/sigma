@@ -846,6 +846,99 @@
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 85 },
+      "title": "DNS Query Tracing",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 100 },
+            { "color": "red", "value": 1000 }
+          ]},
+          "unit": "none"
+        }
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 86 },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Total DNS Queries",
+      "type": "stat",
+      "targets": [{
+        "expr": "sum(sigma_dns_queries_total{hostname=~\"$hostname\"})",
+        "legendFormat": "queries"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "blue", "value": null },
+            { "color": "yellow", "value": 1048576 },
+            { "color": "red", "value": 10485760 }
+          ]},
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 86 },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Total DNS Bytes",
+      "type": "stat",
+      "targets": [{
+        "expr": "sum(sigma_dns_bytes_total{hostname=~\"$hostname\"})",
+        "legendFormat": "bytes"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "orange", "value": null }] },
+          "unit": "none"
+        }
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 86 },
+      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Processes with DNS Activity",
+      "type": "stat",
+      "targets": [{
+        "expr": "count(sigma_dns_queries_total{hostname=~\"$hostname\"} > 0)",
+        "legendFormat": "processes"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "stacking": { "mode": "normal" }
+          },
+          "unit": "none"
+        }
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 90 },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "sortBy": "Last *", "sortDesc": true, "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "title": "DNS Queries by Process",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "sigma_dns_queries_total{hostname=~\"$hostname\"}",
+        "legendFormat": "{{ process }}"
+      }]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 98 },
       "title": "Process Details",
       "type": "row"
     },
@@ -887,10 +980,15 @@
             { "id": "unit", "value": "\u00b5s" },
             { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
             { "id": "color", "value": { "mode": "continuous-GrYlRd" } }
+          ]},
+          { "matcher": { "id": "byName", "options": "DNS Queries" }, "properties": [
+            { "id": "unit", "value": "none" },
+            { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
+            { "id": "color", "value": { "mode": "continuous-GrYlRd" } }
           ]}
         ]
       },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 86 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 99 },
       "options": {
         "footer": { "enablePagination": true },
         "sortBy": [{ "desc": true, "displayName": "TCP Sent" }]
@@ -946,12 +1044,19 @@
           "instant": true,
           "format": "table",
           "refId": "G"
+        },
+        {
+          "expr": "sigma_dns_queries_total{hostname=~\"$hostname\"}",
+          "legendFormat": "",
+          "instant": true,
+          "format": "table",
+          "refId": "H"
         }
       ],
       "transformations": [
         { "id": "seriesToColumns", "options": { "byField": "process" } },
         { "id": "organize", "options": {
-          "excludeByName": { "Time 1": true, "Time 2": true, "Time 3": true, "Time 4": true, "Time 5": true, "Time 6": true, "Time 7": true, "__name__ 1": true, "__name__ 2": true, "__name__ 3": true, "__name__ 4": true, "__name__ 5": true, "__name__ 6": true, "container 2": true, "container 3": true, "container 4": true, "container 5": true, "container 6": true, "container 7": true, "hostname 2": true, "hostname 3": true, "hostname 4": true, "hostname 5": true, "hostname 6": true, "hostname 7": true, "job 1": true, "job 2": true, "job 3": true, "job 4": true, "job 5": true, "job 6": true, "job 7": true, "instance 1": true, "instance 2": true, "instance 3": true, "instance 4": true, "instance 5": true, "instance 6": true, "instance 7": true },
+          "excludeByName": { "Time 1": true, "Time 2": true, "Time 3": true, "Time 4": true, "Time 5": true, "Time 6": true, "Time 7": true, "Time 8": true, "__name__ 1": true, "__name__ 2": true, "__name__ 3": true, "__name__ 4": true, "__name__ 5": true, "__name__ 6": true, "__name__ 7": true, "container 2": true, "container 3": true, "container 4": true, "container 5": true, "container 6": true, "container 7": true, "container 8": true, "hostname 2": true, "hostname 3": true, "hostname 4": true, "hostname 5": true, "hostname 6": true, "hostname 7": true, "hostname 8": true, "job 1": true, "job 2": true, "job 3": true, "job 4": true, "job 5": true, "job 6": true, "job 7": true, "job 8": true, "instance 1": true, "instance 2": true, "instance 3": true, "instance 4": true, "instance 5": true, "instance 6": true, "instance 7": true, "instance 8": true },
           "renameByName": {
             "hostname 1": "Hostname",
             "process": "Process",
@@ -962,7 +1067,8 @@
             "Value #D": "UDP Received",
             "Value #E": "RTT Avg",
             "Value #F": "Total Drops",
-            "Value #G": "Conn Latency Avg"
+            "Value #G": "Conn Latency Avg",
+            "Value #H": "DNS Queries"
           }
         }}
       ]

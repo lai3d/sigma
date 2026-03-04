@@ -320,6 +320,36 @@ pub fn render_traffic_metrics(stats: &[crate::ebpf_traffic::ProcessTraffic], hos
         }
     }
 
+    // DNS query metrics — only emit for processes with DNS activity
+    let has_dns: Vec<_> = stats.iter().filter(|e| e.dns_queries > 0).collect();
+    if !has_dns.is_empty() {
+        writeln!(out).unwrap();
+
+        writeln!(out, "# HELP sigma_dns_queries_total DNS queries (UDP to port 53) by process (eBPF)").unwrap();
+        writeln!(out, "# TYPE sigma_dns_queries_total gauge").unwrap();
+        for entry in &has_dns {
+            let container = entry.container_id.as_deref().unwrap_or("");
+            writeln!(
+                out,
+                "sigma_dns_queries_total{{hostname=\"{}\",process=\"{}\",container=\"{}\"}} {}",
+                hostname, entry.process_name, container, entry.dns_queries
+            ).unwrap();
+        }
+
+        writeln!(out).unwrap();
+
+        writeln!(out, "# HELP sigma_dns_bytes_total DNS query bytes (UDP to port 53) by process (eBPF)").unwrap();
+        writeln!(out, "# TYPE sigma_dns_bytes_total gauge").unwrap();
+        for entry in &has_dns {
+            let container = entry.container_id.as_deref().unwrap_or("");
+            writeln!(
+                out,
+                "sigma_dns_bytes_total{{hostname=\"{}\",process=\"{}\",container=\"{}\"}} {}",
+                hostname, entry.process_name, container, entry.dns_bytes
+            ).unwrap();
+        }
+    }
+
     // RTT metrics — only emit for processes with RTT data
     let has_rtt: Vec<_> = stats.iter().filter(|e| e.rtt_avg_us > 0).collect();
     if !has_rtt.is_empty() {

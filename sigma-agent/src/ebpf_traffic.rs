@@ -67,6 +67,13 @@ struct DropValue {
     count: u64,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct DnsQueryValue {
+    queries: u64,
+    bytes: u64,
+}
+
 unsafe impl aya::Pod for TrafficKey {}
 unsafe impl aya::Pod for TrafficValue {}
 unsafe impl aya::Pod for RetransmitValue {}
@@ -75,6 +82,7 @@ unsafe impl aya::Pod for RttValue {}
 unsafe impl aya::Pod for ConnLatencyValue {}
 unsafe impl aya::Pod for DropKey {}
 unsafe impl aya::Pod for DropValue {}
+unsafe impl aya::Pod for DnsQueryValue {}
 
 /// Per-process traffic stats resolved from eBPF data.
 #[derive(Clone, Debug)]
@@ -95,6 +103,8 @@ pub struct ProcessTraffic {
     pub conn_latency_min_us: u64,
     pub conn_latency_max_us: u64,
     pub drops: Vec<(String, u64)>,
+    pub dns_queries: u64,
+    pub dns_bytes: u64,
 }
 
 pub type SharedTrafficStats = Arc<RwLock<Vec<ProcessTraffic>>>;
@@ -255,6 +265,21 @@ pub fn load_ebpf() -> anyhow::Result<Ebpf> {
             Err(e) => warn!("kfree_skb program type mismatch: {:#}", e),
         },
         None => warn!("tracepoint program 'kfree_skb' not found in eBPF object"),
+    }
+
+    // Attach kprobe to udp_sendmsg for DNS query tracing (non-fatal)
+    match ebpf.program_mut("dns_udp_sendmsg") {
+        Some(prog) => match <&mut KProbe>::try_from(prog) {
+            Ok(kp) => {
+                if let Err(e) = kp.load().and_then(|()| kp.attach("udp_sendmsg", 0)) {
+                    warn!("Failed to attach kprobe to udp_sendmsg (DNS): {:#}", e);
+                } else {
+                    info!("Attached kprobe to udp_sendmsg (DNS)");
+                }
+            }
+            Err(e) => warn!("dns_udp_sendmsg program type mismatch: {:#}", e),
+        },
+        None => warn!("kprobe program 'dns_udp_sendmsg' not found in eBPF object"),
     }
 
     Ok(ebpf)
@@ -437,6 +462,26 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
         }
     }
 
+    // --- Read DNS_QUERY_MAP (read-and-clear, like TRAFFIC_MAP) ---
+    let mut dns_entries: Vec<(TrafficKey, DnsQueryValue)> = Vec::new();
+    if let Some(map) = ebpf.map_mut("DNS_QUERY_MAP") {
+        if let Ok(mut dns_map) = BpfHashMap::<&mut aya::maps::MapData, TrafficKey, DnsQueryValue>::try_from(map) {
+            let mut dns_keys: Vec<TrafficKey> = Vec::new();
+            for item in dns_map.iter() {
+                match item {
+                    Ok((key, value)) => {
+                        dns_entries.push((key, value));
+                        dns_keys.push(key);
+                    }
+                    Err(e) => debug!("Error reading DNS_QUERY_MAP entry: {}", e),
+                }
+            }
+            for key in &dns_keys {
+                let _ = dns_map.remove(key);
+            }
+        }
+    }
+
     // Aggregate by (process_name, container_id)
     // Fields: bytes_sent, bytes_recv, udp_bytes_sent, udp_bytes_recv, retransmits,
     //         active_conns, total_conns, rtt_count, rtt_sum_us, rtt_min_us, rtt_max_us, drops
@@ -458,6 +503,8 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
         conn_latency_min_us: u64,
         conn_latency_max_us: u64,
         drops: HashMap<u32, u64>,
+        dns_queries: u64,
+        dns_bytes: u64,
     }
 
     let mut aggregated: HashMap<(String, Option<String>), Agg> = HashMap::new();
@@ -528,6 +575,14 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
         *entry.drops.entry(key.reason).or_insert(0) += value.count;
     }
 
+    for (key, value) in &dns_entries {
+        let proc_name = resolve_process_name(key.pid, host_proc);
+        let container_id = resolve_container_id(key.pid, host_proc);
+        let entry = aggregated.entry((proc_name, container_id)).or_default();
+        entry.dns_queries += value.queries;
+        entry.dns_bytes += value.bytes;
+    }
+
     let stats: Vec<ProcessTraffic> = aggregated
         .into_iter()
         .map(|((process_name, container_id), agg)| {
@@ -554,6 +609,8 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
                 conn_latency_min_us: agg.conn_latency_min_us,
                 conn_latency_max_us: agg.conn_latency_max_us,
                 drops,
+                dns_queries: agg.dns_queries,
+                dns_bytes: agg.dns_bytes,
             }
         })
         .collect();

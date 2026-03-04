@@ -64,3 +64,11 @@ pub struct DropKey {
 pub struct DropValue {
     pub count: u64,
 }
+
+/// DNS query counters per PID (UDP sends to port 53).
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct DnsQueryValue {
+    pub queries: u64,
+    pub bytes: u64,
+}

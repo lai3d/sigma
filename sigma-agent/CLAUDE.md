@@ -307,8 +307,9 @@ sent/received (`udp_sendmsg`/`udp_recvmsg`), retransmit events (`tcp_retransmit_
 tracking (`tcp_v4_connect`/`tcp_close`/`inet_csk_accept`), TCP RTT/latency tracking
 (`tcp_rcv_established` — reads `srtt_us` from `tcp_sock` via `bpf_probe_read_kernel`), TCP
 connection latency (`tcp_v4_connect` entry kprobe + kretprobe — measures SYN-to-established time
-via `bpf_ktime_get_ns()`), and packet drop monitoring (`skb:kfree_skb` tracepoint — per-process
-drop counts with kernel reason codes).
+via `bpf_ktime_get_ns()`), packet drop monitoring (`skb:kfree_skb` tracepoint — per-process
+drop counts with kernel reason codes), and DNS query tracing (`dns_udp_sendmsg` kprobe on
+`udp_sendmsg` — filters for destination port 53 to detect DNS leaks on VPN nodes).
 This is feature-gated behind the `ebpf-traffic` cargo feature (compiled in via Docker by default).
 
 ### Configuration
@@ -379,6 +380,16 @@ sigma_tcp_connection_latency_min_us{hostname="relay-01",process="envoy",containe
 # TYPE sigma_tcp_connection_latency_max_us gauge
 sigma_tcp_connection_latency_max_us{hostname="relay-01",process="envoy",container=""} 120000
 
+# HELP sigma_dns_queries_total DNS queries (UDP to port 53) by process (eBPF)
+# TYPE sigma_dns_queries_total gauge
+sigma_dns_queries_total{hostname="relay-01",process="dig",container=""} 15
+sigma_dns_queries_total{hostname="relay-01",process="curl",container=""} 3
+
+# HELP sigma_dns_bytes_total DNS query bytes (UDP to port 53) by process (eBPF)
+# TYPE sigma_dns_bytes_total gauge
+sigma_dns_bytes_total{hostname="relay-01",process="dig",container=""} 1200
+sigma_dns_bytes_total{hostname="relay-01",process="curl",container=""} 240
+
 # HELP sigma_packet_drops_total Packet drops by process and reason (eBPF tracepoint skb:kfree_skb)
 # TYPE sigma_packet_drops_total gauge
 sigma_packet_drops_total{hostname="relay-01",process="envoy",container="",reason="NETFILTER_DROP"} 15
@@ -390,6 +401,12 @@ Packet drop metrics are only emitted for processes with non-zero drops. The trac
 On older kernels, the tracepoint attachment fails gracefully and the agent continues without
 drop metrics. Common drop reasons include: `NO_SOCKET`, `TCP_CSUM`, `NETFILTER_DROP`,
 `SOCKET_RCVBUFF`, `TCP_OLD_DATA`, `TCP_RESET`, `QDISC_DROP`.
+
+DNS query metrics are only emitted for processes with non-zero DNS activity. The `dns_udp_sendmsg`
+kprobe attaches to the same `udp_sendmsg` kernel function but reads `skc_dport` from the sock struct
+(at offset 12, `sock.__sk_common.skc_dport`) to filter for destination port 53. This detects DNS
+leaks on VPN nodes — any process sending UDP to port 53 is potentially bypassing the VPN tunnel.
+If the kprobe attachment or dport read fails, the agent continues without DNS metrics.
 
 Connection latency metrics are only emitted for processes with active connection latency data.
 Unlike RTT (which measures per-packet round-trip on established connections), connection latency

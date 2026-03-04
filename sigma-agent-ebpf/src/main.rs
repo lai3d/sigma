@@ -7,7 +7,11 @@ use aya_ebpf::{
     maps::HashMap,
     programs::{ProbeContext, RetProbeContext, TracePointContext},
 };
-use sigma_agent_ebpf_common::{ConnLatencyValue, ConnValue, DropKey, DropValue, RetransmitValue, RttValue, TrafficKey, TrafficValue};
+use sigma_agent_ebpf_common::{ConnLatencyValue, ConnValue, DnsQueryValue, DropKey, DropValue, RetransmitValue, RttValue, TrafficKey, TrafficValue};
+
+/// Offset of `skc_dport` within `struct sock` (Linux 5.x/6.x x86_64).
+/// Located at sock.__sk_common.skc_dport. Network byte order (big-endian).
+const SKC_DPORT_OFFSET: usize = 12;
 
 /// Offset of `srtt_us` field within `struct tcp_sock` (Linux 6.x x86_64).
 /// The kernel stores smoothed RTT as `actual_rtt_us << 3`, so we right-shift by 3 to unscale.
@@ -45,6 +49,10 @@ static CONN_LATENCY_MAP: HashMap<TrafficKey, ConnLatencyValue> = HashMap::with_m
 /// Per-(PID, reason) packet drop counters from skb:kfree_skb tracepoint.
 #[map]
 static DROP_MAP: HashMap<DropKey, DropValue> = HashMap::with_max_entries(8192, 0);
+
+/// Per-PID DNS query counters (UDP sends to port 53).
+#[map]
+static DNS_QUERY_MAP: HashMap<TrafficKey, DnsQueryValue> = HashMap::with_max_entries(8192, 0);
 
 /// Offset of the `reason` field within the skb:kfree_skb tracepoint args.
 /// Layout: trace_entry common header (8) + skbaddr(8) + location(8) + rx_sk(8) + protocol(2) + padding(2) = 36
@@ -427,6 +435,52 @@ fn try_tcp_rcv_established(ctx: &ProbeContext) -> Result<(), i64> {
             max_us: rtt_us,
         };
         let _ = RTT_MAP.insert(&key, &val, 0);
+    }
+
+    Ok(())
+}
+
+/// kprobe on udp_sendmsg — DNS query tracing. Filters for destination port 53 only.
+/// Reads `skc_dport` from the sock struct to detect DNS traffic (potential VPN DNS leaks).
+#[kprobe]
+pub fn dns_udp_sendmsg(ctx: ProbeContext) -> u32 {
+    match try_dns_udp_sendmsg(&ctx) {
+        Ok(()) => 0,
+        Err(_) => 0,
+    }
+}
+
+fn try_dns_udp_sendmsg(ctx: &ProbeContext) -> Result<(), i64> {
+    let sk: *const u8 = ctx.arg(0).ok_or(1i64)?;
+    if sk.is_null() {
+        return Ok(());
+    }
+
+    // Read skc_dport from sock.__sk_common (network byte order)
+    let raw_dport: u16 = unsafe {
+        bpf_probe_read_kernel(sk.add(SKC_DPORT_OFFSET) as *const u16).map_err(|_| 1i64)?
+    };
+    let dport = u16::from_be(raw_dport);
+
+    if dport != 53 {
+        return Ok(());
+    }
+
+    let size: u64 = ctx.arg(2).ok_or(1i64)?;
+    let pid = (bpf_get_current_pid_tgid() >> 32) as u32;
+    let key = TrafficKey { pid };
+
+    if let Some(val) = DNS_QUERY_MAP.get_ptr_mut(&key) {
+        unsafe {
+            (*val).queries += 1;
+            (*val).bytes += size;
+        }
+    } else {
+        let val = DnsQueryValue {
+            queries: 1,
+            bytes: size,
+        };
+        let _ = DNS_QUERY_MAP.insert(&key, &val, 0);
     }
 
     Ok(())
