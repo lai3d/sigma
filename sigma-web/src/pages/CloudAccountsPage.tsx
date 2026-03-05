@@ -80,6 +80,7 @@ export default function CloudAccountsPage() {
         <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-800">
           Sync complete: {syncResult.instances_found} instances found,{' '}
           {syncResult.created} created, {syncResult.updated} updated,{' '}
+          {syncResult.merged > 0 && <>{syncResult.merged} merged, </>}
           {syncResult.retired} retired
           <button
             onClick={() => setSyncResult(null)}

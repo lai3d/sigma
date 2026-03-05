@@ -1330,6 +1330,7 @@ pub struct CloudSyncResult {
     pub created: i64,
     pub updated: i64,
     pub retired: i64,
+    pub merged: i64,
 }
 
 #[derive(Debug, Deserialize, IntoParams)]

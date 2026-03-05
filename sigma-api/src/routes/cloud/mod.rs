@@ -4,23 +4,98 @@ pub mod digitalocean;
 pub mod linode;
 pub mod volcengine;
 
+use std::collections::HashMap;
+
 use axum::{
     extract::{Path, Query, State},
     routing::get,
     Extension, Json, Router,
 };
+use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::auth::{require_role, CurrentUser};
 use crate::errors::AppError;
 use crate::models::{
     CloudAccount, CloudAccountListQuery, CloudAccountResponse, CloudSyncResult,
-    CreateCloudAccount, PaginatedCloudAccountResponse, PaginatedResponse, UpdateCloudAccount,
+    CreateCloudAccount, IpEntry, PaginatedCloudAccountResponse, PaginatedResponse,
+    UpdateCloudAccount,
 };
 use crate::routes::audit_logs::log_audit;
 use crate::routes::AppState;
 
 const VALID_PROVIDER_TYPES: &[&str] = &["aws", "alibaba", "digitalocean", "linode", "volcengine"];
+
+/// Find an existing VPS by public IP overlap (fallback when cloud_instance_id / hostname miss).
+/// Returns (id, source, hostname) of the first non-retired VPS sharing a public IP.
+pub(crate) async fn find_vps_by_public_ip_overlap(
+    db: &PgPool,
+    ips: &[IpEntry],
+    exclude_id: Option<Uuid>,
+) -> Result<Option<(Uuid, String, String)>, AppError> {
+    let public_ips: Vec<&str> = ips
+        .iter()
+        .filter(|e| e.label != "internal")
+        .map(|e| e.ip.as_str())
+        .collect();
+    if public_ips.is_empty() {
+        return Ok(None);
+    }
+
+    let row: Option<(Uuid, String, String)> = sqlx::query_as(
+        r#"SELECT id, source, hostname FROM vps
+           WHERE status != 'retired'
+             AND ($2::uuid IS NULL OR id != $2)
+             AND EXISTS(
+               SELECT 1 FROM jsonb_array_elements(ip_addresses) AS e
+               WHERE e->>'label' != 'internal'
+                 AND e->>'ip' = ANY($1)
+             )
+           LIMIT 1"#,
+    )
+    .bind(&public_ips)
+    .bind(exclude_id)
+    .fetch_optional(db)
+    .await?;
+
+    Ok(row)
+}
+
+/// Union-merge two IP lists: existing labels preserved for overlapping IPs,
+/// all IPs from both sides kept.
+pub(crate) fn merge_ip_labels_union(new_ips: &[IpEntry], existing_ips: &[IpEntry]) -> Vec<IpEntry> {
+    let existing_map: HashMap<&str, &str> = existing_ips
+        .iter()
+        .map(|e| (e.ip.as_str(), e.label.as_str()))
+        .collect();
+
+    let mut result: Vec<IpEntry> = Vec::new();
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    // Start with existing IPs (preserve their labels)
+    for entry in existing_ips {
+        if seen.insert(entry.ip.clone()) {
+            result.push(entry.clone());
+        }
+    }
+
+    // Add new IPs that aren't already present
+    for entry in new_ips {
+        if seen.insert(entry.ip.clone()) {
+            // Use existing label if somehow present, otherwise new label
+            let label = existing_map
+                .get(entry.ip.as_str())
+                .unwrap_or(&entry.label.as_str())
+                .to_string();
+            result.push(IpEntry {
+                ip: entry.ip.clone(),
+                label,
+            });
+        }
+    }
+
+    result
+}
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -374,6 +449,7 @@ pub async fn sync_account(
             "created": result.created,
             "updated": result.updated,
             "retired": result.retired,
+            "merged": result.merged,
         }),
     )
     .await;

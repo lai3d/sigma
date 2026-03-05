@@ -4,6 +4,7 @@ use axum::{extract::State, routing::post, Json, Router};
 
 use crate::errors::{AppError, ErrorResponse};
 use crate::models::{AgentHeartbeat, AgentRegister, IpEntry, Vps};
+use crate::routes::cloud::find_vps_by_public_ip_overlap;
 use crate::routes::AppState;
 
 pub fn router() -> Router<AppState> {
@@ -56,10 +57,22 @@ pub async fn register(
 
     validate_ips(&input.ip_addresses)?;
 
-    let existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE hostname = $1")
+    let mut existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE hostname = $1")
         .bind(&input.hostname)
         .fetch_optional(&state.db)
         .await?;
+
+    // Fallback: match by public IP overlap if hostname miss
+    if existing.is_none() {
+        if let Some((vps_id, _, _)) =
+            find_vps_by_public_ip_overlap(&state.db, &input.ip_addresses, None).await?
+        {
+            existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE id = $1")
+                .bind(vps_id)
+                .fetch_optional(&state.db)
+                .await?;
+        }
+    }
 
     let now = chrono::Utc::now().to_rfc3339();
 
@@ -94,15 +107,17 @@ pub async fn register(
 
         let row = sqlx::query_as::<_, Vps>(
             r#"UPDATE vps SET
-                alias = $2,
-                ip_addresses = $3,
-                ssh_port = $4,
-                extra = $5,
+                hostname = $2,
+                alias = $3,
+                ip_addresses = $4,
+                ssh_port = $5,
+                extra = $6,
                 status = 'active'
                WHERE id = $1
                RETURNING *"#,
         )
         .bind(existing.id)
+        .bind(&input.hostname)
         .bind(effective_alias)
         .bind(&ip_json)
         .bind(input.ssh_port)
@@ -177,11 +192,24 @@ pub async fn heartbeat(
         return Err(AppError::BadRequest("hostname is required".into()));
     }
 
-    let existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE hostname = $1")
+    let mut existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE hostname = $1")
         .bind(&input.hostname)
         .fetch_optional(&state.db)
-        .await?
-        .ok_or(AppError::NotFound)?;
+        .await?;
+
+    // Fallback: match by public IP overlap if hostname miss
+    if existing.is_none() && !input.ip_addresses.is_empty() {
+        if let Some((vps_id, _, _)) =
+            find_vps_by_public_ip_overlap(&state.db, &input.ip_addresses, None).await?
+        {
+            existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE id = $1")
+                .bind(vps_id)
+                .fetch_optional(&state.db)
+                .await?;
+        }
+    }
+
+    let existing = existing.ok_or(AppError::NotFound)?;
 
     let mut extra = existing.extra.clone();
     if let serde_json::Value::Object(ref mut map) = extra {
@@ -206,9 +234,10 @@ pub async fn heartbeat(
             .await?;
 
         let row = sqlx::query_as::<_, Vps>(
-            "UPDATE vps SET ip_addresses = $2, extra = $3 WHERE id = $1 RETURNING *",
+            "UPDATE vps SET hostname = $2, ip_addresses = $3, extra = $4 WHERE id = $1 RETURNING *",
         )
         .bind(existing.id)
+        .bind(&input.hostname)
         .bind(&ip_json)
         .bind(&extra)
         .fetch_one(&mut *tx)
@@ -217,11 +246,14 @@ pub async fn heartbeat(
         tx.commit().await?;
         row
     } else {
-        sqlx::query_as::<_, Vps>("UPDATE vps SET extra = $2 WHERE id = $1 RETURNING *")
-            .bind(existing.id)
-            .bind(&extra)
-            .fetch_one(&state.db)
-            .await?
+        sqlx::query_as::<_, Vps>(
+            "UPDATE vps SET hostname = $2, extra = $3 WHERE id = $1 RETURNING *",
+        )
+        .bind(existing.id)
+        .bind(&input.hostname)
+        .bind(&extra)
+        .fetch_one(&state.db)
+        .await?
     };
 
     Ok(Json(row))

@@ -624,4 +624,5 @@ export interface CloudSyncResult {
   created: number;
   updated: number;
   retired: number;
+  merged: number;
 }
