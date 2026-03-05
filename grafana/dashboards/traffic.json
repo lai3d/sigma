@@ -2220,6 +2220,205 @@
         "x": 0,
         "y": 111
       },
+      "title": "OOM Kill Tracking",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "none"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 112
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "title": "Total OOM Kills",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "sum(sigma_oom_kills_total{hostname=~\"$hostname\"}) or vector(0)",
+          "legendFormat": "kills"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          },
+          "unit": "none"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 112
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^process$/"
+        }
+      },
+      "title": "Top OOM Trigger Process",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "topk(1, sigma_oom_kills_total{hostname=~\"$hostname\"})",
+          "legendFormat": "{{ process }}",
+          "instant": true,
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "unit": "none"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 112
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "title": "Unique Processes with OOM Kills",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "count(sigma_oom_kills_total{hostname=~\"$hostname\"} > 0) or vector(0)",
+          "legendFormat": "processes"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "stacking": {
+              "mode": "normal"
+            }
+          },
+          "unit": "none"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 116
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "sortBy": "Last *",
+          "sortDesc": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "title": "OOM Kills by Process",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sigma_oom_kills_total{hostname=~\"$hostname\"}",
+          "legendFormat": "{{ process }}"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 124
+      },
       "title": "Process Details",
       "type": "row"
     },
@@ -2477,6 +2676,31 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "OOM Kills"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "gradient",
+                  "type": "gauge"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-GrYlRd"
+                }
+              }
+            ]
           }
         ]
       },
@@ -2484,7 +2708,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 112
+        "y": 125
       },
       "options": {
         "footer": {
@@ -2562,6 +2786,13 @@
           "instant": true,
           "format": "table",
           "refId": "I"
+        },
+        {
+          "expr": "sigma_oom_kills_total{hostname=~\"$hostname\"}",
+          "legendFormat": "",
+          "instant": true,
+          "format": "table",
+          "refId": "J"
         }
       ],
       "transformations": [
@@ -2621,11 +2852,17 @@
               "instance 7": true,
               "instance 8": true,
               "Time 9": true,
+              "Time 10": true,
               "__name__ 8": true,
+              "__name__ 9": true,
               "container 9": true,
+              "container 10": true,
               "hostname 9": true,
+              "hostname 10": true,
               "job 9": true,
-              "instance 9": true
+              "job 10": true,
+              "instance 9": true,
+              "instance 10": true
             },
             "renameByName": {
               "hostname 1": "Hostname",
@@ -2639,7 +2876,8 @@
               "Value #F": "Total Drops",
               "Value #G": "Conn Latency Avg",
               "Value #H": "DNS Queries",
-              "Value #I": "Execs"
+              "Value #I": "Execs",
+              "Value #J": "OOM Kills"
             }
           }
         }

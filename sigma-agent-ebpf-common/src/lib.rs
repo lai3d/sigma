@@ -79,3 +79,10 @@ pub struct DnsQueryValue {
 pub struct ExecValue {
     pub count: u64,
 }
+
+/// OOM kill counter per triggering PID (oom:mark_victim tracepoint).
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct OomKillValue {
+    pub count: u64,
+}

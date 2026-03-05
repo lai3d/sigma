@@ -116,7 +116,7 @@ sigma/
 - [x] eBPF TCP connection latency (SYN-to-established time via `tcp_v4_connect` entry+return)
 - [x] eBPF DNS query tracing (trace UDP sends to port 53 — detect DNS leaks on VPN nodes)
 - [ ] eBPF disk I/O per process (kprobe on `vfs_read`/`vfs_write` — identify disk bottlenecks)
-- [ ] eBPF OOM kill tracking (tracepoint `oom:oom_score_adj_update` — immediate process kill alerts)
+- [x] eBPF OOM kill tracking (tracepoint `oom:mark_victim` — immediate process kill alerts)
 - [ ] eBPF socket buffer depth monitoring (track `sk_rcvbuf`/`sk_sndbuf` usage — detect buffer bloat)
 - [ ] eBPF outbound connection audit (log all `connect()` with dest IP/port — detect unexpected traffic)
 - [x] eBPF exec tracing (tracepoint `sched:sched_process_exec` — intrusion detection on remote VPS)

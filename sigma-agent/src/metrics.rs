@@ -367,6 +367,23 @@ pub fn render_traffic_metrics(stats: &[crate::ebpf_traffic::ProcessTraffic], hos
         }
     }
 
+    // OOM kill metrics — only emit for processes with OOM kills
+    let has_oom: Vec<_> = stats.iter().filter(|e| e.oom_kills > 0).collect();
+    if !has_oom.is_empty() {
+        writeln!(out).unwrap();
+
+        writeln!(out, "# HELP sigma_oom_kills_total OOM kills by triggering process (eBPF tracepoint oom:mark_victim)").unwrap();
+        writeln!(out, "# TYPE sigma_oom_kills_total gauge").unwrap();
+        for entry in &has_oom {
+            let container = entry.container_id.as_deref().unwrap_or("");
+            writeln!(
+                out,
+                "sigma_oom_kills_total{{hostname=\"{}\",process=\"{}\",container=\"{}\"}} {}",
+                hostname, entry.process_name, container, entry.oom_kills
+            ).unwrap();
+        }
+    }
+
     // RTT metrics — only emit for processes with RTT data
     let has_rtt: Vec<_> = stats.iter().filter(|e| e.rtt_avg_us > 0).collect();
     if !has_rtt.is_empty() {

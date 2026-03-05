@@ -80,6 +80,12 @@ struct ExecValue {
     count: u64,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct OomKillValue {
+    count: u64,
+}
+
 unsafe impl aya::Pod for TrafficKey {}
 unsafe impl aya::Pod for TrafficValue {}
 unsafe impl aya::Pod for RetransmitValue {}
@@ -90,6 +96,7 @@ unsafe impl aya::Pod for DropKey {}
 unsafe impl aya::Pod for DropValue {}
 unsafe impl aya::Pod for DnsQueryValue {}
 unsafe impl aya::Pod for ExecValue {}
+unsafe impl aya::Pod for OomKillValue {}
 
 /// Per-process traffic stats resolved from eBPF data.
 #[derive(Clone, Debug)]
@@ -113,6 +120,7 @@ pub struct ProcessTraffic {
     pub dns_queries: u64,
     pub dns_bytes: u64,
     pub exec_count: u64,
+    pub oom_kills: u64,
 }
 
 pub type SharedTrafficStats = Arc<RwLock<Vec<ProcessTraffic>>>;
@@ -303,6 +311,21 @@ pub fn load_ebpf() -> anyhow::Result<Ebpf> {
             Err(e) => warn!("sched_process_exec program type mismatch: {:#}", e),
         },
         None => warn!("tracepoint program 'sched_process_exec' not found in eBPF object"),
+    }
+
+    // Attach tracepoint to oom/mark_victim (non-fatal — OOM kill tracking)
+    match ebpf.program_mut("oom_mark_victim") {
+        Some(prog) => match <&mut TracePoint>::try_from(prog) {
+            Ok(tp) => {
+                if let Err(e) = tp.load().and_then(|()| tp.attach("oom", "mark_victim")) {
+                    warn!("Failed to attach tracepoint to oom/mark_victim: {:#}", e);
+                } else {
+                    info!("Attached tracepoint to oom/mark_victim");
+                }
+            }
+            Err(e) => warn!("oom_mark_victim program type mismatch: {:#}", e),
+        },
+        None => warn!("tracepoint program 'oom_mark_victim' not found in eBPF object"),
     }
 
     Ok(ebpf)
@@ -525,6 +548,26 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
         }
     }
 
+    // --- Read OOM_KILL_MAP (read-and-clear, like EXEC_MAP) ---
+    let mut oom_entries: Vec<(TrafficKey, OomKillValue)> = Vec::new();
+    if let Some(map) = ebpf.map_mut("OOM_KILL_MAP") {
+        if let Ok(mut oom_map) = BpfHashMap::<&mut aya::maps::MapData, TrafficKey, OomKillValue>::try_from(map) {
+            let mut oom_keys: Vec<TrafficKey> = Vec::new();
+            for item in oom_map.iter() {
+                match item {
+                    Ok((key, value)) => {
+                        oom_entries.push((key, value));
+                        oom_keys.push(key);
+                    }
+                    Err(e) => debug!("Error reading OOM_KILL_MAP entry: {}", e),
+                }
+            }
+            for key in &oom_keys {
+                let _ = oom_map.remove(key);
+            }
+        }
+    }
+
     // Aggregate by (process_name, container_id)
     // Fields: bytes_sent, bytes_recv, udp_bytes_sent, udp_bytes_recv, retransmits,
     //         active_conns, total_conns, rtt_count, rtt_sum_us, rtt_min_us, rtt_max_us, drops
@@ -549,6 +592,7 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
         dns_queries: u64,
         dns_bytes: u64,
         exec_count: u64,
+        oom_kills: u64,
     }
 
     let mut aggregated: HashMap<(String, Option<String>), Agg> = HashMap::new();
@@ -634,6 +678,13 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
         entry.exec_count += value.count;
     }
 
+    for (key, value) in &oom_entries {
+        let proc_name = resolve_process_name(key.pid, host_proc);
+        let container_id = resolve_container_id(key.pid, host_proc);
+        let entry = aggregated.entry((proc_name, container_id)).or_default();
+        entry.oom_kills += value.count;
+    }
+
     let stats: Vec<ProcessTraffic> = aggregated
         .into_iter()
         .map(|((process_name, container_id), agg)| {
@@ -663,6 +714,7 @@ fn harvest_traffic(ebpf: &mut Ebpf, host_proc: &str) -> anyhow::Result<Vec<Proce
                 dns_queries: agg.dns_queries,
                 dns_bytes: agg.dns_bytes,
                 exec_count: agg.exec_count,
+                oom_kills: agg.oom_kills,
             }
         })
         .collect();
