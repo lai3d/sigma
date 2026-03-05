@@ -626,3 +626,26 @@ export interface CloudSyncResult {
   retired: number;
   merged: number;
 }
+
+// ─── VPS Duplicate Detection ──────────────────────────────
+
+export interface DuplicateGroup {
+  vps_a: Vps;
+  vps_b: Vps;
+  shared_ips: string[];
+}
+
+export interface DuplicateDetectionResponse {
+  groups: DuplicateGroup[];
+  total_groups: number;
+}
+
+export interface MergeVpsRequest {
+  target_id: string;
+  source_id: string;
+}
+
+export interface MergeVpsResponse {
+  merged_vps: Vps;
+  deleted_id: string;
+}

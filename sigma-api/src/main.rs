@@ -117,6 +117,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(routes::envoy::router())
         .merge(routes::dns::router())
         .merge(routes::cloud::router())
+        .merge(routes::vps_duplicates::router())
         .merge(routes::vps_purposes::router())
         .merge(routes::ip_labels::router())
         .merge(routes::settings::router())

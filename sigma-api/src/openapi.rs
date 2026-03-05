@@ -6,6 +6,7 @@ use crate::models::{
     AgentHeartbeat, AgentRegister, BatchCreateEnvoyRoutes, ChangePasswordRequest,
     CloudAccountResponse, CloudSyncResult, CreateCloudAccount, UpdateCloudAccount,
     PaginatedCloudAccountResponse, SystemSetting,
+    DuplicateGroup, DuplicateDetectionResponse, MergeVpsRequest, MergeVpsResponse,
     ConvertedTotal, CostMonthlyResponse, CostSummaryResponse, CountStat,
     CreateDnsAccount, CreateEnvoyNode, CreateEnvoyRoute, CreateExchangeRate,
     CreateIpCheck, CreateProvider, CreateTicket, CreateTicketComment, CreateUser, CreateVps,
@@ -140,6 +141,9 @@ use crate::models::{
         crate::routes::cloud::update_account,
         crate::routes::cloud::delete_account,
         crate::routes::cloud::sync_account,
+        // VPS Duplicates
+        crate::routes::vps_duplicates::detect_duplicates,
+        crate::routes::vps_duplicates::merge_vps,
         // Settings
         crate::routes::settings::list,
         crate::routes::settings::update,
@@ -181,6 +185,7 @@ use crate::models::{
         VpsPurpose, CreateVpsPurpose, UpdateVpsPurpose, PaginatedVpsPurposeResponse,
         CloudAccountResponse, CreateCloudAccount, UpdateCloudAccount, CloudSyncResult,
         PaginatedCloudAccountResponse,
+        DuplicateGroup, DuplicateDetectionResponse, MergeVpsRequest, MergeVpsResponse,
         VpsIpHistory, PaginatedVpsIpHistoryResponse,
         IpLabel, CreateIpLabel, UpdateIpLabel, PaginatedIpLabelResponse,
         SystemSetting,

@@ -58,7 +58,7 @@ pub struct UpdateProvider {
 
 // ─── VPS ─────────────────────────────────────────────────
 
-#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, ToSchema)]
 pub struct Vps {
     pub id: Uuid,
     pub hostname: String,
@@ -1347,4 +1347,31 @@ pub struct PaginatedCloudAccountResponse {
     pub total: i64,
     pub page: i64,
     pub per_page: i64,
+}
+
+// ─── VPS Duplicate Detection ─────────────────────────────
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct DuplicateGroup {
+    pub vps_a: Vps,
+    pub vps_b: Vps,
+    pub shared_ips: Vec<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct DuplicateDetectionResponse {
+    pub groups: Vec<DuplicateGroup>,
+    pub total_groups: usize,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct MergeVpsRequest {
+    pub target_id: Uuid,
+    pub source_id: Uuid,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct MergeVpsResponse {
+    pub merged_vps: Vps,
+    pub deleted_id: Uuid,
 }

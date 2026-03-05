@@ -21,6 +21,7 @@ import TopologyPage from '@/pages/TopologyPage';
 import DomainsPage from '@/pages/DomainsPage';
 import DnsZoneDetail from '@/pages/DnsZoneDetail';
 import CloudAccountsPage from '@/pages/CloudAccountsPage';
+import VpsDuplicatesPage from '@/pages/VpsDuplicatesPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,6 +48,7 @@ export default function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/vps" element={<VpsList />} />
               <Route path="/vps/new" element={<VpsForm />} />
+              <Route path="/vps/duplicates" element={<VpsDuplicatesPage />} />
               <Route path="/vps/:id" element={<VpsDetail />} />
               <Route path="/vps/:id/edit" element={<VpsForm />} />
               <Route path="/providers" element={<ProviderList />} />
