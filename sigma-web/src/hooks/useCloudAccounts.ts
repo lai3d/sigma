@@ -9,6 +9,14 @@ export function useCloudAccounts(query?: { page?: number; per_page?: number }) {
   });
 }
 
+export function useCloudAccount(id: string) {
+  return useQuery({
+    queryKey: ['cloud-accounts', id],
+    queryFn: () => api.getAccount(id),
+    enabled: !!id,
+  });
+}
+
 export function useCreateCloudAccount() {
   const qc = useQueryClient();
   return useMutation({

@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Pencil, Trash2, Power, BarChart3, Network, Copy, Check, Shield } from 'lucide-react';
 import { useVps, useDeleteVps, useRetireVps, useAllocatePorts, useVpsIpHistory } from '@/hooks/useVps';
 import { useProvider } from '@/hooks/useProviders';
+import { useCloudAccount } from '@/hooks/useCloudAccounts';
 import { useTickets } from '@/hooks/useTickets';
 import { useEnvoyNodes, useBatchCreateEnvoyRoutes } from '@/hooks/useEnvoy';
 import { useAuth } from '@/contexts/AuthContext';
@@ -34,6 +35,7 @@ export default function VpsDetail() {
 
   const { data: vps, isLoading } = useVps(id || '');
   const { data: provider } = useProvider(vps?.provider_id || '');
+  const { data: cloudAccount } = useCloudAccount(vps?.cloud_account_id || '');
   const { data: ticketsResult } = useTickets({ vps_id: id, per_page: 10 });
   const { data: purposesResult } = useVpsPurposes({ per_page: 100 });
   const purposeLabel = purposesResult?.data.find(p => p.name === vps?.purpose)?.label;
@@ -319,6 +321,21 @@ export default function VpsDetail() {
               <dt className="text-gray-500">Provider</dt>
               <dd className="text-gray-700">{provider?.name || '-'}</dd>
             </div>
+            {vps.cloud_account_id && (
+              <div className="flex justify-between">
+                <dt className="text-gray-500">Cloud Account</dt>
+                <dd className="text-gray-700">
+                  <Link to="/cloud-accounts" className="text-blue-600 hover:underline">
+                    {cloudAccount?.name || vps.cloud_account_id}
+                  </Link>
+                  {cloudAccount?.provider_type && (
+                    <span className="ml-1.5 px-1.5 py-0.5 text-[10px] rounded bg-gray-100 text-gray-500">
+                      {cloudAccount.provider_type}
+                    </span>
+                  )}
+                </dd>
+              </div>
+            )}
             <div className="flex justify-between">
               <dt className="text-gray-500">Country</dt>
               <dd className="text-gray-700">{vps.country || '-'}</dd>
@@ -335,6 +352,10 @@ export default function VpsDetail() {
                 <dd className="text-gray-700">{vps.dc_name}</dd>
               </div>
             )}
+            <div className="flex justify-between">
+              <dt className="text-gray-500">Source</dt>
+              <dd className="text-gray-700">{vps.source || '-'}</dd>
+            </div>
             <div className="flex justify-between">
               <dt className="text-gray-500">Purpose</dt>
               <dd className="text-gray-700">{purposeLabel || vps.purpose || '-'}</dd>
