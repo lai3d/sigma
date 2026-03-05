@@ -175,7 +175,7 @@ export default function VpsDuplicatesPage() {
 
       {!isLoading && groups.length > 0 && (
         <div className="space-y-6">
-          {groups.map((group, i) => (
+          {groups.map((group) => (
             <GroupCard
               key={`${group.vps_a.id}-${group.vps_b.id}`}
               group={group}
