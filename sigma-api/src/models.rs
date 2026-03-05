@@ -1163,6 +1163,7 @@ pub struct DnsRecordListQuery {
     pub zone_name: Option<String>,
     pub record_type: Option<String>,
     pub has_vps: Option<bool>,
+    pub vps_id: Option<Uuid>,
     #[serde(default = "default_page")]
     pub page: i64,
     #[serde(default = "default_per_page")]

@@ -581,6 +581,10 @@ pub async fn list_dns_records(
         param_idx += 1;
         where_clause.push_str(&format!(" AND d.record_type = ${param_idx}"));
     }
+    if q.vps_id.is_some() {
+        param_idx += 1;
+        where_clause.push_str(&format!(" AND d.vps_id = ${param_idx}"));
+    }
     if let Some(has_vps) = q.has_vps {
         if has_vps {
             where_clause.push_str(" AND d.vps_id IS NOT NULL");
@@ -600,6 +604,9 @@ pub async fn list_dns_records(
         count_query = count_query.bind(v);
     }
     if let Some(ref v) = q.record_type {
+        count_query = count_query.bind(v);
+    }
+    if let Some(ref v) = q.vps_id {
         count_query = count_query.bind(v);
     }
     let total = count_query.fetch_one(&state.db).await?.0;
@@ -630,6 +637,9 @@ pub async fn list_dns_records(
         query = query.bind(v);
     }
     if let Some(ref v) = q.record_type {
+        query = query.bind(v);
+    }
+    if let Some(ref v) = q.vps_id {
         query = query.bind(v);
     }
     query = query.bind(per_page).bind(offset);

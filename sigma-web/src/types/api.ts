@@ -517,6 +517,7 @@ export interface DnsRecordListQuery {
   zone_name?: string;
   record_type?: string;
   has_vps?: boolean;
+  vps_id?: string;
   page?: number;
   per_page?: number;
 }

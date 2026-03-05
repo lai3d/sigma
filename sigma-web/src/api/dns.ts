@@ -70,6 +70,7 @@ export async function listDnsRecords(query?: DnsRecordListQuery): Promise<Pagina
   if (query?.zone_name) params.set('zone_name', query.zone_name);
   if (query?.record_type) params.set('record_type', query.record_type);
   if (query?.has_vps !== undefined) params.set('has_vps', String(query.has_vps));
+  if (query?.vps_id) params.set('vps_id', query.vps_id);
   if (query?.page) params.set('page', String(query.page));
   if (query?.per_page) params.set('per_page', String(query.per_page));
   const { data } = await apiClient.get(`/dns-records?${params.toString()}`);

@@ -6,6 +6,7 @@ import { useProvider } from '@/hooks/useProviders';
 import { useCloudAccount } from '@/hooks/useCloudAccounts';
 import { useTickets } from '@/hooks/useTickets';
 import { useEnvoyNodes, useBatchCreateEnvoyRoutes } from '@/hooks/useEnvoy';
+import { useDnsRecords } from '@/hooks/useDns';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVpsPurposes } from '@/hooks/useVpsPurposes';
 import StatusBadge from '@/components/StatusBadge';
@@ -37,6 +38,7 @@ export default function VpsDetail() {
   const { data: provider } = useProvider(vps?.provider_id || '');
   const { data: cloudAccount } = useCloudAccount(vps?.cloud_account_id || '');
   const { data: ticketsResult } = useTickets({ vps_id: id, per_page: 10 });
+  const { data: dnsRecordsResult } = useDnsRecords({ vps_id: id, per_page: 20 });
   const { data: purposesResult } = useVpsPurposes({ per_page: 100 });
   const purposeLabel = purposesResult?.data.find(p => p.name === vps?.purpose)?.label;
   const deleteMutation = useDeleteVps();
@@ -614,6 +616,49 @@ export default function VpsDetail() {
           </div>
         ) : (
           <p className="text-sm text-gray-400">No tickets linked to this VPS.</p>
+        )}
+      </div>
+
+      {/* Related DNS Records */}
+      <div className="mt-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Related DNS Records</h3>
+        {dnsRecordsResult && dnsRecordsResult.data.length > 0 ? (
+          <div className="bg-white rounded-lg border overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-500 border-b bg-gray-50">
+                  <th className="px-4 py-3 font-medium">Name</th>
+                  <th className="px-4 py-3 font-medium">Type</th>
+                  <th className="px-4 py-3 font-medium">Content</th>
+                  <th className="px-4 py-3 font-medium">Zone</th>
+                  <th className="px-4 py-3 font-medium">TTL</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dnsRecordsResult.data.map((r) => (
+                  <tr key={r.id} className="border-b last:border-0 hover:bg-gray-50">
+                    <td className="px-4 py-3 font-mono text-xs">{r.name}</td>
+                    <td className="px-4 py-3">
+                      <span className="inline-block px-1.5 py-0.5 text-xs font-medium rounded bg-purple-50 text-purple-700">
+                        {r.record_type}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs max-w-xs truncate">{r.content}</td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {r.zone_name ? (
+                        <Link to={`/domains/zones/${r.zone_uuid}`} className="text-blue-600 hover:underline">
+                          {r.zone_name}
+                        </Link>
+                      ) : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">{r.ttl}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400">No DNS records linked to this VPS.</p>
         )}
       </div>
 
