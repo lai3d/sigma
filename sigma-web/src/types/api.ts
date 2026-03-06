@@ -1,4 +1,4 @@
-export type VpsStatus = 'provisioning' | 'active' | 'retiring' | 'retired';
+export type VpsStatus = 'provisioning' | 'active' | 'retiring' | 'retired' | 'deleted';
 export type VpsPurpose = string;
 
 // ─── VPS Purposes ────────────────────────────────────────
