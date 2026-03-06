@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Pencil, Trash2, Power } from 'lucide-react';
-import { useVpsList, useDeleteVps, useRetireVps, useImportVps } from '@/hooks/useVps';
+import { Plus, Pencil, Trash2, Power, RotateCcw } from 'lucide-react';
+import { useVpsList, useDeleteVps, useRetireVps, useRestoreVps, useImportVps } from '@/hooks/useVps';
 import { useProviders } from '@/hooks/useProviders';
 import { useVpsPurposes } from '@/hooks/useVpsPurposes';
 import StatusBadge from '@/components/StatusBadge';
@@ -21,6 +21,7 @@ export default function VpsList() {
   const { data: purposesResult } = useVpsPurposes({ per_page: 100 });
   const deleteMutation = useDeleteVps();
   const retireMutation = useRetireVps();
+  const restoreMutation = useRestoreVps();
   const importMutation = useImportVps();
 
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -157,8 +158,9 @@ export default function VpsList() {
             <tbody>
               {vpsList.map((vps) => {
                 const days = daysUntil(vps.expire_date);
+                const isDeleted = vps.status === 'deleted';
                 return (
-                  <tr key={vps.id} className="border-b last:border-0 hover:bg-gray-50">
+                  <tr key={vps.id} className={`border-b last:border-0 hover:bg-gray-50 ${isDeleted ? 'opacity-50' : ''}`}>
                     <td className="px-4 py-3">
                       <Link
                         to={`/vps/${vps.id}`}
@@ -241,29 +243,42 @@ export default function VpsList() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
-                        <Link
-                          to={`/vps/${vps.id}/edit`}
-                          title="Edit"
-                          className="p-1 text-blue-500 hover:bg-blue-50 rounded"
-                        >
-                          <Pencil size={15} />
-                        </Link>
-                        {vps.status !== 'retired' && (
+                        {isDeleted ? (
                           <button
-                            title="Retire"
-                            onClick={() => setConfirmRetire(vps.id)}
-                            className="p-1 text-orange-500 hover:bg-orange-50 rounded"
+                            title="Restore"
+                            onClick={() => restoreMutation.mutate(vps.id)}
+                            disabled={restoreMutation.isPending}
+                            className="p-1 text-teal-600 hover:bg-teal-50 rounded"
                           >
-                            <Power size={15} />
+                            <RotateCcw size={15} />
                           </button>
+                        ) : (
+                          <>
+                            <Link
+                              to={`/vps/${vps.id}/edit`}
+                              title="Edit"
+                              className="p-1 text-blue-500 hover:bg-blue-50 rounded"
+                            >
+                              <Pencil size={15} />
+                            </Link>
+                            {vps.status !== 'retired' && (
+                              <button
+                                title="Retire"
+                                onClick={() => setConfirmRetire(vps.id)}
+                                className="p-1 text-orange-500 hover:bg-orange-50 rounded"
+                              >
+                                <Power size={15} />
+                              </button>
+                            )}
+                            <button
+                              title="Delete"
+                              onClick={() => setConfirmDelete(vps.id)}
+                              className="p-1 text-red-500 hover:bg-red-50 rounded"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </>
                         )}
-                        <button
-                          title="Delete"
-                          onClick={() => setConfirmDelete(vps.id)}
-                          className="p-1 text-red-500 hover:bg-red-50 rounded"
-                        >
-                          <Trash2 size={15} />
-                        </button>
                       </div>
                     </td>
                   </tr>
