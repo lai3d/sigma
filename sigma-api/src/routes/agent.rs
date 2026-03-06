@@ -58,7 +58,7 @@ pub async fn register(
 
     // Match by hostname or merged_hostnames (preserved from VPS merge)
     let existing = sqlx::query_as::<_, Vps>(
-        "SELECT * FROM vps WHERE status != 'deleted' AND (hostname = $1 OR extra->'merged_hostnames' ? $1)"
+        "SELECT * FROM vps WHERE status != 'deleted' AND (hostname = $1 OR extra->'merged_hostnames' @> to_jsonb($1::text))"
     )
         .bind(&input.hostname)
         .fetch_optional(&state.db)
@@ -184,7 +184,7 @@ pub async fn heartbeat(
 
     // Match by hostname or merged_hostnames (preserved from VPS merge)
     let existing = sqlx::query_as::<_, Vps>(
-        "SELECT * FROM vps WHERE status != 'deleted' AND (hostname = $1 OR extra->'merged_hostnames' ? $1)"
+        "SELECT * FROM vps WHERE status != 'deleted' AND (hostname = $1 OR extra->'merged_hostnames' @> to_jsonb($1::text))"
     )
         .bind(&input.hostname)
         .fetch_optional(&state.db)
