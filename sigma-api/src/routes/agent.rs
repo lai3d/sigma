@@ -4,7 +4,6 @@ use axum::{extract::State, routing::post, Json, Router};
 
 use crate::errors::{AppError, ErrorResponse};
 use crate::models::{AgentHeartbeat, AgentRegister, IpEntry, Vps};
-use crate::routes::cloud::find_vps_by_public_ip_overlap;
 use crate::routes::AppState;
 
 pub fn router() -> Router<AppState> {
@@ -57,22 +56,11 @@ pub async fn register(
 
     validate_ips(&input.ip_addresses)?;
 
-    let mut existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE hostname = $1 AND status != 'deleted'")
+    // Only match by exact hostname — IP overlap is left to the duplicates page
+    let existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE hostname = $1 AND status != 'deleted'")
         .bind(&input.hostname)
         .fetch_optional(&state.db)
         .await?;
-
-    // Fallback: match by public IP overlap if hostname miss
-    if existing.is_none() {
-        if let Some((vps_id, _, _)) =
-            find_vps_by_public_ip_overlap(&state.db, &input.ip_addresses, None).await?
-        {
-            existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE id = $1 AND status != 'deleted'")
-                .bind(vps_id)
-                .fetch_optional(&state.db)
-                .await?;
-        }
-    }
 
     let now = chrono::Utc::now().to_rfc3339();
 
@@ -192,24 +180,12 @@ pub async fn heartbeat(
         return Err(AppError::BadRequest("hostname is required".into()));
     }
 
-    let mut existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE hostname = $1 AND status != 'deleted'")
+    // Only match by exact hostname — IP overlap is left to the duplicates page
+    let existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE hostname = $1 AND status != 'deleted'")
         .bind(&input.hostname)
         .fetch_optional(&state.db)
-        .await?;
-
-    // Fallback: match by public IP overlap if hostname miss
-    if existing.is_none() && !input.ip_addresses.is_empty() {
-        if let Some((vps_id, _, _)) =
-            find_vps_by_public_ip_overlap(&state.db, &input.ip_addresses, None).await?
-        {
-            existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE id = $1 AND status != 'deleted'")
-                .bind(vps_id)
-                .fetch_optional(&state.db)
-                .await?;
-        }
-    }
-
-    let existing = existing.ok_or(AppError::NotFound)?;
+        .await?
+        .ok_or(AppError::NotFound)?;
 
     let mut extra = existing.extra.clone();
     if let serde_json::Value::Object(ref mut map) = extra {
