@@ -168,6 +168,21 @@ pub async fn merge_vps(
                 base.insert(k, v);
             }
         }
+        // Preserve source hostname so agent heartbeat can still match
+        if source.hostname != target.hostname {
+            let mut hostnames: Vec<String> = base
+                .get("merged_hostnames")
+                .and_then(|v| v.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                .unwrap_or_default();
+            if !hostnames.contains(&source.hostname) {
+                hostnames.push(source.hostname.clone());
+            }
+            base.insert(
+                "merged_hostnames".to_string(),
+                serde_json::Value::Array(hostnames.into_iter().map(serde_json::Value::String).collect()),
+            );
+        }
         serde_json::Value::Object(base)
     };
 

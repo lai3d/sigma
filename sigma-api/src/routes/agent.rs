@@ -56,8 +56,10 @@ pub async fn register(
 
     validate_ips(&input.ip_addresses)?;
 
-    // Only match by exact hostname — IP overlap is left to the duplicates page
-    let existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE hostname = $1 AND status != 'deleted'")
+    // Match by hostname or merged_hostnames (preserved from VPS merge)
+    let existing = sqlx::query_as::<_, Vps>(
+        "SELECT * FROM vps WHERE status != 'deleted' AND (hostname = $1 OR extra->'merged_hostnames' ? $1)"
+    )
         .bind(&input.hostname)
         .fetch_optional(&state.db)
         .await?;
@@ -180,8 +182,10 @@ pub async fn heartbeat(
         return Err(AppError::BadRequest("hostname is required".into()));
     }
 
-    // Only match by exact hostname — IP overlap is left to the duplicates page
-    let existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE hostname = $1 AND status != 'deleted'")
+    // Match by hostname or merged_hostnames (preserved from VPS merge)
+    let existing = sqlx::query_as::<_, Vps>(
+        "SELECT * FROM vps WHERE status != 'deleted' AND (hostname = $1 OR extra->'merged_hostnames' ? $1)"
+    )
         .bind(&input.hostname)
         .fetch_optional(&state.db)
         .await?
