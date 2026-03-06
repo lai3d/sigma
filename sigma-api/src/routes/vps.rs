@@ -51,6 +51,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/vps/import", axum::routing::post(import))
         .route("/api/vps/{id}", get(get_one).put(update).delete(delete))
         .route("/api/vps/{id}/retire", axum::routing::post(retire))
+        .route("/api/vps/{id}/restore", axum::routing::post(restore))
         .route("/api/vps/{id}/ip-history", get(ip_history))
         .route("/api/vps/{id}/allocate-ports", axum::routing::post(allocate_ports))
 }
@@ -78,6 +79,8 @@ pub async fn list(
     if q.status.is_some() {
         param_idx += 1;
         where_clause.push_str(&format!(" AND status = ${}", param_idx));
+    } else {
+        where_clause.push_str(" AND status != 'deleted'");
     }
     if q.country.is_some() {
         param_idx += 1;
@@ -356,17 +359,21 @@ pub async fn delete(
 ) -> Result<Json<serde_json::Value>, AppError> {
     require_role(&user, &["admin", "operator"])?;
 
-    let result = sqlx::query("DELETE FROM vps WHERE id = $1")
-        .bind(id)
-        .execute(&state.db)
-        .await?;
-
-    if result.rows_affected() == 0 {
-        return Err(AppError::NotFound);
-    }
+    let row = sqlx::query_as::<_, Vps>(
+        "UPDATE vps SET status = 'deleted', updated_at = now() WHERE id = $1 AND status != 'deleted' RETURNING *",
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
 
     log_audit(&state.db, &user, "delete", "vps", Some(&id.to_string()),
-        serde_json::json!({})).await;
+        serde_json::json!({
+            "hostname": row.hostname,
+            "country": row.country,
+            "provider_id": row.provider_id,
+            "ip_addresses": row.ip_addresses.0,
+        })).await;
 
     Ok(Json(serde_json::json!({ "deleted": true })))
 }
@@ -403,6 +410,37 @@ pub async fn retire(
     .ok_or(AppError::NotFound)?;
 
     log_audit(&state.db, &user, "retire", "vps", Some(&id.to_string()),
+        serde_json::json!({"hostname": row.hostname})).await;
+
+    Ok(Json(row))
+}
+
+/// Restore a soft-deleted VPS (sets status to 'retired' as safe default)
+#[utoipa::path(
+    post, path = "/api/vps/{id}/restore",
+    tag = "VPS",
+    params(("id" = Uuid, Path, description = "VPS ID")),
+    responses(
+        (status = 200, body = Vps, description = "VPS restored"),
+        (status = 404, body = ErrorResponse),
+    )
+)]
+pub async fn restore(
+    State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Vps>, AppError> {
+    require_role(&user, &["admin", "operator"])?;
+
+    let row = sqlx::query_as::<_, Vps>(
+        "UPDATE vps SET status = 'retired', updated_at = now() WHERE id = $1 AND status = 'deleted' RETURNING *",
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    log_audit(&state.db, &user, "restore", "vps", Some(&id.to_string()),
         serde_json::json!({"hostname": row.hostname})).await;
 
     Ok(Json(row))

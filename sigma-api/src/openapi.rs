@@ -68,6 +68,7 @@ use crate::models::{
         crate::routes::vps::update,
         crate::routes::vps::delete,
         crate::routes::vps::retire,
+        crate::routes::vps::restore,
         crate::routes::vps::export,
         crate::routes::vps::import,
         crate::routes::vps::ip_history,

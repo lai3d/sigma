@@ -66,6 +66,7 @@ export default function VpsList() {
           <option value="active">Active</option>
           <option value="retiring">Retiring</option>
           <option value="retired">Retired</option>
+          <option value="deleted">Deleted</option>
         </select>
 
         <select
@@ -298,7 +299,7 @@ export default function VpsList() {
       <ConfirmDialog
         open={!!confirmDelete}
         title="Delete VPS"
-        message="This will permanently delete this VPS record. This cannot be undone."
+        message="This will mark the VPS as deleted. You can restore it later from the Deleted filter."
         confirmLabel="Delete"
         variant="danger"
         onConfirm={() => {

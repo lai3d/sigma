@@ -821,9 +821,9 @@ pub async fn get_topology(
     .fetch_all(&state.db)
     .await?;
 
-    // 2. Fetch all non-retired VPS
+    // 2. Fetch all non-retired, non-deleted VPS
     let all_vps = sqlx::query_as::<_, crate::models::Vps>(
-        "SELECT * FROM vps WHERE status != 'retired'",
+        "SELECT * FROM vps WHERE status NOT IN ('retired', 'deleted')",
     )
     .fetch_all(&state.db)
     .await?;

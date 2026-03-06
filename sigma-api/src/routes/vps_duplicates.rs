@@ -45,7 +45,7 @@ pub async fn detect_duplicates(
         WITH public_ips AS (
             SELECT v.id AS vps_id, e->>'ip' AS ip
             FROM vps v, jsonb_array_elements(v.ip_addresses) AS e
-            WHERE v.status != 'retired'
+            WHERE v.status NOT IN ('retired', 'deleted')
               AND e->>'label' != 'internal'
               AND e->>'ip' IS NOT NULL
         )
@@ -287,8 +287,8 @@ pub async fn merge_vps(
     .fetch_one(&mut *tx)
     .await?;
 
-    // 5. DELETE source VPS
-    sqlx::query("DELETE FROM vps WHERE id = $1")
+    // 5. Soft-delete source VPS
+    sqlx::query("UPDATE vps SET status = 'deleted', updated_at = now() WHERE id = $1")
         .bind(input.source_id)
         .execute(&mut *tx)
         .await?;

@@ -44,7 +44,7 @@ pub(crate) async fn find_vps_by_public_ip_overlap(
 
     let row: Option<(Uuid, String, String)> = sqlx::query_as(
         r#"SELECT id, source, hostname FROM vps
-           WHERE status != 'retired'
+           WHERE status NOT IN ('retired', 'deleted')
              AND ($2::uuid IS NULL OR id != $2)
              AND EXISTS(
                SELECT 1 FROM jsonb_array_elements(ip_addresses) AS e

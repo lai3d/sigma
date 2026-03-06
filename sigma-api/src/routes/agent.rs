@@ -57,7 +57,7 @@ pub async fn register(
 
     validate_ips(&input.ip_addresses)?;
 
-    let mut existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE hostname = $1")
+    let mut existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE hostname = $1 AND status != 'deleted'")
         .bind(&input.hostname)
         .fetch_optional(&state.db)
         .await?;
@@ -67,7 +67,7 @@ pub async fn register(
         if let Some((vps_id, _, _)) =
             find_vps_by_public_ip_overlap(&state.db, &input.ip_addresses, None).await?
         {
-            existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE id = $1")
+            existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE id = $1 AND status != 'deleted'")
                 .bind(vps_id)
                 .fetch_optional(&state.db)
                 .await?;
@@ -192,7 +192,7 @@ pub async fn heartbeat(
         return Err(AppError::BadRequest("hostname is required".into()));
     }
 
-    let mut existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE hostname = $1")
+    let mut existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE hostname = $1 AND status != 'deleted'")
         .bind(&input.hostname)
         .fetch_optional(&state.db)
         .await?;
@@ -202,7 +202,7 @@ pub async fn heartbeat(
         if let Some((vps_id, _, _)) =
             find_vps_by_public_ip_overlap(&state.db, &input.ip_addresses, None).await?
         {
-            existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE id = $1")
+            existing = sqlx::query_as::<_, Vps>("SELECT * FROM vps WHERE id = $1 AND status != 'deleted'")
                 .bind(vps_id)
                 .fetch_optional(&state.db)
                 .await?;

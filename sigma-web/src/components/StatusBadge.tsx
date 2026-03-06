@@ -5,6 +5,7 @@ const statusColors: Record<string, string> = {
   active: 'bg-green-100 text-green-800',
   retiring: 'bg-orange-100 text-orange-800',
   retired: 'bg-gray-100 text-gray-600',
+  deleted: 'bg-red-50 text-red-600',
 };
 
 export default function StatusBadge({ status }: { status: string }) {

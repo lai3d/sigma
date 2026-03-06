@@ -16,7 +16,7 @@ pub fn router() -> Router<AppState> {
     )
 )]
 pub async fn dashboard(State(state): State<AppState>) -> Result<Json<DashboardStats>, AppError> {
-    let total_vps: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM vps")
+    let total_vps: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM vps WHERE status != 'deleted'")
         .fetch_one(&state.db)
         .await?;
 
@@ -30,7 +30,7 @@ pub async fn dashboard(State(state): State<AppState>) -> Result<Json<DashboardSt
         .await?;
 
     let by_country = sqlx::query_as::<_, CountStat>(
-        "SELECT country as label, COUNT(*) as count FROM vps WHERE status != 'retired' GROUP BY country ORDER BY count DESC",
+        "SELECT country as label, COUNT(*) as count FROM vps WHERE status NOT IN ('retired', 'deleted') GROUP BY country ORDER BY count DESC",
     )
     .fetch_all(&state.db)
     .await?;
@@ -38,14 +38,14 @@ pub async fn dashboard(State(state): State<AppState>) -> Result<Json<DashboardSt
     let by_provider = sqlx::query_as::<_, CountStat>(
         r#"SELECT COALESCE(p.name, '(unassigned)') as label, COUNT(*) as count
            FROM vps v LEFT JOIN providers p ON p.id = v.provider_id
-           WHERE v.status != 'retired'
+           WHERE v.status NOT IN ('retired', 'deleted')
            GROUP BY COALESCE(p.name, '(unassigned)') ORDER BY count DESC"#,
     )
     .fetch_all(&state.db)
     .await?;
 
     let by_status = sqlx::query_as::<_, CountStat>(
-        "SELECT status as label, COUNT(*) as count FROM vps GROUP BY status ORDER BY count DESC",
+        "SELECT status as label, COUNT(*) as count FROM vps WHERE status != 'deleted' GROUP BY status ORDER BY count DESC",
     )
     .fetch_all(&state.db)
     .await?;

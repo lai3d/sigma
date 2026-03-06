@@ -130,7 +130,7 @@ pub async fn sync_single_zone(
 
     // Build IP→VPS map
     let vps_rows: Vec<(Uuid, serde_json::Value)> =
-        sqlx::query_as("SELECT id, ip_addresses FROM vps WHERE status != 'retired'")
+        sqlx::query_as("SELECT id, ip_addresses FROM vps WHERE status NOT IN ('retired', 'deleted')")
             .fetch_all(&state.db)
             .await?;
 
@@ -251,7 +251,7 @@ pub async fn sync(state: &AppState, account: &DnsAccount) -> Result<DnsSyncResul
 
     // Build IP→VPS map
     let vps_rows: Vec<(Uuid, serde_json::Value)> =
-        sqlx::query_as("SELECT id, ip_addresses FROM vps WHERE status != 'retired'")
+        sqlx::query_as("SELECT id, ip_addresses FROM vps WHERE status NOT IN ('retired', 'deleted')")
             .fetch_all(&state.db)
             .await?;
 

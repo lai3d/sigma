@@ -42,6 +42,14 @@ export function useDeleteVps() {
   });
 }
 
+export function useRestoreVps() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.restoreVps(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['vps'] }),
+  });
+}
+
 export function useRetireVps() {
   const qc = useQueryClient();
   return useMutation({

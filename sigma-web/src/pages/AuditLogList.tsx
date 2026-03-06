@@ -4,13 +4,14 @@ import { useAuditLogs } from '@/hooks/useAuditLogs';
 import Pagination from '@/components/Pagination';
 
 const RESOURCE_OPTIONS = ['', 'vps', 'provider', 'user'];
-const ACTION_OPTIONS = ['', 'create', 'update', 'delete', 'retire', 'merge', 'import', 'login'];
+const ACTION_OPTIONS = ['', 'create', 'update', 'delete', 'retire', 'restore', 'merge', 'import', 'login'];
 
 const ACTION_COLORS: Record<string, string> = {
   create: 'bg-green-50 text-green-700',
   update: 'bg-blue-50 text-blue-700',
   delete: 'bg-red-50 text-red-700',
   retire: 'bg-orange-50 text-orange-700',
+  restore: 'bg-teal-50 text-teal-700',
   merge: 'bg-indigo-50 text-indigo-700',
   import: 'bg-purple-50 text-purple-700',
   login: 'bg-gray-100 text-gray-600',
@@ -30,9 +31,8 @@ function timeAgo(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString();
 }
 
-function resourceLink(resource: string, resourceId: string | null, action: string): string | null {
+function resourceLink(resource: string, resourceId: string | null): string | null {
   if (!resourceId) return null;
-  if (action === 'delete') return null;
   if (resource === 'vps') return `/vps/${resourceId}`;
   return null;
 }
@@ -109,7 +109,7 @@ export default function AuditLogList() {
             <tbody>
               {logs.map((log) => {
                 const isExpanded = expanded.has(log.id);
-                const link = resourceLink(log.resource, log.resource_id, log.action);
+                const link = resourceLink(log.resource, log.resource_id);
                 const hasDetails = Object.keys(log.details).length > 0;
                 return (
                   <Fragment key={log.id}>

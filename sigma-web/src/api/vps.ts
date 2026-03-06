@@ -38,6 +38,11 @@ export async function retireVps(id: string): Promise<Vps> {
   return data;
 }
 
+export async function restoreVps(id: string): Promise<Vps> {
+  const { data } = await apiClient.post(`/vps/${id}/restore`);
+  return data;
+}
+
 export async function exportVps(format: 'csv' | 'json'): Promise<Blob> {
   const { data } = await apiClient.get(`/vps/export?format=${format}`, {
     responseType: 'blob',

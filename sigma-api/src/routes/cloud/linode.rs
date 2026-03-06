@@ -302,7 +302,7 @@ pub async fn sync(state: &AppState, account: &CloudAccount) -> Result<CloudSyncR
                  AND source = 'cloud-sync'
                  AND extra->>'cloud_instance_id' IS NOT NULL
                  AND extra->>'cloud_instance_id' != ALL($2)
-                 AND status != 'retired'"#,
+                 AND status NOT IN ('retired', 'deleted')"#,
         )
         .bind(account.id)
         .bind(&seen_instance_ids)

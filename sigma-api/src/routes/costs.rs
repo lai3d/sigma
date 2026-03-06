@@ -39,7 +39,7 @@ pub async fn summary(
         bindings.push(QueryBinding::Text(status.clone()));
         where_parts.push(format!("status = ${}", bindings.len()));
     } else {
-        where_parts.push("status != 'retired'".to_string());
+        where_parts.push("status NOT IN ('retired', 'deleted')".to_string());
     }
 
     if let Some(ref provider_id) = q.provider_id {
@@ -108,7 +108,7 @@ pub async fn monthly(
 
     let mut where_parts: Vec<String> = vec![
         "v.cost_monthly IS NOT NULL".to_string(),
-        "v.status != 'retired'".to_string(),
+        "v.status NOT IN ('retired', 'deleted')".to_string(),
     ];
     let mut bindings: Vec<QueryBinding> = Vec::new();
 

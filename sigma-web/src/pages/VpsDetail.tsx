@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Pencil, Trash2, Power, BarChart3, Network, Copy, Check, Shield } from 'lucide-react';
-import { useVps, useDeleteVps, useRetireVps, useAllocatePorts, useVpsIpHistory } from '@/hooks/useVps';
+import { Pencil, Trash2, Power, BarChart3, Network, Copy, Check, Shield, RotateCcw } from 'lucide-react';
+import { useVps, useDeleteVps, useRetireVps, useRestoreVps, useAllocatePorts, useVpsIpHistory } from '@/hooks/useVps';
 import { useProvider } from '@/hooks/useProviders';
 import { useCloudAccount } from '@/hooks/useCloudAccounts';
 import { useTickets } from '@/hooks/useTickets';
@@ -43,6 +43,7 @@ export default function VpsDetail() {
   const purposeLabel = purposesResult?.data.find(p => p.name === vps?.purpose)?.label;
   const deleteMutation = useDeleteVps();
   const retireMutation = useRetireVps();
+  const restoreMutation = useRestoreVps();
 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmRetire, setConfirmRetire] = useState(false);
@@ -108,8 +109,28 @@ export default function VpsDetail() {
   const agentOnline = hb ? Date.now() - new Date(hb).getTime() < 3 * 60 * 1000 : false;
   const si = vps.extra?.system_info as { cpu_cores?: number; ram_mb?: number; disk_gb?: number; disk_used_gb?: number; uptime_seconds?: number; load_avg?: number[]; metrics_port?: number } | undefined;
 
+  const isDeleted = vps.status === 'deleted';
+
   return (
     <div>
+      {/* Deleted banner */}
+      {isDeleted && (
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+          <p className="text-sm font-medium text-red-800">
+            This VPS has been deleted. You can restore it to bring it back as retired.
+          </p>
+          {canMutate && (
+            <button
+              onClick={() => restoreMutation.mutate(vps.id)}
+              disabled={restoreMutation.isPending}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50"
+            >
+              <RotateCcw size={14} /> {restoreMutation.isPending ? 'Restoring...' : 'Restore'}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -132,7 +153,7 @@ export default function VpsDetail() {
               <BarChart3 size={14} /> Grafana
             </a>
           )}
-          {canMutate && (
+          {canMutate && !isDeleted && (
             <>
               <Link
                 to={`/vps/${vps.id}/edit`}
@@ -681,7 +702,7 @@ export default function VpsDetail() {
       <ConfirmDialog
         open={confirmDelete}
         title="Delete VPS"
-        message="This will permanently delete this VPS record. This cannot be undone."
+        message="This will mark the VPS as deleted. You can restore it later from the Deleted filter."
         confirmLabel="Delete"
         variant="danger"
         onConfirm={handleDelete}
