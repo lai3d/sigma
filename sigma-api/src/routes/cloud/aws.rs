@@ -1,10 +1,9 @@
 use uuid::Uuid;
 
 use crate::errors::AppError;
-use crate::models::{CloudAccount, CloudSyncResult, IpEntry, Vps};
+use crate::models::{CloudAccount, CloudSyncResult, IpEntry};
 use crate::routes::AppState;
 
-use super::{find_vps_by_public_ip_overlap, merge_ip_labels_union};
 
 /// Validate AWS credentials by calling DescribeInstances with max_results=5.
 pub async fn validate(config: &serde_json::Value) -> Result<(), AppError> {
@@ -70,7 +69,7 @@ pub async fn sync(state: &AppState, account: &CloudAccount) -> Result<CloudSyncR
     let mut instances_found: i64 = 0;
     let mut created: i64 = 0;
     let mut updated: i64 = 0;
-    let mut merged: i64 = 0;
+    let merged: i64 = 0;
     let mut seen_instance_ids: Vec<String> = Vec::new();
 
     for region in &regions {
@@ -195,46 +194,6 @@ pub async fn sync(state: &AppState, account: &CloudAccount) -> Result<CloudSyncR
                         .execute(&state.db)
                         .await?;
                         updated += 1;
-                    } else if let Some((vps_id, _, existing_hostname)) =
-                        find_vps_by_public_ip_overlap(&state.db, &ips, None).await?
-                    {
-                        // Merge: matched by public IP overlap
-                        let existing_vps = sqlx::query_as::<_, Vps>(
-                            "SELECT * FROM vps WHERE id = $1",
-                        )
-                        .bind(vps_id)
-                        .fetch_one(&state.db)
-                        .await?;
-                        let merged_ips = merge_ip_labels_union(&ips, &existing_vps.ip_addresses.0);
-                        let merged_ip_json = serde_json::to_value(&merged_ips).unwrap_or_default();
-                        // Keep existing hostname if non-empty
-                        let effective_hostname = if existing_hostname.is_empty() {
-                            &hostname
-                        } else {
-                            &existing_hostname
-                        };
-                        sqlx::query(
-                            r#"UPDATE vps SET
-                                hostname = $2,
-                                ip_addresses = $3,
-                                status = $4,
-                                country = $5,
-                                provider_id = $6,
-                                cloud_account_id = $7,
-                                extra = extra || $8::jsonb
-                            WHERE id = $1"#,
-                        )
-                        .bind(vps_id)
-                        .bind(effective_hostname)
-                        .bind(&merged_ip_json)
-                        .bind(status)
-                        .bind(country)
-                        .bind(provider_id)
-                        .bind(account.id)
-                        .bind(&extra)
-                        .execute(&state.db)
-                        .await?;
-                        merged += 1;
                     } else {
                         // Create new VPS
                         sqlx::query(

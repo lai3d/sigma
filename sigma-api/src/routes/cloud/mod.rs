@@ -11,7 +11,6 @@ use axum::{
     routing::get,
     Extension, Json, Router,
 };
-use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::auth::{require_role, CurrentUser};
@@ -25,41 +24,6 @@ use crate::routes::audit_logs::log_audit;
 use crate::routes::AppState;
 
 const VALID_PROVIDER_TYPES: &[&str] = &["aws", "alibaba", "digitalocean", "linode", "volcengine"];
-
-/// Find an existing VPS by public IP overlap (fallback when cloud_instance_id / hostname miss).
-/// Returns (id, source, hostname) of the first non-retired VPS sharing a public IP.
-pub(crate) async fn find_vps_by_public_ip_overlap(
-    db: &PgPool,
-    ips: &[IpEntry],
-    exclude_id: Option<Uuid>,
-) -> Result<Option<(Uuid, String, String)>, AppError> {
-    let public_ips: Vec<&str> = ips
-        .iter()
-        .filter(|e| e.label != "internal")
-        .map(|e| e.ip.as_str())
-        .collect();
-    if public_ips.is_empty() {
-        return Ok(None);
-    }
-
-    let row: Option<(Uuid, String, String)> = sqlx::query_as(
-        r#"SELECT id, source, hostname FROM vps
-           WHERE status NOT IN ('retired', 'deleted')
-             AND ($2::uuid IS NULL OR id != $2)
-             AND EXISTS(
-               SELECT 1 FROM jsonb_array_elements(ip_addresses) AS e
-               WHERE e->>'label' != 'internal'
-                 AND e->>'ip' = ANY($1)
-             )
-           LIMIT 1"#,
-    )
-    .bind(&public_ips)
-    .bind(exclude_id)
-    .fetch_optional(db)
-    .await?;
-
-    Ok(row)
-}
 
 /// Union-merge two IP lists: existing labels preserved for overlapping IPs,
 /// all IPs from both sides kept.

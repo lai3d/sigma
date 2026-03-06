@@ -1,10 +1,9 @@
 use uuid::Uuid;
 
 use crate::errors::AppError;
-use crate::models::{CloudAccount, CloudSyncResult, IpEntry, Vps};
+use crate::models::{CloudAccount, CloudSyncResult, IpEntry};
 use crate::routes::AppState;
 
-use super::{find_vps_by_public_ip_overlap, merge_ip_labels_union};
 
 /// Validate Linode (Akamai) credentials by calling GET /v4/profile.
 pub async fn validate(
@@ -60,7 +59,7 @@ pub async fn sync(state: &AppState, account: &CloudAccount) -> Result<CloudSyncR
     let mut instances_found: i64 = 0;
     let mut created: i64 = 0;
     let mut updated: i64 = 0;
-    let mut merged: i64 = 0;
+    let merged: i64 = 0;
     let mut seen_instance_ids: Vec<String> = Vec::new();
 
     let mut page = 1u32;
@@ -200,51 +199,6 @@ pub async fn sync(state: &AppState, account: &CloudAccount) -> Result<CloudSyncR
                 .execute(&state.db)
                 .await?;
                 updated += 1;
-            } else if let Some((vps_id, _, existing_hostname)) =
-                find_vps_by_public_ip_overlap(&state.db, &ips, None).await?
-            {
-                let existing_vps = sqlx::query_as::<_, Vps>(
-                    "SELECT * FROM vps WHERE id = $1",
-                )
-                .bind(vps_id)
-                .fetch_one(&state.db)
-                .await?;
-                let merged_ips = merge_ip_labels_union(&ips, &existing_vps.ip_addresses.0);
-                let merged_ip_json = serde_json::to_value(&merged_ips).unwrap_or_default();
-                let effective_hostname = if existing_hostname.is_empty() {
-                    &hostname
-                } else {
-                    &existing_hostname
-                };
-                sqlx::query(
-                    r#"UPDATE vps SET
-                        hostname = $2,
-                        ip_addresses = $3,
-                        status = $4,
-                        country = $5,
-                        provider_id = $6,
-                        cloud_account_id = $7,
-                        cpu_cores = COALESCE($8, cpu_cores),
-                        ram_mb = COALESCE($9, ram_mb),
-                        disk_gb = COALESCE($10, disk_gb),
-                        currency = 'USD',
-                        extra = extra || $11::jsonb
-                    WHERE id = $1"#,
-                )
-                .bind(vps_id)
-                .bind(effective_hostname)
-                .bind(&merged_ip_json)
-                .bind(status)
-                .bind(country)
-                .bind(provider_id)
-                .bind(account.id)
-                .bind(vcpus)
-                .bind(memory_mb)
-                .bind(disk_gb)
-                .bind(&extra)
-                .execute(&state.db)
-                .await?;
-                merged += 1;
             } else {
                 sqlx::query(
                     r#"INSERT INTO vps (
