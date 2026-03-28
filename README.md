@@ -254,7 +254,7 @@ curl -X POST http://localhost:3000/api/api-keys \
 ## Documentation
 
 - [API Authentication & API Key Management (EN)](docs/api-authentication.en.md)
-- [API 认证与 API Key 管理 (ZH)](docs/api-authentication.zh.md)
+- [API Authentication & API Key Management (ZH)](docs/api-authentication.zh.md)
 - [Deployment Guide](DEPLOYMENT.md)
 
 ## Deployment
