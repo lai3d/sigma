@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
-use axum::{extract::State, routing::post, Json, Router};
+use axum::{extract::State, routing::post, Extension, Json, Router};
 
+use crate::auth::{require_role, CurrentUser};
 use crate::errors::{AppError, ErrorResponse};
 use crate::models::{AgentHeartbeat, AgentRegister, IpEntry, Vps};
 use crate::routes::AppState;
@@ -48,8 +49,10 @@ fn merge_ip_labels(agent_ips: &[IpEntry], existing_ips: &[IpEntry]) -> Vec<IpEnt
 )]
 pub async fn register(
     State(state): State<AppState>,
+    Extension(current): Extension<CurrentUser>,
     Json(input): Json<AgentRegister>,
 ) -> Result<Json<Vps>, AppError> {
+    require_role(&current, &["admin", "operator", "agent"])?;
     if input.hostname.trim().is_empty() {
         return Err(AppError::BadRequest("hostname is required".into()));
     }
@@ -176,8 +179,10 @@ pub async fn register(
 )]
 pub async fn heartbeat(
     State(state): State<AppState>,
+    Extension(current): Extension<CurrentUser>,
     Json(input): Json<AgentHeartbeat>,
 ) -> Result<Json<Vps>, AppError> {
+    require_role(&current, &["admin", "operator", "agent"])?;
     if input.hostname.trim().is_empty() {
         return Err(AppError::BadRequest("hostname is required".into()));
     }

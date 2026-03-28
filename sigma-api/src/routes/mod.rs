@@ -1,5 +1,6 @@
 pub mod agent;
 pub mod ansible;
+pub mod api_keys;
 pub mod audit_logs;
 pub mod auth_routes;
 pub mod cloud;
@@ -27,8 +28,9 @@ use axum::{
     response::Response,
 };
 
-use crate::auth::{verify_token, CurrentUser};
+use crate::auth::{hash_api_key, verify_token, CurrentUser};
 use crate::db::Db;
+use crate::models::ApiKey;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -66,25 +68,51 @@ pub async fn auth(
     }
 
     // 2. Try X-Api-Key
-    if let Some(ref expected) = state.api_key {
-        let provided = req
-            .headers()
-            .get("x-api-key")
-            .and_then(|v| v.to_str().ok());
+    if let Some(provided_key) = req.headers().get("x-api-key").and_then(|v| v.to_str().ok()) {
+        let key_hash = hash_api_key(provided_key);
 
-        match provided {
-            Some(key) if key == expected => {
+        // 2a. Check database for managed API keys
+        if let Ok(Some(api_key_row)) = sqlx::query_as::<_, ApiKey>(
+            "SELECT * FROM api_keys WHERE key_hash = $1",
+        )
+        .bind(&key_hash)
+        .fetch_optional(&state.db)
+        .await
+        {
+            // Fire-and-forget: update last_used_at
+            let db = state.db.clone();
+            let key_id = api_key_row.id;
+            tokio::spawn(async move {
+                let _ = sqlx::query("UPDATE api_keys SET last_used_at = now() WHERE id = $1")
+                    .bind(key_id)
+                    .execute(&db)
+                    .await;
+            });
+
+            req.extensions_mut().insert(CurrentUser {
+                id: api_key_row.id,
+                email: format!("api-key:{}", api_key_row.name),
+                role: api_key_row.role,
+                is_api_key: true,
+            });
+            return Ok(next.run(req).await);
+        }
+
+        // 2b. Legacy: check static API_KEY env var (backwards compat)
+        if let Some(ref expected) = state.api_key {
+            if provided_key == expected {
                 req.extensions_mut().insert(CurrentUser {
                     id: uuid::Uuid::nil(),
-                    email: "api-key".to_string(),
+                    email: "api-key:legacy".to_string(),
                     role: "admin".to_string(),
                     is_api_key: true,
                 });
                 return Ok(next.run(req).await);
             }
-            Some(_) => return Err(StatusCode::UNAUTHORIZED),
-            None => {}
         }
+
+        // Key was provided but matched nothing
+        return Err(StatusCode::UNAUTHORIZED);
     }
 
     // 3. If no API_KEY env is set, allow without auth (backwards compat)

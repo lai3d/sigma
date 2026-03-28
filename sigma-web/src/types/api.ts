@@ -29,7 +29,7 @@ export interface UpdateVpsPurpose {
 
 // ─── Auth & Users ────────────────────────────────────────
 
-export type UserRole = 'admin' | 'operator' | 'readonly';
+export type UserRole = 'admin' | 'operator' | 'readonly' | 'agent';
 
 export interface User {
   id: string;
@@ -649,4 +649,31 @@ export interface MergeVpsRequest {
 export interface MergeVpsResponse {
   merged_vps: Vps;
   deleted_id: string;
+}
+
+// ─── API Keys ────────────────────────────────────────────
+
+export interface ApiKeyResponse {
+  id: string;
+  name: string;
+  key_prefix: string;
+  role: UserRole;
+  created_by: string | null;
+  last_used_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApiKeyCreatedResponse {
+  id: string;
+  name: string;
+  key: string;
+  key_prefix: string;
+  role: UserRole;
+  created_at: string;
+}
+
+export interface CreateApiKey {
+  name: string;
+  role?: UserRole;
 }

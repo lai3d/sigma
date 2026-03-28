@@ -120,6 +120,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(routes::vps_duplicates::router())
         .merge(routes::vps_purposes::router())
         .merge(routes::ip_labels::router())
+        .merge(routes::api_keys::router())
         .merge(routes::settings::router())
         .layer(axum::middleware::from_fn_with_state(
             app_state.clone(),

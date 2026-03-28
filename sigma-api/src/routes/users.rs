@@ -21,9 +21,9 @@ pub fn router() -> Router<AppState> {
 
 fn validate_role(role: &str) -> Result<(), AppError> {
     match role {
-        "admin" | "operator" | "readonly" => Ok(()),
+        "admin" | "operator" | "readonly" | "agent" => Ok(()),
         _ => Err(AppError::BadRequest(
-            "role must be one of: admin, operator, readonly".into(),
+            "role must be one of: admin, operator, readonly, agent".into(),
         )),
     }
 }

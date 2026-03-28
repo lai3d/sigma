@@ -108,6 +108,7 @@ export default function UserFormDialog({ id, onClose }: Props) {
           <select {...register('role')} className="input w-full mt-1">
             <option value="readonly">Readonly</option>
             <option value="operator">Operator</option>
+            <option value="agent">Agent</option>
             <option value="admin">Admin</option>
           </select>
         </div>

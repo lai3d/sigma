@@ -5,6 +5,7 @@ use argon2::{
 use chrono::Utc;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use totp_rs::{Algorithm, Secret, TOTP};
 use uuid::Uuid;
 
@@ -78,7 +79,7 @@ pub fn verify_token(token: &str, secret: &str) -> Result<Claims, AppError> {
 }
 
 pub fn require_role(user: &CurrentUser, allowed: &[&str]) -> Result<(), AppError> {
-    if user.is_api_key || allowed.contains(&user.role.as_str()) {
+    if allowed.contains(&user.role.as_str()) {
         Ok(())
     } else {
         Err(AppError::Forbidden(format!(
@@ -87,6 +88,27 @@ pub fn require_role(user: &CurrentUser, allowed: &[&str]) -> Result<(), AppError
             allowed.join(", ")
         )))
     }
+}
+
+// ─── API Key helpers ─────────────────────────────────────
+
+/// Generate a new API key. Returns (plaintext_key, sha256_hash, prefix).
+pub fn generate_api_key() -> (String, String, String) {
+    use argon2::password_hash::rand_core::RngCore;
+    let mut bytes = [0u8; 20];
+    OsRng.fill_bytes(&mut bytes);
+    let random_hex = hex::encode(bytes);
+    let plaintext = format!("sk_sigma_{random_hex}");
+    let hash = hash_api_key(&plaintext);
+    let prefix = plaintext[..8].to_string();
+    (plaintext, hash, prefix)
+}
+
+/// SHA-256 hex digest of an API key for storage/lookup.
+pub fn hash_api_key(key: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(key.as_bytes());
+    hex::encode(hasher.finalize())
 }
 
 // ─── TOTP helpers ─────────────────────────────────────────
@@ -259,15 +281,35 @@ mod tests {
     }
 
     #[test]
-    fn test_require_role_api_key_bypass() {
-        let user = CurrentUser {
+    fn test_api_key_respects_role_check() {
+        let readonly_key = CurrentUser {
             id: Uuid::nil(),
-            email: "api-key".to_string(),
+            email: "api-key:test".to_string(),
+            role: "readonly".to_string(),
+            is_api_key: true,
+        };
+        // API keys are now subject to role checks
+        assert!(require_role(&readonly_key, &["admin", "operator"]).is_err());
+        assert!(require_role(&readonly_key, &["readonly"]).is_ok());
+
+        let admin_key = CurrentUser {
+            id: Uuid::nil(),
+            email: "api-key:admin".to_string(),
             role: "admin".to_string(),
             is_api_key: true,
         };
-        // Even if we check for a role that doesn't exist, API key bypasses
-        assert!(require_role(&user, &["nonexistent-role"]).is_ok());
+        assert!(require_role(&admin_key, &["admin"]).is_ok());
+    }
+
+    #[test]
+    fn test_generate_api_key() {
+        let (plaintext, hash, prefix) = generate_api_key();
+        assert!(plaintext.starts_with("sk_sigma_"));
+        assert_eq!(plaintext.len(), 9 + 40); // "sk_sigma_" + 40 hex chars
+        assert_eq!(hash.len(), 64); // SHA-256 hex
+        assert_eq!(prefix.len(), 8);
+        // Hash is deterministic
+        assert_eq!(hash, hash_api_key(&plaintext));
     }
 
     #[test]

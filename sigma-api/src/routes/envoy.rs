@@ -143,7 +143,7 @@ pub async fn create_node(
     Extension(user): Extension<CurrentUser>,
     Json(input): Json<CreateEnvoyNode>,
 ) -> Result<Json<EnvoyNode>, AppError> {
-    require_role(&user, &["admin", "operator"])?;
+    require_role(&user, &["admin", "operator", "agent"])?;
 
     // Validate vps_id exists
     sqlx::query_as::<_, (Uuid,)>("SELECT id FROM vps WHERE id = $1")
@@ -195,7 +195,7 @@ pub async fn update_node(
     Path(id): Path<Uuid>,
     Json(input): Json<UpdateEnvoyNode>,
 ) -> Result<Json<EnvoyNode>, AppError> {
-    require_role(&user, &["admin", "operator"])?;
+    require_role(&user, &["admin", "operator", "agent"])?;
 
     let existing = sqlx::query_as::<_, EnvoyNode>("SELECT * FROM envoy_nodes WHERE id = $1")
         .bind(id)
@@ -265,7 +265,7 @@ pub async fn delete_node(
     Extension(user): Extension<CurrentUser>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    require_role(&user, &["admin", "operator"])?;
+    require_role(&user, &["admin", "operator", "agent"])?;
 
     let result = sqlx::query("DELETE FROM envoy_nodes WHERE id = $1")
         .bind(id)
@@ -406,7 +406,7 @@ pub async fn create_route(
     Extension(user): Extension<CurrentUser>,
     Json(input): Json<CreateEnvoyRoute>,
 ) -> Result<Json<EnvoyRoute>, AppError> {
-    require_role(&user, &["admin", "operator"])?;
+    require_role(&user, &["admin", "operator", "agent"])?;
 
     // Validate envoy_node_id exists
     sqlx::query_as::<_, (Uuid,)>("SELECT id FROM envoy_nodes WHERE id = $1")
@@ -470,7 +470,7 @@ pub async fn update_route(
     Path(id): Path<Uuid>,
     Json(input): Json<UpdateEnvoyRoute>,
 ) -> Result<Json<EnvoyRoute>, AppError> {
-    require_role(&user, &["admin", "operator"])?;
+    require_role(&user, &["admin", "operator", "agent"])?;
 
     let existing = sqlx::query_as::<_, EnvoyRoute>("SELECT * FROM envoy_routes WHERE id = $1")
         .bind(id)
@@ -552,7 +552,7 @@ pub async fn delete_route(
     Extension(user): Extension<CurrentUser>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    require_role(&user, &["admin", "operator"])?;
+    require_role(&user, &["admin", "operator", "agent"])?;
 
     // Fetch the route to get the parent node ID before deletion
     let route = sqlx::query_as::<_, EnvoyRoute>("SELECT * FROM envoy_routes WHERE id = $1")
@@ -600,7 +600,7 @@ pub async fn batch_create_routes(
     Extension(user): Extension<CurrentUser>,
     Json(input): Json<BatchCreateEnvoyRoutes>,
 ) -> Result<Json<Vec<EnvoyRoute>>, AppError> {
-    require_role(&user, &["admin", "operator"])?;
+    require_role(&user, &["admin", "operator", "agent"])?;
 
     if input.routes.is_empty() {
         return Err(AppError::BadRequest("routes array must not be empty".into()));
@@ -689,7 +689,7 @@ pub async fn sync_static_routes(
     Extension(user): Extension<CurrentUser>,
     Json(input): Json<SyncStaticRoutes>,
 ) -> Result<Json<SyncStaticRoutesResponse>, AppError> {
-    require_role(&user, &["admin", "operator"])?;
+    require_role(&user, &["admin", "operator", "agent"])?;
 
     // Validate envoy_node_id exists
     sqlx::query_as::<_, (Uuid,)>("SELECT id FROM envoy_nodes WHERE id = $1")

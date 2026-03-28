@@ -40,7 +40,7 @@ The project uses a `Makefile` for common operations:
   - Uses `Axum` for web routing and `SQLx` for database interactions.
   - Migrations are located in `sigma-api/migrations` and are automatically run on startup.
   - OpenAPI documentation is generated via `utoipa` and available at `/swagger-ui`.
-  - Authentication is handled via `API_KEY` (X-Api-Key header) or JWT for users.
+  - Authentication is handled via multi-API-key management (`X-Api-Key` header, per-key roles stored in DB) or JWT for users. Legacy `API_KEY` env var supported as fallback.
 
 - **Frontend (TypeScript/React)**:
   - Uses `Tailwind CSS v4` for styling and `Lucide React` for icons.

@@ -1376,3 +1376,79 @@ pub struct MergeVpsResponse {
     pub merged_vps: Vps,
     pub deleted_id: Uuid,
 }
+
+// ─── API Keys ─────────────────────────────────────────────
+
+#[derive(Debug, sqlx::FromRow, Serialize)]
+pub struct ApiKey {
+    pub id: Uuid,
+    pub name: String,
+    #[serde(skip_serializing)]
+    pub key_hash: String,
+    pub key_prefix: String,
+    pub role: String,
+    pub created_by: Option<Uuid>,
+    pub last_used_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ApiKeyResponse {
+    pub id: Uuid,
+    pub name: String,
+    pub key_prefix: String,
+    pub role: String,
+    pub created_by: Option<Uuid>,
+    pub last_used_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<ApiKey> for ApiKeyResponse {
+    fn from(k: ApiKey) -> Self {
+        Self {
+            id: k.id,
+            name: k.name,
+            key_prefix: k.key_prefix,
+            role: k.role,
+            created_by: k.created_by,
+            last_used_at: k.last_used_at,
+            created_at: k.created_at,
+            updated_at: k.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ApiKeyCreatedResponse {
+    pub id: Uuid,
+    pub name: String,
+    pub key: String,
+    pub key_prefix: String,
+    pub role: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateApiKey {
+    pub name: String,
+    #[serde(default = "default_role")]
+    pub role: String,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct ApiKeyListQuery {
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_per_page")]
+    pub per_page: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct PaginatedApiKeyResponse {
+    pub data: Vec<ApiKeyResponse>,
+    pub total: i64,
+    pub page: i64,
+    pub per_page: i64,
+}

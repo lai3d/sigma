@@ -10,6 +10,7 @@ const ROLE_BADGE: Record<string, string> = {
   admin: 'bg-red-50 text-red-700',
   operator: 'bg-blue-50 text-blue-700',
   readonly: 'bg-gray-100 text-gray-600',
+  agent: 'bg-amber-50 text-amber-700',
 };
 
 export default function UserList() {

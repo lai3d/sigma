@@ -28,6 +28,7 @@ use crate::models::{
     VpsIpHistory, PaginatedVpsIpHistoryResponse,
     DnsRecordHistory, PaginatedDnsRecordHistoryResponse,
     IpLabel, CreateIpLabel, UpdateIpLabel, PaginatedIpLabelResponse,
+    ApiKeyResponse, ApiKeyCreatedResponse, CreateApiKey, PaginatedApiKeyResponse,
 };
 
 #[derive(OpenApi)]
@@ -154,6 +155,11 @@ use crate::models::{
         crate::routes::vps_purposes::create,
         crate::routes::vps_purposes::update,
         crate::routes::vps_purposes::delete,
+        // API Keys
+        crate::routes::api_keys::list,
+        crate::routes::api_keys::get_one,
+        crate::routes::api_keys::create,
+        crate::routes::api_keys::delete,
     ),
     components(schemas(
         ErrorResponse,
@@ -190,6 +196,7 @@ use crate::models::{
         VpsIpHistory, PaginatedVpsIpHistoryResponse,
         IpLabel, CreateIpLabel, UpdateIpLabel, PaginatedIpLabelResponse,
         SystemSetting,
+        ApiKeyResponse, ApiKeyCreatedResponse, CreateApiKey, PaginatedApiKeyResponse,
     )),
     tags(
         (name = "Auth", description = "Authentication and session management"),
@@ -210,6 +217,7 @@ use crate::models::{
         (name = "VPS Purposes", description = "VPS purpose type management"),
         (name = "IP Labels", description = "IP address label management"),
         (name = "Settings", description = "System-wide runtime settings"),
+        (name = "API Keys", description = "API key management (admin only)"),
     )
 )]
 pub struct ApiDoc;

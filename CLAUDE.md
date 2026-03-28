@@ -27,7 +27,7 @@ sigma/
 - **PostgreSQL** — leverages JSONB, TEXT[], GIN indexes for IP and tag queries
 - **No ORM magic** — raw SQL via sqlx::query_as for full control and transparency
 - **Runtime migrations** — using `sqlx::migrate::Migrator::new()` instead of compile-time `migrate!()` macro
-- **JWT + API key dual auth** — email/password login with JWT (Bearer token), plus legacy API key (`X-Api-Key`) for CLI/agent. Three roles: admin, operator, readonly
+- **JWT + API key dual auth** — email/password login with JWT (Bearer token), plus multi-API-key management (`X-Api-Key`) with per-key roles. Four roles: admin, operator, agent, readonly
 - **Prometheus file_sd integration** — core integration point with Thanos/Prometheus/Grafana stack
 - **Docker Compose (dev)** → **Kubernetes (production)**
 
@@ -42,6 +42,7 @@ sigma/
 - **dns_accounts** — DNS provider accounts (Cloudflare, Route 53, GoDaddy, Name.com) with `provider_type` and JSONB `config`
 - **dns_zones** — synced DNS zones per account, with domain/cert expiry tracking
 - **dns_records** — synced DNS records with auto VPS-IP linking and provider-specific `extra` JSONB
+- **api_keys** — multi-API-key management with per-key roles (admin/operator/readonly), SHA-256 hashed keys, `last_used_at` tracking, admin-only CRUD
 
 ### VPS fields of note:
 - `ip_addresses` — JSONB array of `{ip, label}` objects. Labels: `china-telecom`, `china-unicom`, `china-mobile`, `china-cernet`, `overseas`, `internal`, `anycast`
@@ -63,6 +64,7 @@ sigma/
 - [x] Dashboard stats: `GET /api/stats`
 - [x] Port allocation proxy: `POST /api/vps/{id}/allocate-ports` (forwards to agent)
 - [x] IP change history: `GET /api/vps/{id}/ip-history` (auto-tracked via PostgreSQL trigger on `ip_addresses` column)
+- [x] Multi-API-key management: `GET/POST /api/api-keys`, `GET/DELETE /api/api-keys/{id}` (per-key roles, SHA-256 hashed, admin-only CRUD, DB lookup in auth middleware with legacy env var fallback)
 - [x] Dockerfile (multi-stage, rust:latest → debian:bookworm-slim)
 
 ### Frontend (sigma-web) — Done:
@@ -74,6 +76,7 @@ sigma/
 - [x] Settings page (API key config in localStorage)
 - [x] Layout with sidebar navigation
 - [x] Audit log page: filterable table (resource/action), expandable JSON details, admin-only
+- [x] API Keys management page: create with one-time key display + copy, list with role badges, delete with confirmation, admin-only
 - [x] Dockerfile (Node 20 → nginx:alpine, API reverse proxy)
 
 ### Deployment — Done:
@@ -142,8 +145,21 @@ sigma/
 - IP addresses stored as JSONB `[{ip, label}]`, validated server-side via `std::net::IpAddr`
 - Partial updates: PUT endpoints fetch existing record, merge with provided fields
 - Frontend: React Query hooks in `src/hooks/`, API layer in `src/api/`, types in `src/types/api.ts`
-- Auth: JWT in localStorage (`sigma_token`), AuthContext provides `useAuth()` hook, ProtectedRoute component for route guarding
-- RBAC: mutating handlers require `admin` or `operator` role; user management requires `admin`; read endpoints open to all authenticated users
+- Auth: JWT in localStorage (`sigma_token`), AuthContext provides `useAuth()` hook, ProtectedRoute component for route guarding. API keys via `X-Api-Key` header — DB-managed keys checked first (SHA-256 hash lookup), legacy `API_KEY` env var as fallback
+- RBAC: four roles with descending privilege. API keys respect role checks (no bypass)
+
+### RBAC Role Matrix
+
+| Scope | admin | operator | agent | readonly |
+|-------|:-----:|:--------:|:-----:|:--------:|
+| All GET endpoints (read) | ✓ | ✓ | ✓ | ✓ |
+| VPS / Provider / DNS / Cloud CRUD | ✓ | ✓ | — | — |
+| Tickets / IP Checks / Costs / Import | ✓ | ✓ | — | — |
+| `POST /agent/register`, `/agent/heartbeat` | ✓ | ✓ | ✓ | — |
+| Envoy nodes & routes write (8 endpoints) | ✓ | ✓ | ✓ | — |
+| User management (`/api/users`) | ✓ | — | — | — |
+| API key management (`/api/api-keys`) | ✓ | — | — | — |
+| Audit logs, system settings | ✓ | — | — | — |
 
 ## Build & Run
 

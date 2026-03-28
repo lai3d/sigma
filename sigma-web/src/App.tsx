@@ -22,6 +22,7 @@ import DomainsPage from '@/pages/DomainsPage';
 import DnsZoneDetail from '@/pages/DnsZoneDetail';
 import CloudAccountsPage from '@/pages/CloudAccountsPage';
 import VpsDuplicatesPage from '@/pages/VpsDuplicatesPage';
+import ApiKeyList from '@/pages/ApiKeyList';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -63,6 +64,9 @@ export default function App() {
               <Route path="/cloud-accounts" element={<CloudAccountsPage />} />
               <Route path="/users" element={
                 <ProtectedRoute requiredRole="admin"><UserList /></ProtectedRoute>
+              } />
+              <Route path="/api-keys" element={
+                <ProtectedRoute requiredRole="admin"><ApiKeyList /></ProtectedRoute>
               } />
               <Route path="/audit-log" element={
                 <ProtectedRoute requiredRole="admin"><AuditLogList /></ProtectedRoute>

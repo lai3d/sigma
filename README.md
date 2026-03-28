@@ -73,7 +73,7 @@ make test-api      # Health check API
 
 ### Authentication
 
-Set `API_KEY` env var to enable. Pass via `X-Api-Key` header. If unset, auth is disabled.
+Two auth methods: JWT (email/password login, `Authorization: Bearer <token>`) or API Key (`X-Api-Key` header). API keys are managed via `/api/api-keys` (admin only) — each key has its own role (admin/operator/agent/readonly). The `agent` role restricts access to `/agent/*` and `/envoy-*` endpoints only. Legacy `API_KEY` env var still works as fallback (admin role).
 
 ### Endpoints
 
@@ -88,6 +88,8 @@ Set `API_KEY` env var to enable. Pass via `X-Api-Key` header. If unset, auth is 
 | GET | `/api/prometheus/targets` | Prometheus file_sd JSON |
 | POST | `/api/agent/register` | Agent self-registration |
 | POST | `/api/agent/heartbeat` | Agent heartbeat with system info |
+| GET/POST | `/api/api-keys` | List / Create API key (admin) |
+| GET/DELETE | `/api/api-keys/{id}` | Get / Delete API key (admin) |
 
 ### VPS Filters (query params)
 
