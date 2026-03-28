@@ -12,6 +12,61 @@ Lightweight VPS fleet management platform for high-turnover VPN infrastructure. 
 - **Dashboard** — Stats cards, charts by country/status/provider, expiring VPS alerts
 - **Web UI** — Full CRUD for providers and VPS, settings page, responsive sidebar layout
 
+## Architecture
+
+```mermaid
+graph TB
+    subgraph "Central Platform (Kubernetes)"
+        Web["sigma-web<br/><i>React + Nginx</i>"]
+        API["sigma-api<br/><i>Rust + Axum</i>"]
+        PG[("PostgreSQL 16")]
+        Redis[("Redis")]
+        Web -->|reverse proxy| API
+        API --> PG
+        API --> Redis
+    end
+
+    subgraph "Monitoring Stack"
+        Prom["Prometheus / Thanos"]
+        Grafana["Grafana"]
+        API -->|"/api/prometheus/targets<br/>file_sd"| Prom
+        Prom --> Grafana
+    end
+
+    subgraph "VPS Fleet (dozens of providers)"
+        Agent1["sigma-agent<br/><i>VPS-1</i>"]
+        Agent2["sigma-agent<br/><i>VPS-2</i>"]
+        AgentN["sigma-agent<br/><i>VPS-N</i>"]
+        Agent1 -->|register / heartbeat<br/>envoy sync| API
+        Agent2 --> API
+        AgentN --> API
+        Prom -.->|scrape node_exporter| Agent1
+        Prom -.->|scrape| Agent2
+        Prom -.->|scrape| AgentN
+    end
+
+    subgraph "China Probes"
+        Probe["sigma-probe<br/><i>ICMP/TCP/HTTP</i>"]
+        Probe -->|"/api/ip-checks"| API
+    end
+
+    subgraph "Users"
+        Browser["Browser"]
+        CLI["sigma-cli"]
+        Browser --> Web
+        CLI -->|"X-Api-Key / JWT"| API
+    end
+
+    subgraph "External Integrations"
+        Cloud["Cloud APIs<br/><i>AWS, Alibaba, DO,<br/>Linode, Volcengine</i>"]
+        DNS["DNS APIs<br/><i>Cloudflare, Route53,<br/>GoDaddy, Name.com</i>"]
+        Telegram["Telegram Bot"]
+        API -->|sync instances| Cloud
+        API -->|sync zones/records| DNS
+        API -->|expiry alerts| Telegram
+    end
+```
+
 ## Tech Stack
 
 | Layer | Stack |
