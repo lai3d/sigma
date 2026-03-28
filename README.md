@@ -1,5 +1,7 @@
 # Σ Sigma
 
+[中文版](README.zh.md)
+
 Lightweight VPS fleet management platform for high-turnover VPN infrastructure. Track instances across dozens of small cloud providers, manage IP addresses with carrier labels, and integrate with Prometheus/Grafana for monitoring.
 
 ## Architecture
