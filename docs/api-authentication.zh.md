@@ -80,7 +80,7 @@ curl -X POST https://api.example.com/api/api-keys \
 }
 ```
 
-> **重要���** 完整的 key（`sk_sigma_...`）仅在创建时返回一次。请立即复制并安全保存，之后无法再次查看。
+> **重要：** 完整的 key（`sk_sigma_...`）仅在创建时返回一次。请立即复制并安全保存，之后无法再次查看。
 
 或通过 Web UI：**侧边栏 > API Keys > Create Key**
 
@@ -158,22 +158,22 @@ SIGMA_API_KEY=sk_sigma_...
 **为什么每个 agent 要独立的 key？**
 
 - **爆炸半径** — 如果某台 VPS 被入侵，只需吊销该 key，不影响其他 agent
-- **最小权限** — `agent` 角色只能注册、心跳和管理 Envoy 配置，无法修改 VPS 记录、Provider、用户等���何其他资源
+- **最小权限** — `agent` 角色只能注册、心跳和管理 Envoy 配置，无法修改 VPS 记录、Provider、用户等任何其他资源
 - **审计追踪** — 每个 API key 有独立的 UUID，审计日志能精确显示是哪个 agent 执行了什么操作
 - **监控** — 每个 key 的 `last_used_at` 字段可以检测不活跃或异常的 agent
 
 ## 旧版 API Key（`API_KEY` 环境变量）
 
-为了向后兼容，API 仍然支持通过 `API_KEY` 环境变量设置的单���静态 key。该 key 始终获得 `admin` 角色。
+为了向后兼容，API 仍然支持通过 `API_KEY` 环境变量设置的单一静态 key。该 key 始终获得 `admin` 角色。
 
-这是过渡方案。新部署建���使用 `/api/api-keys` 管理的数据库 API key。
+这是过渡方案。新部署建议使用 `/api/api-keys` 管理的数据库 API key。
 
 ## 认证优先级
 
 当请求到达时，认证中间件按以下顺序检查：
 
 1. `Authorization: Bearer <token>` — JWT
-2. `X-Api-Key: <key>` — 数据库管���的 key（SHA-256 哈希查找）
+2. `X-Api-Key: <key>` — 数据库管理的 key（SHA-256 哈希查找）
 3. `X-Api-Key: <key>` — 旧版 `API_KEY` 环境变量兜底
 4. 未设置 `API_KEY` 环境变量 — 匿名访问，admin 角色（仅开发环境，不推荐）
 5. 以上都不匹配 — `401 Unauthorized`
