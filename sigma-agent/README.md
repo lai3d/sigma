@@ -31,6 +31,8 @@ Config via environment variables or CLI flags (flags override env):
 | `AGENT_INTERVAL` | `--interval` | `60` | Heartbeat interval (seconds) |
 | `AGENT_HOSTNAME` | `--hostname` | auto-detect | Override system hostname |
 | `AGENT_SSH_PORT` | `--ssh-port` | `22` | SSH port to report |
+| `AGENT_MCP_ENABLED` | `--mcp-enabled` | `false` | Enable MCP (LLM tool) server |
+| `AGENT_MCP_BIND` | `--mcp-bind` | `127.0.0.1:9103` | MCP listen address (host:port) |
 
 ## Usage
 
@@ -100,6 +102,52 @@ sigma-agent xDS gRPC server → pushes DiscoveryResponse → Envoy
 ```
 
 Each `envoy_route` generates one **Cluster** (CDS) + one **Listener** (LDS) for Layer 4 TCP proxy. Multiple Envoy instances with different `node.id` values can connect to the same agent simultaneously.
+
+## MCP Tool Surface (LLM-callable control plane)
+
+When `--mcp-enabled` is set, the agent runs a [Model Context Protocol](https://modelcontextprotocol.io) server at `POST /mcp` (JSON-RPC 2.0). This exposes agent capabilities as **tools that an external LLM can call** — e.g., an SRE assistant in `sigma-api` invoking `query_ebpf_traffic` during incident triage, or an automation calling `allocate_ports` when provisioning new Envoy routes.
+
+**Design contract — keep the agent lean.** The MCP server is intentionally light: no LLM, no persistent state, no extra background loops. Each tool wraps data already collected by `port_scan`, `ebpf_traffic`, or `xds`, or proxies a single call to `sigma-api`. Idle resource cost is effectively a listening socket; per-call CPU is bounded by the underlying capability. This keeps the agent within its budget (<1% CPU, <50MB RSS) on 1 vCPU VPS instances. The "AI brain" lives in `sigma-api`, not here.
+
+**Security default — localhost-only.** Binds to `127.0.0.1:9103` by default. Override to `0.0.0.0:9103` (or another address) only behind a network policy.
+
+### Tools
+
+| Tool | Arguments | Returns |
+|------|-----------|---------|
+| `query_metrics` | none | Host system info + port-scan snapshot |
+| `query_ebpf_traffic` | `process?` | Per-process TCP/UDP/RTT/drops/DNS/exec/OOM stats |
+| `allocate_ports` | `count` (1-1000) | N free ports from scan range (real-time bind tests) |
+| `query_envoy_routes` | `source?` (dynamic/static/all) | Envoy routes for this VPS via sigma-api |
+| `query_dns_leaks` | `min_queries?` (default 1) | Processes sending UDP to port 53 |
+
+Tools that depend on capabilities (port scan, eBPF, registration) return a structured `isError` or `enabled=false` payload when their dependency is not configured — they do not break the MCP session.
+
+### Example: list tools
+
+```bash
+curl -s -X POST http://127.0.0.1:9103/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+### Example: call query_metrics
+
+```bash
+curl -s -X POST http://127.0.0.1:9103/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call",
+       "params":{"name":"query_metrics","arguments":{}}}'
+```
+
+### Methods implemented
+
+- `initialize` — protocol handshake (returns server info + capabilities)
+- `tools/list` — enumerate tools with JSON schemas
+- `tools/call` — invoke a tool by name with arguments
+- `notifications/initialized` — acknowledged (no-op)
+
+Unknown methods return JSON-RPC error `-32601` (method not found). Unknown tools return an MCP-shaped `isError: true` payload.
 
 ## Comparison with Istio Agent
 

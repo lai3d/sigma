@@ -1672,7 +1672,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "sigma-agent"
-version = "0.1.0"
+version = "3.1.0"
 dependencies = [
  "anyhow",
  "axum 0.8.8",
@@ -1688,7 +1688,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "sigma-agent-ebpf-common",
  "tempfile",
  "tokio",
  "tokio-stream",
@@ -1698,10 +1697,6 @@ dependencies = [
  "uuid",
  "xds-api",
 ]
-
-[[package]]
-name = "sigma-agent-ebpf-common"
-version = "0.1.0"
 
 [[package]]
 name = "signal-hook-registry"

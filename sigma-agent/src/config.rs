@@ -86,6 +86,14 @@ pub struct Config {
     /// eBPF traffic BPF map max entries (number of unique PIDs tracked)
     #[arg(long, env = "AGENT_EBPF_TRAFFIC_MAX_ENTRIES", default_value = "8192")]
     pub ebpf_traffic_max_entries: u32,
+
+    /// Enable MCP (Model Context Protocol) server — exposes agent capabilities as LLM-callable tools
+    #[arg(long, env = "AGENT_MCP_ENABLED", default_value = "false")]
+    pub mcp_enabled: bool,
+
+    /// MCP server bind address (host:port). Defaults to 127.0.0.1 — override to 0.0.0.0 only with a network policy.
+    #[arg(long, env = "AGENT_MCP_BIND", default_value = "127.0.0.1:9103")]
+    pub mcp_bind: String,
 }
 
 impl Config {

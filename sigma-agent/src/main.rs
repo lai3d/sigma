@@ -3,6 +3,7 @@ mod config;
 #[cfg(feature = "ebpf-traffic")]
 mod ebpf_traffic;
 mod envoy_config;
+mod mcp;
 mod metrics;
 mod models;
 mod port_scan;
@@ -193,6 +194,27 @@ async fn main() -> Result<()> {
                 });
             }
         }
+    }
+
+    // Conditionally start MCP server (LLM-callable tool surface)
+    if config.mcp_enabled {
+        let state = Arc::new(mcp::McpState {
+            scan_result: scan_result.clone(),
+            hostname: hostname.clone(),
+            port_range,
+            client: client.clone(),
+            vps_id,
+            metrics_port: config.metrics_port,
+            public_ip: public_ip.clone(),
+            agent_version: env!("CARGO_PKG_VERSION"),
+            #[cfg(feature = "ebpf-traffic")]
+            traffic_stats: traffic_stats.clone(),
+        });
+        let bind = config.mcp_bind.clone();
+        info!(bind = %bind, "MCP server enabled");
+        tokio::spawn(async move {
+            mcp::serve_mcp(bind, state).await;
+        });
     }
 
     // Heartbeat loop
